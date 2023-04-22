@@ -44,91 +44,6 @@ namespace SpaceCG.ModbusExtension
         /// </summary>
         private ConcurrentQueue<ModbusMethod> MethodQueues = new ConcurrentQueue<ModbusMethod>();
 
-#if false
-        /// <summary>
-        /// 分割寄存器地址集
-        /// </summary>
-        /// <param name="addresses"></param>
-        /// <returns></returns>
-        public static Dictionary<ushort, ushort> SplitAddresses(IReadOnlyDictionary<ushort, Register> registers)
-        {
-            Dictionary<ushort, ushort> result = new Dictionary<ushort, ushort>();
-            if (registers?.Count <= 0) return result;
-
-            var addresses = registers.Keys.ToArray();
-            Array.Sort(addresses);
-           
-            ushort i = 0;
-            ushort startAddress = addresses[i];
-            ushort numberOfPoints = registers[startAddress].Count;
-            ushort nextAddress = (ushort)(startAddress + numberOfPoints);
-
-            while (i < addresses.Length)
-            {
-                i++;
-
-                if (addresses.Contains(nextAddress))
-                {
-                    numberOfPoints += registers[nextAddress].Count;
-                    nextAddress += registers[nextAddress].Count;
-                }
-                else
-                {
-                    result.Add(startAddress, numberOfPoints);
-                    Console.WriteLine($"{startAddress},{numberOfPoints}");
-
-                    if (i >= addresses.Length) break;
-
-                    startAddress = addresses[i];
-                    numberOfPoints = registers[startAddress].Count;
-                    nextAddress = (ushort)(startAddress + numberOfPoints);
-                }
-            }
-
-            return result;
-        }
-#endif
-
-#if false
-        /// <summary>
-        /// 读取数字输入状态信号
-        /// </summary>
-        /// <param name="device"></param>
-        /// <returns></returns>
-        protected bool ReadCoilStatus(ModbusDevice device)
-        {
-            if (device?.CoilStatus.Count <= 0) return false;
-
-            Dictionary<ushort, ushort> split =  SplitAddresses(device.CoilStatus);
-
-            foreach(var t in split)
-            {
-                bool[] result = null;
-
-                try
-                {
-                    result = Master.ReadInputs(device.Address, t.Key, t.Value);
-                }
-                catch(Exception ex)
-                {
-                    Log.Error(ex);
-                    Thread.Sleep(4);
-                    continue;
-                }
-
-                if (result == null) continue;
-
-                int i = 0;
-                for (ushort address = t.Key; address < t.Key + t.Value; address ++,i++)
-                {
-                    device.UpdateCoilStatus(address, result[i]);
-                }
-            }
-
-
-            return true;
-        }
-#endif
 
         /// <summary>
         /// 翻转单个线圈
@@ -315,13 +230,13 @@ namespace SpaceCG.ModbusExtension
         }
 
         /// <summary>
-        /// 暂时同步输入
+        /// 禁用输入同步
         /// </summary>
-        /// <param name="address"></param>
+        /// <param name="slaveAddress"></param>
         /// <param name="inter_ms"></param>
-        public void PauseInputSync(byte address, int inter_ms)
+        public void DisableInputSync(byte slaveAddress, int disable_ms)
         {
-            ModbusIODevice device = GetDevice(address);
+            ModbusIODevice device = GetDevice(slaveAddress);
             if (device == null) return;
 
             //Thread.Sleep(200);

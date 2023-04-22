@@ -236,15 +236,15 @@ namespace SpaceCG.ModbusExtension
         /// <summary>
         /// 离散输入，数据类型为 bool 类型，RO-ReadOnly
         /// </summary>
-        internal ConcurrentDictionary<ushort, bool> DiscreteInputs { get; private set; } = new ConcurrentDictionary<ushort, bool>(2, 16);
+        private ConcurrentDictionary<ushort, bool> DiscreteInputs { get; set; } = new ConcurrentDictionary<ushort, bool>(2, 16);
         /// <summary>
         /// 保持寄存器，数据类型为 ushort 类型，RW-ReadyWrite
         /// </summary>
-        internal ConcurrentDictionary<ushort, ushort> HoldingRegisters { get; private set; } = new ConcurrentDictionary<ushort, ushort>(2, 16);
+        private ConcurrentDictionary<ushort, ushort> HoldingRegisters { get; set; } = new ConcurrentDictionary<ushort, ushort>(2, 16);
         /// <summary>
         /// 输入寄存器，数据类型为 ushort 类型，RO-ReadOnly
         /// </summary>
-        internal ConcurrentDictionary<ushort, ushort> InputRegisters { get; private set; } = new ConcurrentDictionary<ushort, ushort>(2, 16);
+        private ConcurrentDictionary<ushort, ushort> InputRegisters { get; set; } = new ConcurrentDictionary<ushort, ushort>(2, 16);
 
         private Dictionary<ushort, ushort> CoilsStatusAddresses = new Dictionary<ushort, ushort>();
         private Dictionary<ushort, ushort> DiscreteInputsAddresses = new Dictionary<ushort, ushort>();
@@ -383,7 +383,6 @@ namespace SpaceCG.ModbusExtension
 
             return true;
         }
-
         /// <summary>
         /// 移除寄存器对象
         /// </summary>
@@ -413,10 +412,8 @@ namespace SpaceCG.ModbusExtension
             {
                 for (address = startAddress; address < startAddress + values.Length; address++, i++)
                 {
-                    if (CoilsStatus.ContainsKey(address))
-                    {
-                        CoilsStatus[address] = values[i];
-                    }
+                    if (CoilsStatus.ContainsKey(address)) CoilsStatus[address] = values[i];
+#if false
                     else
                     {
                         if (CoilsStatus.TryAdd(address, values[i]))
@@ -425,16 +422,15 @@ namespace SpaceCG.ModbusExtension
                             CoilsStatusAddresses = SpliteAddresses(CoilsStatus.Keys.ToArray());
                         }
                     }
+#endif
                 }
             }
             else if (type == RegisterType.DiscreteInput)
             {
                 for (address = startAddress; address < startAddress + values.Length; address++, i++)
                 {
-                    if (DiscreteInputs.ContainsKey(address))
-                    {
-                        DiscreteInputs[address] = values[i];
-                    }
+                    if (DiscreteInputs.ContainsKey(address)) DiscreteInputs[address] = values[i];
+#if fasle
                     else
                     {
                         if (DiscreteInputs.TryAdd(address, values[i]))
@@ -443,6 +439,7 @@ namespace SpaceCG.ModbusExtension
                             DiscreteInputsAddresses = SpliteAddresses(DiscreteInputs.Keys.ToArray());
                         }
                     }
+#endif
                 }
             }
         }
@@ -459,10 +456,8 @@ namespace SpaceCG.ModbusExtension
             {
                 for (address = startAddress; address < startAddress + values.Length; address++, i++)
                 {
-                    if (HoldingRegisters.ContainsKey(address))
-                    {
-                        HoldingRegisters[address] = values[i];
-                    }
+                    if (HoldingRegisters.ContainsKey(address)) HoldingRegisters[address] = values[i];
+#if false
                     else
                     {
                         if (HoldingRegisters.TryAdd(address, values[i]))
@@ -471,16 +466,15 @@ namespace SpaceCG.ModbusExtension
                             HoldingRegistersAddresses = SpliteAddresses(HoldingRegisters.Keys.ToArray());
                         }
                     }
+#endif
                 }
             }
             else if (type == RegisterType.InputRegister)
             {
                 for (address = startAddress; address < startAddress + values.Length; address++, i++)
                 {
-                    if (InputRegisters.ContainsKey(address))
-                    {
-                        InputRegisters[address] = values[i];
-                    }
+                    if (InputRegisters.ContainsKey(address)) InputRegisters[address] = values[i];
+#if false
                     else
                     {
                         if (InputRegisters.TryAdd(address, values[i]))
@@ -489,25 +483,9 @@ namespace SpaceCG.ModbusExtension
                             InputRegistersAddresses = SpliteAddresses(InputRegisters.Keys.ToArray());
                         }
                     }
+#endif
                 }
             }
-        }
-        /// <summary>
-        /// 清除所有寄存器
-        /// </summary>
-        public void ClearAllRegisters()
-        {
-            CoilsStatus.Clear();
-            DiscreteInputs.Clear();
-            HoldingRegisters.Clear();
-            InputRegisters.Clear();
-
-            RegisterDescriptions.Clear();
-
-            CoilsStatusAddresses.Clear();
-            DiscreteInputsAddresses.Clear();
-            HoldingRegistersAddresses.Clear();
-            InputRegistersAddresses.Clear();
         }
 
         /// <summary>
@@ -515,7 +493,7 @@ namespace SpaceCG.ModbusExtension
         /// </summary>
         /// <param name="description"></param>
         /// <returns></returns>
-        public ulong GetRegistersValue(Register description)
+        public ulong GetRegistersValues(Register description)
         {
             ulong value = 0;
 
@@ -544,19 +522,36 @@ namespace SpaceCG.ModbusExtension
         /// <param name="address"></param>
         /// <param name="type"></param>
         /// <returns></returns>
-        public ulong GetRegistersValue(ushort address, RegisterType type)
+        public ulong GetRegistersValues(ushort address, RegisterType type)
         {
             ulong value = 0;
             var regDes = from des in RegisterDescriptions
                          where des.Address == address && des.Type == type
                          select des;
 
-            if(regDes?.Count() == 1)
-                value = GetRegistersValue(regDes.First());
+            if (regDes?.Count() == 1)
+                value = GetRegistersValues(regDes.First());
 
             return value;
         }
 
+        /// <summary>
+        /// 清除所有寄存器
+        /// </summary>
+        public void ClearAllRegisters()
+        {
+            CoilsStatus.Clear();
+            DiscreteInputs.Clear();
+            HoldingRegisters.Clear();
+            InputRegisters.Clear();
+
+            RegisterDescriptions.Clear();
+
+            CoilsStatusAddresses.Clear();
+            DiscreteInputsAddresses.Clear();
+            HoldingRegistersAddresses.Clear();
+            InputRegistersAddresses.Clear();
+        }
         #endregion
 
         /// <summary>
@@ -565,39 +560,12 @@ namespace SpaceCG.ModbusExtension
         /// </summary>
         public void InitializeDevice()
         {
-            foreach (var kv in CoilsStatus)
-            {
-                CoilsStatus[kv.Key] = default;
-                //AddRegisters(kv.Key, RegisterType.CoilStatus);
-            }
-            foreach (var kv in DiscreteInputs)
-            {
-                DiscreteInputs[kv.Key] = default;
-                //AddRegisters(kv.Key, RegisterType.DiscreteInput);
-            }
-            foreach (var kv in HoldingRegisters)
-            {
-                HoldingRegisters[kv.Key] = default;
-                //AddRegisters(kv.Key, RegisterType.HoldingRegister);
-            }
-            foreach (var kv in InputRegisters)
-            {
-                InputRegisters[kv.Key] = default;
-                //AddRegisters(kv.Key, RegisterType.InputRegister);
-            }
+            foreach (var kv in CoilsStatus) CoilsStatus[kv.Key] = default;
+            foreach (var kv in DiscreteInputs) DiscreteInputs[kv.Key] = default;
+            foreach (var kv in HoldingRegisters) HoldingRegisters[kv.Key] = default;
+            foreach (var kv in InputRegisters) InputRegisters[kv.Key] = default;
 
-            foreach (var des in RegisterDescriptions)
-            {
-                des.Value = ulong.MaxValue;
-
-                if ((des.Type == RegisterType.CoilsStatus && !CoilsStatus.ContainsKey(des.Address)) ||
-                   (des.Type == RegisterType.DiscreteInput && !DiscreteInputs.ContainsKey(des.Address)) ||
-                   (des.Type == RegisterType.HoldingRegister && !HoldingRegisters.ContainsKey(des.Address)) ||
-                   (des.Type == RegisterType.InputRegister && !InputRegisters.ContainsKey(des.Address)))
-                {
-                    RegisterDescriptions.Remove(des);
-                }
-            }
+            foreach (var des in RegisterDescriptions) des.Value = ulong.MaxValue;
 
             CoilsStatusAddresses = SpliteAddresses(CoilsStatus.Keys.ToArray());
             DiscreteInputsAddresses = SpliteAddresses(DiscreteInputs.Keys.ToArray());
@@ -697,81 +665,69 @@ namespace SpaceCG.ModbusExtension
         {
             for(int i = 0; i < RegisterDescriptions.Count; i ++)
             {
-                Register des = RegisterDescriptions[i];
-                if(des.Type == RegisterType.CoilsStatus && CoilsStatus.Count > 0)
+                Register register = RegisterDescriptions[i];
+                if(register.Type == RegisterType.CoilsStatus && CoilsStatus.Count > 0)
                 {
-                    ulong value = (ulong)(CoilsStatus[des.Address] ? 1 : 0);
-                    if(des.Value == ulong.MaxValue)// && des.LastValue ==  ulong.MaxValue)
+                    ulong value = (ulong)(CoilsStatus[register.Address] ? 1 : 0);
+                    if(register.Value == ulong.MaxValue)
                     {
-                        des.Value = value;
-                        //des.LastValue = value;
+                        register.Value = value;
                         continue;
                     }
 
-                    if(des.Value != value)
+                    if(register.Value != value)
                     {
-                        //change event ???
-                        ulong lastValue = des.Value;
-                        des.Value = value;
-                        OutputChangeHandler?.Invoke(Address, des.Address, value, lastValue);
-                        //des.LastValue = des.Value;
+                        ulong lastValue = register.Value;
+                        register.Value = value;
+                        OutputChangeHandler?.Invoke(Address, register.Address, value, lastValue);
                     }
                 }
-                else if(des.Type == RegisterType.DiscreteInput && DiscreteInputs.Count > 0)
+                else if(register.Type == RegisterType.DiscreteInput && DiscreteInputs.Count > 0)
                 {
-                    ulong value = (ulong)(DiscreteInputs[des.Address] ? 1 : 0);
-                    if (des.Value == ulong.MaxValue)// && des.LastValue == ulong.MaxValue)
+                    ulong value = (ulong)(DiscreteInputs[register.Address] ? 1 : 0);
+                    if (register.Value == ulong.MaxValue)
                     {
-                        des.Value = value;
-                        //des.LastValue = value;
+                        register.Value = value;
                         continue;
                     }
 
-                    if (des.Value != value)
+                    if (register.Value != value)
                     {
-                        //change event ???
-                        ulong lastValue = des.Value;
-                        des.Value = value;
-                        InputChangeHandler?.Invoke(Address, des.Address, value, lastValue);
-                        //des.LastValue = des.Value;
+                        ulong lastValue = register.Value;
+                        register.Value = value;
+                        InputChangeHandler?.Invoke(Address, register.Address, value, lastValue);
                     }
                 }
-                else if(des.Type == RegisterType.HoldingRegister && HoldingRegisters.Count > 0)
+                else if(register.Type == RegisterType.HoldingRegister && HoldingRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(HoldingRegisters, des);
-                    if (des.Value == ulong.MaxValue)// && des.LastValue == ulong.MaxValue)
+                    ulong value = GetRegisterValue(HoldingRegisters, register);
+                    if (register.Value == ulong.MaxValue)
                     {
-                        des.Value = value;
-                        //des.LastValue = value;
+                        register.Value = value;
                         continue;
                     }
 
-                    if (des.Value != value)
+                    if (register.Value != value)
                     {
-                        //change event ???
-                        ulong lastValue = des.Value;
-                        des.Value = value;
-                        OutputChangeHandler?.Invoke(Address, des.Address, value, lastValue);
-                        //des.LastValue = des.Value;
+                        ulong lastValue = register.Value;
+                        register.Value = value;
+                        OutputChangeHandler?.Invoke(Address, register.Address, value, lastValue);
                     }
                 }
-                else if(des.Type == RegisterType.InputRegister && InputRegisters.Count > 0)
+                else if(register.Type == RegisterType.InputRegister && InputRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(InputRegisters, des);
-                    if (des.Value == ulong.MaxValue)// && des.LastValue == ulong.MaxValue)
+                    ulong value = GetRegisterValue(InputRegisters, register);
+                    if (register.Value == ulong.MaxValue)
                     {
-                        des.Value = value;
-                        //des.LastValue = value;
+                        register.Value = value;
                         continue;
                     }
 
-                    if (des.Value != value)
+                    if (register.Value != value)
                     {
-                        //change event ???
-                        ulong lastValue = des.Value;
-                        des.Value = value;
-                        InputChangeHandler?.Invoke(Address, des.Address, value, lastValue);
-                        //des.LastValue = des.Value;
+                        ulong lastValue = register.Value;
+                        register.Value = value;
+                        InputChangeHandler?.Invoke(Address, register.Address, value, lastValue);
                     }
                 }
             }
@@ -780,6 +736,8 @@ namespace SpaceCG.ModbusExtension
         /// <inheritdoc/>
         public void Dispose()
         {
+            ClearAllRegisters();
+
             ReadCoilsStatus = null;
             ReadHoldingRegisters = null;
             ReadDiscreteInputs = null;
@@ -787,8 +745,6 @@ namespace SpaceCG.ModbusExtension
 
             InputChangeHandler = null;
             OutputChangeHandler = null;
-
-            ClearAllRegisters();
         }
         /// <inheritdoc/>
         public override string ToString()
