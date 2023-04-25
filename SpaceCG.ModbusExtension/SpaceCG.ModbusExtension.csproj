@@ -37,6 +37,9 @@
     <Reference Include="NModbus4, Version=2.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\NModbus4.2.1.0\lib\net40\NModbus4.dll</HintPath>
     </Reference>
+    <Reference Include="SpaceCG.Generic">
+      <HintPath>..\..\..\005_Projects\2021_LEDs Interactive Display\LedControlSystem\LCMS_Modules\SpaceCG.Generic\bin\Release\SpaceCG.Generic.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -47,16 +50,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="InstanceExtension.cs" />
     <Compile Include="ModbusIODevice.cs" />
     <Compile Include="ModbusDeviceManager.cs" />
     <Compile Include="ModbusTransportDevice.cs" />
     <Compile Include="ModbusTransportDevice_Master.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="StringExtension.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="ModbusDevices.Config" />
+    <None Include="ModbusDevices.Config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

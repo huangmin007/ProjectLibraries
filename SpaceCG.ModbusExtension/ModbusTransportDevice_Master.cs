@@ -53,7 +53,7 @@ namespace SpaceCG.ModbusExtension
         /// <param name="value"></param>
         public void TurnSingleCoil(byte slaveAddress, ushort coilAddress)
         {
-            ModbusIODevice device = GetDevice(slaveAddress);
+            ModbusIODevice device = GetIODevice(slaveAddress);
             if (device == null) return;
             if (!device.CoilsStatus.ContainsKey(coilAddress)) return;
 
@@ -69,7 +69,7 @@ namespace SpaceCG.ModbusExtension
         /// <param name="count"></param>
         public void TurnMultipleCoils(byte slaveAddress, ushort startAddress, byte count)
         {
-            ModbusIODevice device = GetDevice(slaveAddress);
+            ModbusIODevice device = GetIODevice(slaveAddress);
             if (device == null) return;
 
             ushort address = startAddress;
@@ -93,7 +93,7 @@ namespace SpaceCG.ModbusExtension
         /// <param name="addresses"></param>
         public void TurnMultipleCoils(byte slaveAddress, ushort[] addresses)
         {
-            ModbusIODevice device = GetDevice(slaveAddress);
+            ModbusIODevice device = GetIODevice(slaveAddress);
             if (device == null) return;
 
             ushort minAddress = addresses.Min();
@@ -157,7 +157,7 @@ namespace SpaceCG.ModbusExtension
         /// <param name="data"></param>
         public void WriteMultipleCoils(byte slaveAddress, ushort[] addresses, bool[] data)
         {
-            ModbusIODevice device = GetDevice(slaveAddress);
+            ModbusIODevice device = GetIODevice(slaveAddress);
             if (device == null) return;
             if (addresses.Length != data.Length) return;
 
@@ -236,7 +236,7 @@ namespace SpaceCG.ModbusExtension
         /// <param name="inter_ms"></param>
         public void DisableInputSync(byte slaveAddress, int disable_ms)
         {
-            ModbusIODevice device = GetDevice(slaveAddress);
+            ModbusIODevice device = GetIODevice(slaveAddress);
             if (device == null) return;
 
             //Thread.Sleep(200);
@@ -271,7 +271,7 @@ namespace SpaceCG.ModbusExtension
                 return;
             }
 
-            ModbusIODevice device = GetDevice(method.SlaveAddress);
+            ModbusIODevice device = GetIODevice(method.SlaveAddress);
             if (device == null) return;
 
             try
@@ -281,25 +281,25 @@ namespace SpaceCG.ModbusExtension
                     case "WriteSingleCoil":
                         bool bool_value = (bool)method.Value;
                         Master.WriteSingleCoil(method.SlaveAddress, method.StartAddress, bool_value);
-                        device.UpdateRegisters(method.StartAddress, RegisterType.CoilsStatus, new bool[] { bool_value });
+                        device.UpdateRegisterValues(method.StartAddress, RegisterType.CoilsStatus, new bool[] { bool_value });
                         break;
 
                     case "WriteMultipleCoils":
                         bool[] bool_values = (bool[])method.Value;
                         Master.WriteMultipleCoils(method.SlaveAddress, method.StartAddress, bool_values);
-                        device.UpdateRegisters(method.StartAddress, RegisterType.CoilsStatus, bool_values);
+                        device.UpdateRegisterValues(method.StartAddress, RegisterType.CoilsStatus, bool_values);
                         break;
 
                     case "WriteSingleRegister":
                         ushort ushort_value = (ushort)method.Value;
                         Master.WriteSingleRegister(method.SlaveAddress, method.StartAddress, ushort_value);
-                        device.UpdateRegisters(method.StartAddress, RegisterType.HoldingRegister, new ushort[] { ushort_value });
+                        device.UpdateRegisterValues(method.StartAddress, RegisterType.HoldingRegister, new ushort[] { ushort_value });
                         break;
 
                     case "WriteMultipleRegisters":
                         ushort[] ushort_values = (ushort[])method.Value;
                         Master.WriteMultipleRegisters(method.SlaveAddress, method.StartAddress, ushort_values);
-                        device.UpdateRegisters(method.StartAddress, RegisterType.HoldingRegister, ushort_values);
+                        device.UpdateRegisterValues(method.StartAddress, RegisterType.HoldingRegister, ushort_values);
                         break;
                 }
             }
@@ -309,6 +309,7 @@ namespace SpaceCG.ModbusExtension
                 Log.Error(ex);
                 Thread.Sleep(300);
             }
+
         }
     }
 }
