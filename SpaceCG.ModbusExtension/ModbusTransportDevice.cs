@@ -182,6 +182,7 @@ namespace SpaceCG.ModbusExtension
             if (!IOThreadRunning) return;
 
             IOThreadRunning = false;
+            ElapsedMilliseconds = 0;
             SyncTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
             while (MethodQueues.TryDequeue(out ModbusMethod result))
@@ -202,7 +203,7 @@ namespace SpaceCG.ModbusExtension
             ICollection<ModbusIODevice> devices = transport.ModbusDevices.Values;
             foreach(ModbusIODevice device in devices)
             {
-                device.SyncRegisterDescriptionStatus();
+                device.SyncRegisterChangeEvents();
             }
         }
         /// <summary>
@@ -245,7 +246,7 @@ namespace SpaceCG.ModbusExtension
 
             if (element.Name != "Modbus" || !element.HasElements ||
                 String.IsNullOrWhiteSpace(element.Attribute("Name").Value) ||
-                String.IsNullOrWhiteSpace(element.Attribute("ConnectionParams")?.Value))
+                String.IsNullOrWhiteSpace(element.Attribute("Parameters")?.Value))
             {
                 Log.Warn($"({nameof(ModbusTransportDevice)}) 配置格式存在错误, {element}");
                 return false;
@@ -253,7 +254,7 @@ namespace SpaceCG.ModbusExtension
 
             int portORbaudRate = 0;
             Modbus.Device.IModbusMaster master;
-            String[] connectArgs = element.Attribute("ConnectionParams").Value.Split(',');
+            String[] connectArgs = element.Attribute("Parameters").Value.Split(',');
             
             if (connectArgs.Length == 3 && int.TryParse(connectArgs[2], out portORbaudRate))
             {
@@ -261,7 +262,7 @@ namespace SpaceCG.ModbusExtension
             }
             else
             {
-                Log.Warn($"({nameof(ModbusTransportDevice)}) 配置格式存在错误, {element} 节点属性 ConnectionParams 值错误");
+                Log.Warn($"({nameof(ModbusTransportDevice)}) 配置格式存在错误, {element} 节点属性 Parameters 值错误");
                 return false;
             }
 
@@ -290,13 +291,19 @@ namespace SpaceCG.ModbusExtension
         /// <inheritdoc/>
         public void Dispose()
         {
-            foreach (var kv in ModbusDevices)
+            foreach (KeyValuePair<byte, ModbusIODevice> kv in ModbusDevices)
                 kv.Value.Dispose();
 
             StopTransport();
-
             SyncTimer.Dispose();
             ModbusDevices.Clear();
+
+            ModbusDevices = null;
+            InputChangeEvent = null;
+            OutputChangeEvent = null;
+
+            if (Master != null) Master.Dispose();
+            Master = null;
         }
         /// <inheritdoc/>
         public override string ToString()

@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using SpaceCG.Generic;
-using SpaceCG.Module;
 
 namespace SpaceCG.ModbusExtension
 {
@@ -29,18 +28,17 @@ namespace SpaceCG.ModbusExtension
         /// Root Config Items 
         /// </summary>
         private XElement Configuration { get; set; } = null;
-
-        private IEnumerable<XElement> EventElements { get; set; } = null;
+        private IEnumerable<XElement> ModbusElements { get; set; } = null;
 
         /// <summary>
         /// Transport Devices 列表
         /// </summary>
-        internal List<ModbusTransportDevice> TransportDevices { get; private set; } = new List<ModbusTransportDevice>(8);
+        private List<ModbusTransportDevice> TransportDevices = new List<ModbusTransportDevice>(8);
 
         /// <summary>
         /// 可通过反射技术访问的对象列表
         /// </summary>
-        public ConcurrentDictionary<String, IDisposable> AccessObjects { get; private set; } = new ConcurrentDictionary<String, IDisposable>();
+        private ConcurrentDictionary<String, IDisposable> AccessObjects = new ConcurrentDictionary<String, IDisposable>();
 
         /// <summary>
         /// Modbus 设备管理对象
@@ -49,9 +47,24 @@ namespace SpaceCG.ModbusExtension
         public ModbusDeviceManager(String accessName = nameof(ModbusDeviceManager))
         {
             this.Name = accessName;
+        }
 
-            if (!String.IsNullOrWhiteSpace(Name))
-                AddAccessObject(Name, this);
+        /// <summary>
+        /// 添加可访问对象
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        public bool AddAccessObject(string name, IDisposable obj)
+        {
+            if (String.IsNullOrWhiteSpace(name) || obj == null) return false;
+
+            if (AccessObjects.ContainsKey(name))
+            {
+                Log.Warn($"添加可访问对象 {name}:{obj} 失败");
+                return false;
+            }
+            return AccessObjects.TryAdd(name, obj);
         }
 
         /// <summary>
@@ -80,7 +93,6 @@ namespace SpaceCG.ModbusExtension
             return null;
         }
 
-
         /// <summary>
         /// 加载设备配置文件
         /// </summary>
@@ -92,35 +104,34 @@ namespace SpaceCG.ModbusExtension
                 Log.Error($"指定的配置文件不存在 {configFile}, 禁用 Modbus Device Manager 模块.");
                 return;
             }
-#if false
-            //Reset Clear Handler
-            foreach (var modbus in TransportDevices)
-            {
-                if (AccessObjects.ContainsKey(modbus.Name))
-                    AccessObjects[modbus.Name] = modbus.Master;
-                else
-                    AccessObjects.TryAdd(modbus.Name, modbus.Master);
 
-                modbus.StopTransport();
-            }
-            TransportDevices.Clear();
-#endif
+            ResetAndClear();
+
+
             Configuration = XElement.Load(configFile);
+            ParseConnectionsConfig(Configuration.Descendants("Connection"));
 
-            IEnumerable<XElement> ConnectElements = Configuration.Element("Connections")?.Elements("Connection");
+            ModbusElements = Configuration.Elements("Modbus");
+            ParseModbusDevicesConfig(ModbusElements);
 
-            ParseModbusDevicesConfig(Configuration.Elements("Modbus"));
-
+            if (!String.IsNullOrWhiteSpace(Name)) AddAccessObject(Name, this);
         }
-
+        /// <summary>
+        /// 解析 Connections 节点配置
+        /// </summary>
+        /// <param name="connectionsElement"></param>
         private void ParseConnectionsConfig(IEnumerable<XElement> connectionsElement)
         {
+            if (connectionsElement?.Count() <= 0) return;
 
         }
-
+        /// <summary>
+        /// 解析 Modbus 节点配置
+        /// </summary>
+        /// <param name="modbusElements"></param>
         private void ParseModbusDevicesConfig(IEnumerable<XElement> modbusElements)
         {
-            if (modbusElements?.Count() == null) return;
+            if (modbusElements?.Count() <= 0) return;
 
             foreach(XElement modbusElement in modbusElements)
             {
@@ -138,48 +149,93 @@ namespace SpaceCG.ModbusExtension
                 }
             }
         }
-
+        /// <summary>
+        /// 总线 Input 事件处理
+        /// </summary>
+        /// <param name="transportDevice"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="register"></param>
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, byte slaveAddress, Register register)
         {
-            Console.WriteLine(register);
-            if (register.Type == RegisterType.CoilsStatus || register.Type == RegisterType.DiscreteInput)
-                Console.WriteLine($"OutputChange {transportDevice} slaveAddress:{slaveAddress}, registerAddress:{register.Address}, newValue:{Convert.ToString((int)register.Value, 2)}, oldValue:{register.LastValue}");
+            InputOutputEventHandler(transportDevice.Name, "OutputChange", slaveAddress, register);
         }
-
+        /// <summary>
+        /// 总线 Output 事件处理
+        /// </summary>
+        /// <param name="transportDevice"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="register"></param>
         private void Transport_InputChangeEvent(ModbusTransportDevice transportDevice, byte slaveAddress, Register register)
         {
-            Console.WriteLine(register);
-            Console.WriteLine($"InputChange {transportDevice} slaveAddress:{slaveAddress}, registerAddress:{register.Address}, newValue:{Convert.ToString((int)register.Value, 2)}, oldValue:{register.LastValue}");
+            InputOutputEventHandler(transportDevice.Name, "InputChange", slaveAddress, register);
         }
-
-
-
 
         /// <summary>
-        /// 添加可访问对象
+        /// 总线输入输出事件处理
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="obj"></param>
-        /// <returns></returns>
-        public bool AddAccessObject(string name, IDisposable obj)
+        /// <param name="transportName"></param>
+        /// <param name="eventType"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="register"></param>
+        internal void InputOutputEventHandler(String transportName, string eventType, byte slaveAddress, Register register)
         {
-            if (String.IsNullOrWhiteSpace(name) || obj == null) return false;
+            if (ModbusElements?.Count() <= 0) return;
 
-            if (AccessObjects.ContainsKey(name))
+            Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+
+            foreach (XElement modbus in ModbusElements)
             {
-                Log.Warn($"添加可访问对象 {name}:{obj} 失败");
-                return false;
+                if (modbus.Attribute("Name")?.Value != transportName) continue;
+
+                IEnumerable<XElement> events = modbus.Descendants("Event");
+                foreach (XElement evt in events)
+                {
+                    if (evt.Attribute("Type")?.Value != eventType) continue;
+
+                    if (!StringExtension.TryParse(evt.Attribute("DeivceAddress")?.Value, out byte deviceAddress)) continue;
+                    if (deviceAddress != slaveAddress) continue;
+                    
+                    if (!StringExtension.TryParse(evt.Attribute($"{register.Type}Address")?.Value, out ushort regAddress)) continue;
+                    if (regAddress != register.Address) continue;
+                    
+                    if (StringExtension.TryParse(evt.Attribute("Value")?.Value, out ulong regValue) && regValue == register.Value)
+                    {
+                        IEnumerable<XElement> actions = evt.Elements("Action");
+                        foreach (XElement action in actions) CallActionElement(action);
+                        continue;
+                    }
+                    else if(StringExtension.TryParse(evt.Attribute("MinValue")?.Value, out ulong minValue) && StringExtension.TryParse(evt.Attribute("MaxValue")?.Value, out ulong maxValue))
+                    {
+                        if(maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && register.LastValue < minValue)
+                        {
+                            Console.WriteLine("MIN-MAX");
+                        }
+                    }
+                }
             }
-            return AccessObjects.TryAdd(name, obj);
         }
 
-        internal void InputOutputChange(String transportName, string eventName, byte slaveAddress, ushort registerAddress, ushort value)
+        /// <summary>
+        /// 调用配置事件，外部调用
+        /// </summary>
+        /// <param name="transportName"></param>
+        /// <param name="eventId"></param>
+        public void CallEventElement(String transportName, int eventId)
         {
-            if (EventElements?.Count() <= 0) return;
+            foreach (XElement modbus in ModbusElements)
+            {
+                if (modbus.Attribute("Name")?.Value != transportName) continue;
 
-            var events = from evt in EventElements
-                         where evt.Attribute("Name")?.Value == eventName && evt.Attribute("SlaveAddress")?.Value == slaveAddress.ToString()
-                         select evt;
+                IEnumerable<XElement> events = modbus.Descendants("Event");
+                foreach (XElement evt in events)
+                {
+                    if (StringExtension.TryParse(evt.Attribute($"ID")?.Value, out int id) && eventId == id)
+                    {
+                        IEnumerable<XElement> actions = evt.Elements("Action");
+                        foreach (XElement action in actions) CallActionElement(action);
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -230,49 +286,62 @@ namespace SpaceCG.ModbusExtension
         internal void CallActionElement(XElement action)
         {
             if (action == null || action.Name != "Action") return;
-            if (action?.Attribute("TargetKey") == null || action?.Attribute("Method") == null) return;
+            if (String.IsNullOrWhiteSpace(action.Attribute("TargetName")?.Value) ||
+                String.IsNullOrWhiteSpace(action.Attribute("Method")?.Value)) return;
 
-            if (action.Attribute("TargetKey").Value == "Thread" && action.Attribute("Method").Value == "Sleep")
-            {
-                if (int.TryParse(action.Attribute("Params").Value, out int millisecondsTimeout))
-                {
-                    Thread.Sleep(millisecondsTimeout);
-                    return;
-                }
-            }
+            String key = action.Attribute("TargetName").Value;
+            String methodName = action.Attribute("Method").Value;
 
-            String objKey = action.Attribute("TargetKey")?.Value;
-            if (!AccessObjects.TryGetValue(objKey, out IDisposable targetObj))
+            if (!AccessObjects.TryGetValue(key, out IDisposable targetObj))
             {
-                Log.Warn($"未找到时目标对象实例 {objKey} ");
-                return;
-            }
-
-            //Method
-            String methodName = action.Attribute("Method")?.Value;
-            if (String.IsNullOrWhiteSpace(methodName))
-            {
-                if (Log.IsDebugEnabled) Log.Debug($"目标对象实例 {objKey}, 的方法名不能为空");
+                Log.Warn($"未找到时目标对象实例 {key} ");
                 return;
             }
 
             Task.Run(() =>
             {
-                //object[] objs = StringExtension.ConvertParameters(action.Attribute("Params").Value);
-                //foreach (object obj in objs) Console.WriteLine($"{obj.GetType()},{obj}");
-                //StringExtension.ConvertParameters(action.Attribute("Params").Value);
-
-                if (!String.IsNullOrWhiteSpace(action.Attribute("Params")?.Value))
-                    InstanceExtension.CallInstanceMethod(targetObj, methodName, StringExtension.ConvertParameters(action.Attribute("Params").Value));
-                else
-                    InstanceExtension.CallInstanceMethod(targetObj, methodName);
+                InstanceExtension.CallInstanceMethod(targetObj, methodName, StringExtension.ConvertParameters(action.Attribute("Params").Value));
             });
+        }
+
+        /// <summary>
+        /// Reset And Clear
+        /// </summary>
+        private void ResetAndClear()
+        {
+            foreach (ModbusTransportDevice transport in TransportDevices)
+            {
+                transport.StopTransport();
+                Thread.Sleep(32);
+            }
+            foreach (KeyValuePair<String, IDisposable> obj in AccessObjects)
+            {
+                if (obj.Key == this.Name || obj.Value == this) continue;
+                try
+                {
+                    obj.Value.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn(ex);
+                    continue;
+                }
+            }
+
+            AccessObjects.Clear();
+            TransportDevices.Clear();
+
+            Configuration = null;
+            ModbusElements = null;
         }
 
         /// <inheritdoc/>
         public void Dispose()
         {
+            ResetAndClear();
 
+            AccessObjects = null;
+            TransportDevices = null;
         }
         /// <inheritdoc/>
         public override string ToString()

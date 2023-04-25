@@ -14,7 +14,7 @@ namespace SpaceCG.ModbusExtension
     internal class ModbusMethod
     {
         public String Name;
-        public byte FuncCode;
+        //public byte FuncCode;
         public byte SlaveAddress;
         public ushort StartAddress;
         public object Value;
@@ -214,7 +214,7 @@ namespace SpaceCG.ModbusExtension
         }
 
         /// <summary>
-        /// 等待间隔时间
+        /// 总线 IO 中断阻塞时间
         /// </summary>
         /// <param name="millisecondsTimeout"></param>
         public void Sleep(int millisecondsTimeout)
@@ -230,30 +230,61 @@ namespace SpaceCG.ModbusExtension
         }
 
         /// <summary>
-        /// 禁用输入同步
+        /// 禁用指定的的寄存器 IO 事件同步
         /// </summary>
         /// <param name="slaveAddress"></param>
-        /// <param name="inter_ms"></param>
-        public void DisableInputSync(byte slaveAddress, int disable_ms)
+        /// <param name="registerAddress">寄存器地址，-1 表示当前 IO 设备的所有寄存器 </param>
+        /// <param name="type"></param>
+        /// <param name="timeout">超时恢复，大于 0 时，表示会自动恢复启用 IO 事件同步；-1 表示一直禁用</param>
+        public void DisableIOEventSync(byte slaveAddress, int registerAddress = -1, RegisterType type = RegisterType.DiscreteInput, int timeout = -1)
         {
             ModbusIODevice device = GetIODevice(slaveAddress);
             if (device == null) return;
 
-            //Thread.Sleep(200);
-            //bool lastStatus = device.EnabledInputRead;
-            //device.EnabledInputRead = !device.EnabledInputRead;
-
-            //if (Log.IsDebugEnabled)
-            //    Log.Debug($"InterruptInput({address}, {inter_ms}), {device.EnabledInputRead}, {lastStatus}");
-
-            Task.Run(() =>
+            if (registerAddress <= -1)
             {
-                //Thread.Sleep(inter_ms);
-                //device.EnabledInputRead = lastStatus;
+                Register[] registers = device.GetRegisters();
+                foreach (var register in registers)
+                    register.EnabledChangeEvent = false;
+            }
+            else
+            {
+                Register register = device.GetRegister((ushort)registerAddress, type);
+                if (register != null) register.EnabledChangeEvent = false;
+            }
 
-                //if (Log.IsDebugEnabled)
-                //    Log.Debug($"InterruptInput({address}, {inter_ms}), {device.EnabledInputRead}, {lastStatus}");
-            });
+            //自动复位
+            if (timeout > 0)
+            {
+                Task.Run(() =>
+                {
+                    Thread.Sleep(timeout);
+                    EnabledIOEventSync(slaveAddress, registerAddress, type);
+                });
+            }
+        }
+        /// <summary>
+        /// 允许指定的寄存器 IO 事件同步
+        /// </summary>
+        /// <param name="slaveAddress"></param>
+        /// <param name="registerAddress"></param>
+        /// <param name="type"></param>
+        public void EnabledIOEventSync(byte slaveAddress, int registerAddress = -1, RegisterType type = RegisterType.DiscreteInput)
+        {
+            ModbusIODevice device = GetIODevice(slaveAddress);
+            if (device == null) return;
+
+            if (registerAddress <= -1)
+            {
+                Register[] registers = device.GetRegisters();
+                foreach (var register in registers)
+                    register.EnabledChangeEvent = true;
+            }
+            else
+            {
+                Register register = device.GetRegister((ushort)registerAddress, type);
+                if (register != null) register.EnabledChangeEvent = true;
+            }
         }
 
         /// <summary>
@@ -262,9 +293,8 @@ namespace SpaceCG.ModbusExtension
         private void SyncOutputMethodQueues()
         {
             if (MethodQueues.Count() <= 0 || !IOThreadRunning || Master == null) return;
+            if (!MethodQueues.TryDequeue(out ModbusMethod method)) return;
 
-            ModbusMethod method;
-            if (!MethodQueues.TryDequeue(out method)) return;
             if (method.Name == "Sleep")
             {
                 if ((int)method.Value > 0) Thread.Sleep((int)method.Value);

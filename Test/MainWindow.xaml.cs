@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -83,6 +84,13 @@ namespace Test
             transport.InputChangeEvent += Transport_InputChangeEvent;
             transport.OutputChangeEvent += Transport_OutputChangeEvent;
 #endif
+            //String str = "0xAA";
+            //bool result = byte.TryParse(str, NumberStyles.AllowHexSpecifier | NumberStyles.HexNumber, null, out byte value);
+            //Console.WriteLine($"resul: {result} , {value}");
+
+            
+            String registerAddress = $"{RegisterType.CoilsStatus}Address";
+            Console.WriteLine(registerAddress);
 
             deviceManager = new ModbusDeviceManager();
             deviceManager.LoadDeviceConfig("ModbusDevices.Config");
@@ -126,20 +134,21 @@ namespace Test
             Button button = (Button)sender;
             if(button == Button_Test1)
             {
-                transport.TurnSingleCoil(device.Address, 0);
+                deviceManager.LoadDeviceConfig("ModbusDevices.Config");
+                //transport.TurnSingleCoil(device.Address, 0);
                 //transport.WriteSingleCoil(device.Address, 0, true);
             }
             else if(button == Button_Test2)
             {
-                transport.TurnSingleCoil(device.Address, 1);
+                //transport.TurnSingleCoil(device.Address, 1);
             }
             else if(button == Button_Start)
             {
-                transport.StartTransport();
+                //transport.StartTransport();
             }
             else if(button == Button_Stop)
             {
-                transport.StopTransport();
+                //transport.StopTransport();
             }
         }
     }

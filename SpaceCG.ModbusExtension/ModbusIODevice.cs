@@ -57,7 +57,6 @@ namespace SpaceCG.ModbusExtension
         /// </summary>
         public ushort Address { get; internal set; } = 0x0000;
         
-
         /// <summary>
         /// 寄存器类型
         /// </summary>
@@ -99,6 +98,11 @@ namespace SpaceCG.ModbusExtension
         /// 字节顺序(Endianness)，低地址数据在后，高地址数据在前
         /// </summary>
         public bool IsLittleEndian { get; set; } = true;
+
+        /// <summary>
+        /// 允许 IO Change 事件
+        /// </summary>
+        public bool EnabledChangeEvent { get; set; } = true;
 
         /// <summary>
         /// 64位 寄存器的最新数据
@@ -149,13 +153,14 @@ namespace SpaceCG.ModbusExtension
         /// <param name="name"></param>
         /// <param name="units"></param>
         /// <returns></returns>
-        public static Register Create(ushort address, RegisterType type, byte count = 1, bool isLittleEndian = true, byte offset = 0, string name = null, string units = null)
+        public static Register Create(ushort address, RegisterType type, byte count = 1, bool isLittleEndian = true, byte offset = 0, string name = null, string units = null, bool enabledChangeEvent = true)
         {
             Register register = new Register(address, type, count);
             register.Name = name;
             register.Units = units;
             register.Offset = offset;
             register.IsLittleEndian = isLittleEndian;
+            register.EnabledChangeEvent = enabledChangeEvent;
 
             return register;
         }
@@ -176,8 +181,7 @@ namespace SpaceCG.ModbusExtension
                 return false;
             }
 
-            ushort address = 0;
-            if (StringExtension.ToNumber<ushort>(element.Attribute("Address")?.Value, ref address) &&
+            if (StringExtension.TryParse<ushort>(element.Attribute("Address")?.Value, out ushort address) &&
                 Enum.TryParse<RegisterType>(element.Attribute("Type")?.Value, true, out RegisterType type) && type != RegisterType.Unknown)
             {
                 bool result = byte.TryParse(element.Attribute("Count")?.Value, out byte count);
@@ -193,6 +197,7 @@ namespace SpaceCG.ModbusExtension
             register.Units = element.Attribute("Units")?.Value;
             register.Offset = byte.TryParse(element.Attribute("Offset")?.Value, out byte offset) ? offset : (byte)0x00;
             register.IsLittleEndian = bool.TryParse(element.Attribute("IsLittleEndian")?.Value, out bool isLittleEndian) ? isLittleEndian : true;
+            register.EnabledChangeEvent = bool.TryParse(element.Attribute("EnabledChangeEvent")?.Value, out bool enabledChangeEvent) ? enabledChangeEvent : true;
 
             return true;
         }
@@ -535,7 +540,7 @@ namespace SpaceCG.ModbusExtension
         /// <summary>
         /// 获取所有寄存器对象
         /// </summary>
-        public Register[] GetRegisters => RegistersDescription.ToArray();
+        public Register[] GetRegisters() => RegistersDescription.ToArray();
 
         /// <summary>
         /// 获取寄存器的值
@@ -773,11 +778,13 @@ namespace SpaceCG.ModbusExtension
         /// 同步寄存器描述数据，会产生 Input/Output Change 事件
         /// <para>需要在线程中实时或间隔时间调用</para>
         /// </summary>
-        internal void SyncRegisterDescriptionStatus()
+        internal void SyncRegisterChangeEvents()
         {
             for(int i = 0; i < RegistersDescription.Count; i ++)
             {
                 Register register = RegistersDescription[i];
+                if (!register.EnabledChangeEvent) continue;
+
                 //CoilsStatus
                 if (register.Type == RegisterType.CoilsStatus && CoilsStatus.Count > 0)
                 {
@@ -841,6 +848,18 @@ namespace SpaceCG.ModbusExtension
 
             InputChangeHandler = null;
             OutputChangeHandler = null;
+
+            CoilsStatus = null;
+            DiscreteInputs = null;
+            HoldingRegisters = null;
+            InputRegisters = null;
+
+            RegistersDescription = null;
+
+            CoilsStatusAddresses = null;
+            DiscreteInputsAddresses = null;
+            HoldingRegistersAddresses = null;
+            InputRegistersAddresses = null;
         }
         /// <inheritdoc/>
         public override string ToString()
@@ -863,8 +882,7 @@ namespace SpaceCG.ModbusExtension
                 Log.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element}");
                 return false;
             }
-            byte address = 0x00;
-            if (!StringExtension.ToNumber<byte>(element.Attribute("Address").Value, ref address))
+            if (!StringExtension.TryParse<byte>(element.Attribute("Address").Value, out byte address))
             {
                 Log.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element} 节点属性 Address 值错误");
                 return false;
@@ -877,7 +895,7 @@ namespace SpaceCG.ModbusExtension
                 if (!String.IsNullOrWhiteSpace(element.Attribute(attributes[i])?.Value))
                 {
                     ushort[] args = null; // = new ushort[2] { 0, 0 }; //count|startAddress
-                    StringExtension.ToNumberArray<ushort>(element.Attribute(attributes[i]).Value, ref args, ',');
+                    StringExtension.TryParse<ushort>(element.Attribute(attributes[i]).Value, ref args, ',');
 
                     if (args?.Length == 0) continue;
 
