@@ -185,7 +185,7 @@ namespace SpaceCG.ModbusExtension
                 Enum.TryParse<RegisterType>(element.Attribute("Type")?.Value, true, out RegisterType type) && type != RegisterType.Unknown)
             {
                 bool result = byte.TryParse(element.Attribute("Count")?.Value, out byte count);
-                register = new Register(address, type, (byte)(result ? count : 0x01));
+                register = new Register(address, type, result ? count : (byte)0x01);
             }
             else
             {
@@ -626,6 +626,7 @@ namespace SpaceCG.ModbusExtension
             {
                 reg.Value = ulong.MaxValue;
                 reg.LastValue = ulong.MaxValue;
+                //Console.WriteLine($"Type:{reg.Type}  Address:{reg.Address} Count:{reg.Count}");
             }
 
             CoilsStatusAddresses = SpliteAddresses(CoilsStatus.Keys.ToArray());
@@ -825,6 +826,7 @@ namespace SpaceCG.ModbusExtension
                 else if (register.Type == RegisterType.InputRegister && InputRegisters.Count > 0)
                 {
                     ulong value = GetRegisterValue(InputRegisters, register);
+
                     if (register.Value != value)
                     {
                         register.LastValue = register.Value;
@@ -892,37 +894,36 @@ namespace SpaceCG.ModbusExtension
             String[] attributes = new String[] { "Unknown", "CoilsStatusCount", "DiscreteInputCount", "HoldingRegisterCount", "InputRegisterCount" };
             for (int i = 1; i < attributes.Length; i++)
             {
-                if (!String.IsNullOrWhiteSpace(element.Attribute(attributes[i])?.Value))
+                if (String.IsNullOrWhiteSpace(element.Attribute(attributes[i])?.Value)) continue;
+
+                ushort[] args = null; // = new ushort[2] { 0, 0 }; //count|startAddress
+                StringExtension.TryParse<ushort>(element.Attribute(attributes[i]).Value, ref args, ',');
+
+                if (args?.Length == 0) continue;
+
+                ushort count = 0;
+                ushort startAddress = 0x0000;
+
+                if (args.Length == 1)
                 {
-                    ushort[] args = null; // = new ushort[2] { 0, 0 }; //count|startAddress
-                    StringExtension.TryParse<ushort>(element.Attribute(attributes[i]).Value, ref args, ',');
+                    count = args[0];
+                }
+                else if (args.Length == 2)
+                {
+                    count = args[1];
+                    startAddress = args[0];
+                }
+                else
+                {
+                    Log.Warn($"解析寄存器错误, {element} 节点属性 {attributes[i]} 值格式错误");
+                    continue;
+                }
 
-                    if (args?.Length == 0) continue;
-
-                    ushort count = 0;
-                    ushort startAddress = 0x0000;
-
-                    if(args.Length == 1)
-                    {
-                        count = args[0];
-                    }
-                    else if(args.Length == 2)
-                    {
-                        count = args[1];
-                        startAddress = args[0];
-                    }
-                    else
-                    {
-                        Log.Warn($"解析寄存器错误, {element} 节点属性 {attributes[i]} 值格式错误");
-                        continue;
-                    }
-                    
-                    for (ushort j = 0; j < count; j++, startAddress++)
-                    {
-                        if(!device.AddRegister(startAddress, (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true)))
-                            Log.Warn($"{device} 添加寄存器失败, {element} 节点属性 {attributes[i]} 值格式错误");
-                    }
-                } 
+                for (ushort j = 0; j < count; j++, startAddress++)
+                {
+                    if (!device.AddRegister(startAddress, (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true)))
+                        Log.Warn($"{device} 添加寄存器失败, {element} 节点属性 {attributes[i]} 值格式错误");
+                }
             }
 
             if (!element.HasElements) return true;
@@ -936,7 +937,6 @@ namespace SpaceCG.ModbusExtension
 
             return true;
         }
-
 
         /// <summary>
         /// 分割非连续的寄存器地址
@@ -1001,10 +1001,12 @@ namespace SpaceCG.ModbusExtension
             for (ushort address = description.Address; address < description.Address + description.Count; address++, i ++)
             {
                 ulong value = registers.ContainsKey(address) ? registers[address] : (ushort)0x0000;
-
+                
                 //BitConverter
                 int bitOffset = description.IsLittleEndian ? i * 16 : (description.Count - 1 - i) * 16;
                 longValue |= (ulong)(value << bitOffset);
+                //Console.WriteLine($"{description.IsLittleEndian},{address},,{value},,{bitOffset},,{longValue}");
+
             }
 
             return longValue;

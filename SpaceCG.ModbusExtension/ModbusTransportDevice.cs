@@ -190,6 +190,7 @@ namespace SpaceCG.ModbusExtension
                 ;
             }
 
+            Thread.Sleep(32);
             Log.Info($"传输总线 ({this}) 停止同步传输");
         }
 
@@ -220,9 +221,11 @@ namespace SpaceCG.ModbusExtension
             while(transport.IOThreadRunning)
             {
                 stopwatch.Restart();
-                
+
                 foreach (ModbusIODevice device in devices)
                 {
+                    if (!transport.IOThreadRunning) break;
+
                     device.SyncInputRegisters();
                     transport.SyncOutputMethodQueues();
                 }                

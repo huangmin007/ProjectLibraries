@@ -2,11 +2,13 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Ports;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using HPSocket;
 using SpaceCG.Generic;
 
 namespace SpaceCG.ModbusExtension
@@ -30,6 +32,9 @@ namespace SpaceCG.ModbusExtension
         private XElement Configuration { get; set; } = null;
         private IEnumerable<XElement> ModbusElements { get; set; } = null;
 
+        HPSocket.IServer HPTcpServer;
+        HPSocket.IServer HPUdpServer;
+
         /// <summary>
         /// Transport Devices 列表
         /// </summary>
@@ -44,9 +49,22 @@ namespace SpaceCG.ModbusExtension
         /// Modbus 设备管理对象
         /// </summary>
         /// <param name="accessName">当前对象可通过反射技术访问的名称</param>
-        public ModbusDeviceManager(String accessName = nameof(ModbusDeviceManager))
+        public ModbusDeviceManager(ushort localPort = 2023, String accessName = nameof(ModbusDeviceManager))
         {
             this.Name = accessName;
+            if(localPort >= 1024)
+            {
+                HPTcpServer = InstanceExtension.CreateNetworkServer<HPSocket.Tcp.TcpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
+                HPUdpServer = InstanceExtension.CreateNetworkServer<HPSocket.Udp.UdpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
+            }
+        }
+
+        private HandleResult OnServerReceiveEventHandler(IServer sender, IntPtr connId, byte[] data)
+        {
+            String message = Encoding.UTF8.GetString(data);
+            ReceiveNetworkMessageHandler(message);
+
+            return HandleResult.Ok; 
         }
 
         /// <summary>
@@ -107,14 +125,20 @@ namespace SpaceCG.ModbusExtension
 
             ResetAndClear();
 
-
             Configuration = XElement.Load(configFile);
-            ParseConnectionsConfig(Configuration.Descendants("Connection"));
-
-            ModbusElements = Configuration.Elements("Modbus");
-            ParseModbusDevicesConfig(ModbusElements);
+            ModbusElements = Configuration.Elements("Modbus"); 
+            
+            ParseConnectionsConfig(Configuration.Descendants("Connection"));            
+            ParseModbusDevicesConfig(Configuration.Elements("Modbus"));
 
             if (!String.IsNullOrWhiteSpace(Name)) AddAccessObject(Name, this);
+
+            //Initialize
+            foreach (ModbusTransportDevice transport in TransportDevices)
+            {
+                CallEventName(transport.Name, "Initialize");
+                Thread.Sleep(128);
+            }
         }
         /// <summary>
         /// 解析 Connections 节点配置
@@ -123,7 +147,48 @@ namespace SpaceCG.ModbusExtension
         private void ParseConnectionsConfig(IEnumerable<XElement> connectionsElement)
         {
             if (connectionsElement?.Count() <= 0) return;
+            foreach(XElement connection in connectionsElement)
+            {
+                String name = connection.Attribute("Name")?.Value;
+                String type = connection.Attribute("Type")?.Value;
+                String parameters = connection.Attribute("Parameters")?.Value;
 
+                if (String.IsNullOrWhiteSpace(name) ||
+                    String.IsNullOrWhiteSpace(type) ||
+                    String.IsNullOrWhiteSpace(parameters)) continue;
+
+                String[] args = parameters.Split(',');
+                if (args.Length != 3 || !int.TryParse(args[2], out int port)) continue;
+
+                switch(type.ToUpper())
+                {
+                    case "SERIAL":
+                        AddAccessObject(name, new SerialPort(args[1], port));
+                        break;
+
+                    case "MODBUS":
+                        AddAccessObject(name, InstanceExtension.CreateNModbus4Master(args[0], args[1], port));
+                        break;
+
+                    case "SERVER":
+                        if (args[0].ToUpper() == "TCP")
+                            AddAccessObject(name, InstanceExtension.CreateNetworkServer<HPSocket.Tcp.TcpServer>(args[1], (ushort)port, null));
+                        else if (args[0].ToUpper() == "UDP")
+                            AddAccessObject(name, InstanceExtension.CreateNetworkServer<HPSocket.Udp.UdpServer>(args[1], (ushort)port, null));
+                        else
+                            Log.Warn($"连接参数错误：{name},{type},{parameters}");
+                        break;
+
+                    case "CLIENT":
+                        if (args[0].ToUpper() == "TCP")
+                            AddAccessObject(name, InstanceExtension.CreateNetworkClient<HPSocket.Tcp.TcpClient>(args[1], (ushort)port, null));
+                        else if (args[0].ToUpper() == "UDP")
+                            AddAccessObject(name, InstanceExtension.CreateNetworkClient<HPSocket.Udp.UdpClient>(args[1], (ushort)port, null));
+                        else
+                            Log.Warn($"连接参数错误：{name},{type},{parameters}");
+                        break;
+                }
+            }
         }
         /// <summary>
         /// 解析 Modbus 节点配置
@@ -181,7 +246,8 @@ namespace SpaceCG.ModbusExtension
         {
             if (ModbusElements?.Count() <= 0) return;
 
-            Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+            if(Log.IsDebugEnabled)
+                Log.Debug($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
             foreach (XElement modbus in ModbusElements)
             {
@@ -191,13 +257,13 @@ namespace SpaceCG.ModbusExtension
                 foreach (XElement evt in events)
                 {
                     if (evt.Attribute("Type")?.Value != eventType) continue;
-
-                    if (!StringExtension.TryParse(evt.Attribute("DeivceAddress")?.Value, out byte deviceAddress)) continue;
+                    
+                    if (!StringExtension.TryParse(evt.Attribute("DeviceAddress")?.Value, out byte deviceAddress)) continue;
                     if (deviceAddress != slaveAddress) continue;
                     
                     if (!StringExtension.TryParse(evt.Attribute($"{register.Type}Address")?.Value, out ushort regAddress)) continue;
                     if (regAddress != register.Address) continue;
-                    
+
                     if (StringExtension.TryParse(evt.Attribute("Value")?.Value, out ulong regValue) && regValue == register.Value)
                     {
                         IEnumerable<XElement> actions = evt.Elements("Action");
@@ -206,9 +272,11 @@ namespace SpaceCG.ModbusExtension
                     }
                     else if(StringExtension.TryParse(evt.Attribute("MinValue")?.Value, out ulong minValue) && StringExtension.TryParse(evt.Attribute("MaxValue")?.Value, out ulong maxValue))
                     {
-                        if(maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && register.LastValue < minValue)
+                        if(maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && (register.LastValue < minValue || register.LastValue > maxValue))
                         {
-                            Console.WriteLine("MIN-MAX");
+                            //Console.WriteLine("MIN-MAX");
+                            IEnumerable<XElement> actions = evt.Elements("Action");
+                            foreach (XElement action in actions) CallActionElement(action);
                         }
                     }
                 }
@@ -219,8 +287,8 @@ namespace SpaceCG.ModbusExtension
         /// 调用配置事件，外部调用
         /// </summary>
         /// <param name="transportName"></param>
-        /// <param name="eventId"></param>
-        public void CallEventElement(String transportName, int eventId)
+        /// <param name="eventName"></param>
+        public void CallEventName(String transportName, String eventName)
         {
             foreach (XElement modbus in ModbusElements)
             {
@@ -229,7 +297,7 @@ namespace SpaceCG.ModbusExtension
                 IEnumerable<XElement> events = modbus.Descendants("Event");
                 foreach (XElement evt in events)
                 {
-                    if (StringExtension.TryParse(evt.Attribute($"ID")?.Value, out int id) && eventId == id)
+                    if (evt.Attribute("Name")?.Value == eventName)
                     {
                         IEnumerable<XElement> actions = evt.Elements("Action");
                         foreach (XElement action in actions) CallActionElement(action);
@@ -247,12 +315,6 @@ namespace SpaceCG.ModbusExtension
             if (String.IsNullOrWhiteSpace(message)) return;
             Log.Info($"Receive Network Message: {message}");
 
-#if false
-            String[] args = message.Split(',');
-            if (args.Length != 5) return;
-            InputOutputChange(args[0], args[1], Convert.ToByte(args[2]), Convert.ToUInt16(args[3]), Convert.ToUInt16(args[4]));
-#endif
-
             XElement element = null;
 
             try
@@ -269,10 +331,7 @@ namespace SpaceCG.ModbusExtension
 
             try
             {
-                Task.Run(() =>
-                {
-                    this.CallActionElement(element);
-                });
+                this.CallActionElement(element);
             }
             catch (Exception ex)
             {
@@ -311,8 +370,10 @@ namespace SpaceCG.ModbusExtension
         {
             foreach (ModbusTransportDevice transport in TransportDevices)
             {
+                CallEventName(transport.Name, "Dispose");
+                Thread.Sleep(128);
+
                 transport.StopTransport();
-                Thread.Sleep(32);
             }
             foreach (KeyValuePair<String, IDisposable> obj in AccessObjects)
             {
@@ -342,6 +403,23 @@ namespace SpaceCG.ModbusExtension
 
             AccessObjects = null;
             TransportDevices = null;
+
+            if(HPTcpServer != null)
+            {
+                List<IntPtr> clients = HPTcpServer.GetAllConnectionIds();
+                foreach (IntPtr client in clients)
+                    HPTcpServer.Disconnect(client, true);
+                HPTcpServer.Dispose();
+                HPTcpServer = null;
+            }
+            if (HPUdpServer != null)
+            {
+                List<IntPtr> clients = HPUdpServer.GetAllConnectionIds();
+                foreach (IntPtr client in clients)
+                    HPUdpServer.Disconnect(client, true);
+                HPUdpServer.Dispose();
+                HPUdpServer = null;
+            }
         }
         /// <inheritdoc/>
         public override string ToString()

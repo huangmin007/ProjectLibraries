@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Win32APIs4CSharp", "Win32AP
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceCG.ModbusExtension", "SpaceCG.ModbusExtension\SpaceCG.ModbusExtension.csproj", "{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModbusDeviceManagerServer", "ModbusDeviceManagerServer\ModbusDeviceManagerServer.csproj", "{856322E3-12C3-42C8-AB12-806B4A230434}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -65,6 +67,18 @@ Global
 		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Release|x64.Build.0 = Release|Any CPU
 		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Release|x86.ActiveCfg = Release|Any CPU
 		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Release|x86.Build.0 = Release|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Debug|x64.Build.0 = Debug|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Debug|x86.Build.0 = Debug|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Release|Any CPU.Build.0 = Release|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Release|x64.ActiveCfg = Release|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Release|x64.Build.0 = Release|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Release|x86.ActiveCfg = Release|Any CPU
+		{856322E3-12C3-42C8-AB12-806B4A230434}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
