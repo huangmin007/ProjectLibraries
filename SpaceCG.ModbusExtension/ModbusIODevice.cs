@@ -118,7 +118,7 @@ namespace SpaceCG.ModbusExtension
         /// <summary>
         /// 寄存器的原始数据存储块，待我思考一会儿，用于未来出现 大于64位数据时 在升级吧~~~
         /// </summary>
-        internal byte[] RawBytes;
+        internal ushort[] RawBytes;
 #endif
 
         /// <summary>
@@ -166,7 +166,7 @@ namespace SpaceCG.ModbusExtension
         }
 
         /// <summary>
-        /// 解析 XML 格式
+        /// 解析 XML 协议格式
         /// </summary>
         /// <param name="element"></param>
         /// <param name="register"></param>
@@ -234,23 +234,23 @@ namespace SpaceCG.ModbusExtension
 
         /// <summary>
         /// Read Only 寄存器数据 Change 处理
-        /// <para>(byte slaveAddress, Register register)</para>
+        /// <para>(ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        internal event Action<byte, Register> InputChangeHandler;
+        internal event Action<ModbusIODevice, Register> InputChangeHandler;
         /// <summary>
         /// Read Write 寄存器数据 Change 处理
-        /// <para>(byte slaveAddress, Register register)</para>
+        /// <para>(ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        internal event Action<byte, Register> OutputChangeHandler;
+        internal event Action<ModbusIODevice, Register> OutputChangeHandler;
 
         /// <summary>
         /// 设备名称
         /// </summary>
-        public String Name { get; internal set; } = null;
+        public String Name { get; private set; } = null;
         /// <summary>
         /// 设备地址
         /// </summary>
-        public byte Address { get; internal set; } = 0x01;
+        public byte Address { get; private set; } = 0x01;
 
         /// <summary>
         /// 线圈状态，原始数据存储对象，数据类型为 bool 类型，RW-ReadWrite
@@ -616,6 +616,14 @@ namespace SpaceCG.ModbusExtension
                 this.ReadInputRegisters = master.ReadInputRegisters;
                 this.ReadHoldingRegisters = master.ReadHoldingRegisters;
             }
+            else
+            {
+                this.ReadCoilsStatus = null;
+                this.ReadDiscreteInputs = null;
+
+                this.ReadInputRegisters = null;
+                this.ReadHoldingRegisters = null;
+            }
             
             foreach (var kv in CoilsStatus) CoilsStatus[kv.Key] = default;
             foreach (var kv in DiscreteInputs) DiscreteInputs[kv.Key] = default;
@@ -633,6 +641,10 @@ namespace SpaceCG.ModbusExtension
             DiscreteInputsAddresses = SpliteAddresses(DiscreteInputs.Keys.ToArray());
             HoldingRegistersAddresses = SpliteAddresses(HoldingRegisters.Keys.ToArray());
             InputRegistersAddresses = SpliteAddresses(InputRegisters.Keys.ToArray());
+
+            SyncInputRegisters();
+            SyncOutputRegisters();
+            InitializeIORegisters();
 
             Log.Info($"{this} Initialize Device.");
         }
@@ -724,7 +736,7 @@ namespace SpaceCG.ModbusExtension
         /// <summary>
         /// 初使化寄存器的 Value, LastValue 为事件处理做准备
         /// </summary>
-        internal void InitializeIORegisters()
+        private void InitializeIORegisters()
         {
             for (int i = 0; i < RegistersDescription.Count; i++)
             {
@@ -794,7 +806,7 @@ namespace SpaceCG.ModbusExtension
                     {
                         register.LastValue = register.Value;
                         register.Value = value;
-                        OutputChangeHandler?.Invoke(Address, register);
+                        OutputChangeHandler?.Invoke(this, register);
                     }
                     continue;
                 }
@@ -806,7 +818,7 @@ namespace SpaceCG.ModbusExtension
                     {
                         register.LastValue = register.Value;
                         register.Value = value;
-                        InputChangeHandler?.Invoke(Address, register);
+                        InputChangeHandler?.Invoke(this, register);
                     }
                     continue;
                 }
@@ -818,7 +830,7 @@ namespace SpaceCG.ModbusExtension
                     {
                         register.LastValue = register.Value;
                         register.Value = value;
-                        OutputChangeHandler?.Invoke(Address, register);
+                        OutputChangeHandler?.Invoke(this, register);
                     }
                     continue;
                 }
@@ -831,7 +843,7 @@ namespace SpaceCG.ModbusExtension
                     {
                         register.LastValue = register.Value;
                         register.Value = value;
-                        InputChangeHandler?.Invoke(Address, register);
+                        InputChangeHandler?.Invoke(this, register);
                     }
                     continue;
                 }                
@@ -870,7 +882,7 @@ namespace SpaceCG.ModbusExtension
         }
 
         /// <summary>
-        /// 解析 XML 格式
+        /// 解析 XML 协议格式
         /// </summary>
         /// <param name="element"></param>
         /// <param name="device"></param>
@@ -928,6 +940,7 @@ namespace SpaceCG.ModbusExtension
 
             if (!element.HasElements) return true;
 
+            //Registers
             IEnumerable<XElement> regElements = element.Elements(nameof(Register));
             foreach(var regElement in regElements)
             {
@@ -984,14 +997,13 @@ namespace SpaceCG.ModbusExtension
 
             return result;
         }
-
         /// <summary>
         /// 跟据寄存器描述对象，从寄存器原始存储数据集中获取数据
         /// </summary>
         /// <param name="registers"></param>
         /// <param name="description"></param>
         /// <returns></returns>
-        public static ulong GetRegisterValue(IReadOnlyDictionary<ushort, ushort> registers, Register description)
+        internal static ulong GetRegisterValue(IReadOnlyDictionary<ushort, ushort> registers, Register description)
         {            
             ulong longValue = (ulong)0;
             if (description.Count <= 0 || description.Count > 4) return longValue;
@@ -1017,7 +1029,7 @@ namespace SpaceCG.ModbusExtension
         /// <param name="registers"></param>
         /// <param name="description"></param>
         /// <returns></returns>
-        public static ulong GetRegisterValue(IReadOnlyDictionary<ushort, bool> registers, Register description)
+        internal static ulong GetRegisterValue(IReadOnlyDictionary<ushort, bool> registers, Register description)
         {
             ulong longValue = (ulong)0;
             if (description.Count <= 0 || description.Count > 4) return longValue;

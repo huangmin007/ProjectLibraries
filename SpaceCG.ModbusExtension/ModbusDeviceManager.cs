@@ -218,31 +218,31 @@ namespace SpaceCG.ModbusExtension
         /// 总线 Input 事件处理
         /// </summary>
         /// <param name="transportDevice"></param>
-        /// <param name="slaveAddress"></param>
+        /// <param name="ioDevice"></param>
         /// <param name="register"></param>
-        private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, byte slaveAddress, Register register)
+        private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice ioDevice, Register register)
         {
-            InputOutputEventHandler(transportDevice.Name, "OutputChange", slaveAddress, register);
+            InputOutputEventHandler("OutputChange", transportDevice.Name, ioDevice.Address, register);
         }
         /// <summary>
         /// 总线 Output 事件处理
         /// </summary>
         /// <param name="transportDevice"></param>
-        /// <param name="slaveAddress"></param>
+        /// <param name="ioDevice"></param>
         /// <param name="register"></param>
-        private void Transport_InputChangeEvent(ModbusTransportDevice transportDevice, byte slaveAddress, Register register)
+        private void Transport_InputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice ioDevice, Register register)
         {
-            InputOutputEventHandler(transportDevice.Name, "InputChange", slaveAddress, register);
+            InputOutputEventHandler("InputChange", transportDevice.Name, ioDevice.Address, register);
         }
 
         /// <summary>
         /// 总线输入输出事件处理
         /// </summary>
-        /// <param name="transportName"></param>
         /// <param name="eventType"></param>
+        /// <param name="transportName"></param>
         /// <param name="slaveAddress"></param>
         /// <param name="register"></param>
-        internal void InputOutputEventHandler(String transportName, string eventType, byte slaveAddress, Register register)
+        internal void InputOutputEventHandler(string eventType, String transportName, byte slaveAddress, Register register)
         {
             if (ModbusElements?.Count() <= 0) return;
 

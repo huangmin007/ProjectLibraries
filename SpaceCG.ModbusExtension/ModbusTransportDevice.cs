@@ -29,19 +29,19 @@ namespace SpaceCG.ModbusExtension
         /// </summary>
         public long ElapsedMilliseconds { get; private set; }
 
-        private Timer SyncTimer;
+        private Timer EventTimer;
         private bool IOThreadRunning = false;
 
         /// <summary>
         /// Read Only 寄存器数据 Change 处理
-        /// <para>(ModbusTransportDevice transport, byte slaveAddress, Register register)</para>
+        /// <para>(ModbusTransportDevice transport, ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        public event Action<ModbusTransportDevice, byte, Register> InputChangeEvent;
+        public event Action<ModbusTransportDevice, ModbusIODevice, Register> InputChangeEvent;
         /// <summary>
         /// Read Write 寄存器数据 Change 处理
-        /// <para>(ModbusTransportDevice transport, byte slaveAddress, Register register)</para>
+        /// <para>(ModbusTransportDevice transport, ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        public event Action<ModbusTransportDevice, byte, Register> OutputChangeEvent;
+        public event Action<ModbusTransportDevice, ModbusIODevice, Register> OutputChangeEvent;
 
         /// <summary>
         /// Modbus Transport 总线对象
@@ -59,7 +59,7 @@ namespace SpaceCG.ModbusExtension
             if (String.IsNullOrWhiteSpace(Name))
                 this.Name = $"Transport#{this.Master}";
 
-            SyncTimer = new Timer(SyncRegisterDescriptionStatus, this, Timeout.Infinite, Timeout.Infinite);
+            EventTimer = new Timer(SyncRegisterDescriptionStatus, this, Timeout.Infinite, Timeout.Infinite);
         }
 
         #region ModbusDevices
@@ -90,9 +90,8 @@ namespace SpaceCG.ModbusExtension
 
             if(result && Master != null)
             {
-                device.InitializeDevice(Master);
-                device.InputChangeHandler += (slaveAddress, register) => InputChangeEvent?.Invoke(this, slaveAddress, register);
-                device.OutputChangeHandler += (slaveAddress, register) => OutputChangeEvent?.Invoke(this, slaveAddress, register);
+                device.InputChangeHandler += (ioDevice, register) => InputChangeEvent?.Invoke(this, ioDevice, register);
+                device.OutputChangeHandler += (ioDevice, register) => OutputChangeEvent?.Invoke(this, ioDevice, register);
             }
 
             return result;
@@ -163,13 +162,14 @@ namespace SpaceCG.ModbusExtension
             foreach (var device in ModbusDevices)
             {
                 ModbusDevices[device.Key].InitializeDevice(Master);
-                ModbusDevices[device.Key].SyncInputRegisters();
-                ModbusDevices[device.Key].SyncOutputRegisters();
-                ModbusDevices[device.Key].InitializeIORegisters();
+
+                //ModbusDevices[device.Key].SyncInputRegisters();
+                //ModbusDevices[device.Key].SyncOutputRegisters();
+                //ModbusDevices[device.Key].InitializeIORegisters();
             }
 
             IOThreadRunning = true;
-            var sc_result = SyncTimer.Change(100, 5);
+            var sc_result = EventTimer.Change(100, 5);
             var tp_result = ThreadPool.QueueUserWorkItem(new WaitCallback(SyncModbusDevicesStatus), this);
             Log.Info($"传输总线 ({this}) 同步数据线程入池状态： {tp_result}, 事件线程状态：{sc_result}");
         }
@@ -183,7 +183,7 @@ namespace SpaceCG.ModbusExtension
 
             IOThreadRunning = false;
             ElapsedMilliseconds = 0;
-            SyncTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            EventTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
             while (MethodQueues.TryDequeue(out ModbusMethod result))
             {
@@ -237,7 +237,7 @@ namespace SpaceCG.ModbusExtension
         }
 
         /// <summary>
-        /// 
+        /// 解析 XML 协议格式
         /// </summary>
         /// <param name="element"></param>
         /// <param name="transport"></param>
@@ -298,7 +298,7 @@ namespace SpaceCG.ModbusExtension
                 kv.Value.Dispose();
 
             StopTransport();
-            SyncTimer.Dispose();
+            EventTimer.Dispose();
             ModbusDevices.Clear();
 
             ModbusDevices = null;
