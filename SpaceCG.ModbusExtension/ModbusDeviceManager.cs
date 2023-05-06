@@ -266,15 +266,20 @@ namespace SpaceCG.ModbusExtension
 
                     if (StringExtension.TryParse(evt.Attribute("Value")?.Value, out ulong regValue) && regValue == register.Value)
                     {
+                        if (Log.IsInfoEnabled)
+                            Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+
                         IEnumerable<XElement> actions = evt.Elements("Action");
                         foreach (XElement action in actions) CallActionElement(action);
                         continue;
                     }
                     else if(StringExtension.TryParse(evt.Attribute("MinValue")?.Value, out ulong minValue) && StringExtension.TryParse(evt.Attribute("MaxValue")?.Value, out ulong maxValue))
                     {
-                        if(maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && (register.LastValue < minValue || register.LastValue > maxValue))
+                        if (maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && (register.LastValue < minValue || register.LastValue > maxValue))
                         {
-                            //Console.WriteLine("MIN-MAX");
+                            if (Log.IsInfoEnabled)
+                                Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+
                             IEnumerable<XElement> actions = evt.Elements("Action");
                             foreach (XElement action in actions) CallActionElement(action);
                         }
