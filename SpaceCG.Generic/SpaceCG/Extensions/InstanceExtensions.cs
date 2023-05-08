@@ -240,35 +240,37 @@ namespace SpaceCG.Extensions
                 paramInfo = paramInfo.Substring(0, paramInfo.Length - 2);
             }
 
-            object[] _parameters;
+            object[] _parameters = null;
+            int paramsLength = parameters == null ? 0 : parameters.Length;
+
             //扩展方法
-            if (methodInfo.IsStatic && methodInfo.IsDefined(typeof(ExtensionAttribute), false) && parameters.Length != parameterInfos.Length)
+            if (methodInfo.IsStatic && methodInfo.IsDefined(typeof(ExtensionAttribute), false) && paramsLength != parameterInfos.Length)
             {
-                _parameters = new object[parameters.Length + 1];
+                _parameters = new object[paramsLength + 1];
                 _parameters[0] = instanceObj;
-                for (int i = 0; i < parameters.Length; i++)
+                for (int i = 0; i < paramsLength; i++)
                     _parameters[i + 1] = parameters[i];
 
-                Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的扩展函数 {instanceObj.GetType()} {methodInfo.Name}({paramInfo}), 参数 {parameterInfos.Length}/{_parameters.Length} 个");
+                Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的扩展函数 {instanceObj.GetType()} {methodInfo.Name}({paramInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
             }
             //静态方法
             else if(instanceObj == null && methodInfo.IsStatic)
             {
                 _parameters = parameters;
-                Logger.Info($"准备执行匹配的静态函数 {methodInfo.Name}({paramInfo}) 参数 {parameterInfos.Length}/{_parameters.Length} 个");
+                Logger.Info($"准备执行匹配的静态函数 {methodInfo.Name}({paramInfo}) 参数 {parameterInfos.Length}/{paramsLength} 个");
             }
             //实例方法
             else
             {
                 _parameters = parameters;
-                Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的函数 {instanceObj.GetType()} {methodInfo.Name}({paramInfo}), 参数 {parameterInfos.Length}/{_parameters.Length} 个");
+                Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的函数 {instanceObj.GetType()} {methodInfo.Name}({paramInfo}), 参数 {parameterInfos.Length}/{paramsLength} 个");
             }
 
-            object[] arguments = new object[_parameters.Length];
+            object[] arguments = _parameters == null ? null : new object[_parameters.Length];
             try
             {
                 //参数转换
-                for (int i = 0; i < _parameters.Length; i++)
+                for (int i = 0; i < _parameters?.Length; i++)
                 {
                     ParameterInfo pInfo = parameterInfos[i];
                     if (_parameters[i] == null || _parameters[i].ToString().ToLower().Trim() == "null")
@@ -290,6 +292,7 @@ namespace SpaceCG.Extensions
                     else
                     {
                         arguments[i] = Convert.ChangeType(_parameters[i], pInfo.ParameterType);
+                        Console.WriteLine(arguments[i]);
                     }
                 }
 
@@ -321,15 +324,17 @@ namespace SpaceCG.Extensions
             if (instanceObj == null || String.IsNullOrWhiteSpace(methodName))
                 throw new ArgumentNullException("参数不能为空");
 
+            int paramLength = parameters == null ? 0 : parameters.Length;
+
             Type type = instanceObj.GetType();
             IEnumerable<MethodInfo> methods = from method in type.GetMethods()
                                               where method.Name == methodName
-                                              where method.GetParameters().Length == parameters.Length
+                                              where method.GetParameters().Length == paramLength
                                               select method;
 
             if (methods.Count() != 1)
             {
-                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName} 有 {methods.Count()} 个，取消执行 或 查找扩展函数");
+                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName} 参数数量 {paramLength} 有 {methods.Count()} 个，取消执行 或 查找扩展函数");
 
                 return CallInstanceExtensionMethod(instanceObj, methodName, parameters);
             }

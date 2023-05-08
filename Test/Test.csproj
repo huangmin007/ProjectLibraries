@@ -16,7 +16,7 @@
     <Deterministic>true</Deterministic>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -24,6 +24,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -107,13 +108,14 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SpaceCG.Generic\SpaceCG.Generic.csproj">
-      <Project>{597fd101-2f46-49c9-8f69-7f633fc55e90}</Project>
+      <Project>{597FD101-2F46-49C9-8F69-7F633FC55E90}</Project>
       <Name>SpaceCG.Generic</Name>
     </ProjectReference>
-    <ProjectReference Include="..\SpaceCG.ModbusExtension\SpaceCG.ModbusExtension.csproj">
-      <Project>{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}</Project>
-      <Name>SpaceCG.ModbusExtension</Name>
-    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="HPSocket4C.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

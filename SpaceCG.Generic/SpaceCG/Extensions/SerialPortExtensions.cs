@@ -4,9 +4,12 @@ using System.Configuration;
 using System.IO.Ports;
 using System.Linq;
 using System.Management;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Interop;
+using SpaceCG.WindowsAPI.User32;
 
 namespace SpaceCG.Extensions
 {
@@ -127,14 +130,14 @@ namespace SpaceCG.Extensions
             DeletionEvent.Start();
         }
 
-#if false
+#if true
         /// <summary>
         /// 串口设备热插拔自动重新连接
         /// <para>使用 HwndSource Hook Window Message #WM_DEVICECHANGE 事件监听模式</para>
         /// </summary>
         /// <param name="serialPort"></param>
         /// <param name="window">IsLoaded 为 True 的窗口对象</param>
-        public static void AutoReconnection(this SerialPort serialPort, System.Windows.Window window)
+        public static void AutoReconnection(this SerialPort serialPort, Window window)
         {
             if (serialPort == null || window == null) throw new ArgumentException("参数不能为空");
             if (!window.IsLoaded) throw new InvalidOperationException("Window 对象 IsLoaded 为 True 时才能获取窗口句柄");
@@ -155,12 +158,12 @@ namespace SpaceCG.Extensions
                     if (dbt == DeviceBroadcastType.DBT_DEVICEARRIVAL)
                     {
                         if (!serialPort.IsOpen) serialPort.Open();
-                        SpaceCGUtils.Log.InfoFormat("Device Arrival SerialPort Name:{0}", port.dbcp_name);
+                        Logger.InfoFormat("Device Arrival SerialPort Name:{0}", port.dbcp_name);
                     }
                     if (dbt == DeviceBroadcastType.DBT_DEVICEREMOVECOMPLETE)
                     {
                         if (serialPort.IsOpen) serialPort.Close();
-                        SpaceCGUtils.Log.ErrorFormat("Device Remove Complete SerialPort Name:{0}", port.dbcp_name);
+                        Logger.ErrorFormat("Device Remove Complete SerialPort Name:{0}", port.dbcp_name);
                     }
                     handled = true;
                 }

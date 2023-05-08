@@ -16,7 +16,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using SpaceCG.Extensions;
-using SpaceCG.ModbusExtension;
+using SpaceCG.Module.Modbus;
 
 namespace Test
 {
@@ -94,9 +94,10 @@ namespace Test
 
             Console.WriteLine(typeof(NumberStyles));
 
-            //deviceManager = new ModbusDeviceManager();
-            //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
+            deviceManager = new ModbusDeviceManager(2000);
+            deviceManager.LoadDeviceConfig("ModbusDevices.Config");
 
+#if false
             //object[] arr1 = StringExtension.ConvertParameters2("0x01,3,[True,True,False]");
             object[] arr2 = StringExtensions.SplitParameters("0x01,3,[True,True,False]");
             Console.WriteLine(arr2.Length);
@@ -111,6 +112,7 @@ namespace Test
             InstanceExtensions.SetInstancePropertyValue(this, "WindowStyle", 0);
 
             Console.WriteLine(value);
+#endif
         }
 
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, byte slaveAddress, Register register)

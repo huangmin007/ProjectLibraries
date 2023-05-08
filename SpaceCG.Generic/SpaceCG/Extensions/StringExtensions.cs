@@ -61,7 +61,6 @@ namespace SpaceCG.Extensions
 
             return result;
         }
-
         /// <summary>
         /// To Number Array
         /// </summary>
@@ -183,9 +182,12 @@ namespace SpaceCG.Extensions
         /// <returns></returns>
         public static object[] SplitParameters(String parameters)
         {
-            if (String.IsNullOrWhiteSpace(parameters)) return null;
+            if (String.IsNullOrWhiteSpace(parameters)) return new object[] { }; // null
 
-            String pattern = @"\[([\w\s,]+)\]|([\w\s]+),|([\w]+)";
+            //Console.WriteLine(parameters);
+            //Regex regex = new Regex(@"\w\a");
+
+            String pattern = @"\[([\w\s\#\.,]+)\]|([\w\s\#\.]+),|([\w\#\.]+)";
             MatchCollection matchs = Regex.Matches(parameters, pattern, RegexOptions.Compiled | RegexOptions.Singleline);
 
             List<object> args = new List<object>();
@@ -258,7 +260,7 @@ namespace SpaceCG.Extensions
             }
             else if (paramType == typeof(bool))
             {
-                return bool.TryParse(paramValue.ToString(), out bool value) && value;
+                return bool.TryParse(paramValue.ToString(), out bool value) ? value : false;
             }
             else if (paramType == typeof(sbyte) || paramType == typeof(byte) || paramType == typeof(short) || paramType == typeof(ushort) ||
                 paramType == typeof(Int32) || paramType == typeof(UInt32) || paramType == typeof(Int64) || paramType == typeof(UInt64))
