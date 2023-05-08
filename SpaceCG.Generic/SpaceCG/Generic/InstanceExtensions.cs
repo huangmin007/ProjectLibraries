@@ -15,12 +15,12 @@ namespace SpaceCG.Generic
     /// <summary>
     /// 实例功能扩展库
     /// </summary>
-    public static partial class InstanceExtension
+    public static partial class InstanceExtensions
     {
         /// <summary>
         /// log4net.Logger 对象
         /// </summary>
-        public static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(InstanceExtension));
+        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(InstanceExtensions));
 
         /// <summary>
         /// 动态的获取实例的字段对象。注意：包括私有对象
@@ -53,13 +53,13 @@ namespace SpaceCG.Generic
         }
 
         /// <summary>
-        /// 动态的设置实例对象的属性值，跟据 XML 配置文件节点名称(实例字段)及节点属性(字段属性)来个修改实例属性
+        /// 动态的设置实例对象的多个属性值，跟据 XML 配置文件节点名称(实例字段对象)及节点属性(字段对象的属性)来个修改实例属性
         /// <para>例如：&lt;Window Left="100" Width="100"/&gt; </para>
         /// <para> Window 是 instanceObj 中的一个实例对象(或变量对象，非静态对象)，其 Left、Width 为 Window 实例对象的原有属性 </para>
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="element"></param>
-        public static void SetInstancePropertyValue(Object instanceObj, XElement element)
+        public static void SetInstancePropertyValues(Object instanceObj, XElement element)
         {
             if (instanceObj == null || element == null)
                 throw new ArgumentNullException("参数不能为空");
@@ -76,12 +76,12 @@ namespace SpaceCG.Generic
             }
         }
         /// <summary>
-        /// 动态的设置实例对象的属性值，跟据 配置文件 中读取对应实例的 key 属性值
+        /// 动态的设置实例对象的多个属性值，跟据 配置文件 中读取对应实例的 key 属性值
         /// <para>nameSpace 格式指：[Object.]Property , Object 可为空</para>
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="nameSpace"></param>
-        public static void SetInstancePropertyValue(Object instanceObj, String nameSpace)
+        public static void SetInstancePropertyValues(Object instanceObj, String nameSpace)
         {
             if (instanceObj == null)
                 throw new ArgumentNullException(nameof(instanceObj), "参数不能为空");
@@ -99,20 +99,22 @@ namespace SpaceCG.Generic
                 SetInstancePropertyValue(instanceObj, property.Name, value);
             }
         }
+
         /// <summary>
-        /// 动态的设置实例对象的属性值
-        /// <para>属性，实现 get,set 的方法</para>
+        /// 动态的设置实例对象的属性值, Only Support ValueType And ArrayType
+        /// <para>属性是指实现了 get,set 方法的对象</para>
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="propertyName"></param>
         /// <param name="newValue"></param>
-        public static void SetInstancePropertyValue(Object instanceObj, String propertyName, Object newValue)
+        /// <returns>如果设置成功，则返回 true, 否则返回 false </returns>
+        public static bool SetInstancePropertyValue(Object instanceObj, String propertyName, Object newValue)
         {
             if (instanceObj == null || String.IsNullOrWhiteSpace(propertyName)) throw new ArgumentNullException("参数不能为空");
 
             Type type = instanceObj.GetType();
             PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
-            if (property == null || !property.CanWrite || !property.CanRead) return;
+            if (property == null || !property.CanWrite || !property.CanRead) return false;
 
             object convertValue = null;
             try
@@ -120,24 +122,29 @@ namespace SpaceCG.Generic
                 if (newValue == null || newValue.ToString().ToLower().Trim() == "null")
                 {
                     property.SetValue(instanceObj, convertValue, null);
-                    return;
+                    return true;
                 }
 
-                //值不空 && 值类型为枚举类型
-                if (property.GetValue(instanceObj)?.GetType().IsEnum == true)
-                    convertValue = Enum.Parse(property.PropertyType, newValue.ToString());
+                if (property.PropertyType.IsValueType)
+                    convertValue = StringExtensions.ConvertParamsToValueType(property.PropertyType, newValue);
+                else if (property.PropertyType.IsArray)
+                    convertValue = StringExtensions.ConvertParamsToArrayType(property.PropertyType, (object[])newValue);
                 else
                     convertValue = Convert.ChangeType(newValue, property.PropertyType);
 
                 property.SetValue(instanceObj, convertValue, null);
+                return true;
             }
             catch (Exception ex)
             {
-                Logger.ErrorFormat("设置实例对象 {0} 的属性 {1} 值 {2} 失败：{3}", type, property, newValue == null ? "null" : newValue, ex);
+                Logger.Error($"设置实例对象 {type} 的属性 {property} 值 {(newValue == null ? "null" : newValue)} 失败：{ex}");
             }
+
+            return false;
         }
         /// <summary>
         /// 动态的获取实例对象的属性值
+        /// <para>属性是指实现了 get,set 方法的对象</para>
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="propertyName"></param>
@@ -149,35 +156,17 @@ namespace SpaceCG.Generic
             Type type = instanceObj.GetType();
             PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
             if (property == null || !property.CanRead) return null;
-            
+
             return property.GetValue(instanceObj);
         }
 
-        /// <summary>
-        /// 动态移除实例对象所有委托事件
-        /// </summary>
-        /// <param name="instanceObj">对象实例</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        public static void RemoveInstanceEvents(object instanceObj)
-        {
-            if (instanceObj == null) throw new ArgumentNullException("参数不能为空");
-
-            EventInfo[] events = instanceObj.GetType().GetEvents();
-            foreach (EventInfo info in events)
-                RemoveInstanceEvents(instanceObj, info.Name);
-#if false
-            EventInfo[] baseEvents = instanceObj.GetType().BaseType.GetEvents();
-            foreach (EventInfo info in baseEvents)
-                RemoveInstanceEvents(instanceObj, info.Name);
-#endif
-        }
         /// <summary>
         /// 动态移除实例对象指定的委托事件
         /// </summary>
         /// <param name="instanceObj">对象实例</param>
         /// <param name="eventName">对象事件名称</param>
         /// <exception cref="ArgumentNullException"></exception>
-        public static void RemoveInstanceEvents(object instanceObj, string eventName)
+        public static void RemoveInstanceEvent(object instanceObj, string eventName)
         {
             if (instanceObj == null || string.IsNullOrWhiteSpace(eventName))
                 throw new ArgumentNullException("参数不能为空");
@@ -212,9 +201,28 @@ namespace SpaceCG.Generic
                 Logger.ErrorFormat("Remove Anonymous Events Error:{0}", ex);
             }
         }
-
         /// <summary>
-        /// 动态调用 实例 对象的方法
+        /// 动态移除实例对象所有委托事件
+        /// </summary>
+        /// <param name="instanceObj">对象实例</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        public static void RemoveInstanceEvents(object instanceObj)
+        {
+            if (instanceObj == null) throw new ArgumentNullException("参数不能为空");
+
+            EventInfo[] events = instanceObj.GetType().GetEvents();
+            foreach (EventInfo info in events)
+                RemoveInstanceEvent(instanceObj, info.Name);
+#if false
+            EventInfo[] baseEvents = instanceObj.GetType().BaseType.GetEvents();
+            foreach (EventInfo info in baseEvents)
+                RemoveInstanceEvent(instanceObj, info.Name);
+#endif
+        }
+        
+        /// <summary>
+        /// 动态调用对象的方法
+        /// <para>按顺序查找方法：扩展方法 > 静态方法 > 实例方法</para>
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="methodInfo"></param>
@@ -233,6 +241,7 @@ namespace SpaceCG.Generic
             }
 
             object[] _parameters;
+            //扩展方法
             if (methodInfo.IsStatic && methodInfo.IsDefined(typeof(ExtensionAttribute), false) && parameters.Length != parameterInfos.Length)
             {
                 _parameters = new object[parameters.Length + 1];
@@ -242,11 +251,13 @@ namespace SpaceCG.Generic
 
                 Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的扩展函数 {instanceObj.GetType()} {methodInfo.Name}({paramInfo}), 参数 {parameterInfos.Length}/{_parameters.Length} 个");
             }
+            //静态方法
             else if(instanceObj == null && methodInfo.IsStatic)
             {
                 _parameters = parameters;
                 Logger.Info($"准备执行匹配的静态函数 {methodInfo.Name}({paramInfo}) 参数 {parameterInfos.Length}/{_parameters.Length} 个");
             }
+            //实例方法
             else
             {
                 _parameters = parameters;
@@ -270,23 +281,12 @@ namespace SpaceCG.Generic
 
                     if (pInfo.ParameterType.IsValueType)
                     {
-                        arguments[i] = StringExtension.ConvertValueTypeParameters(_parameters[i], pInfo.ParameterType);
+                        arguments[i] = StringExtensions.ConvertParamsToValueType(pInfo.ParameterType, _parameters[i]);
                     }
                     else if (pInfo.ParameterType.IsArray)
                     {
-                        arguments[i] = StringExtension.ConvertArrayParameters((String[])_parameters[i], pInfo.ParameterType);
+                        arguments[i] = StringExtensions.ConvertParamsToArrayType(pInfo.ParameterType, (object[])_parameters[i]);
                     }
-                    else if (pInfo.ParameterType.IsEnum)
-                    {
-                        arguments[i] = Enum.Parse(pInfo.ParameterType, _parameters[i].ToString(), true);
-                    }
-#if false
-                    else if (pInfo.IsOut)
-                    {
-                        arguments[i] = new object[] { _parameters[i] };
-                        arguments[i] = Convert.ChangeType(_parameters[i], pInfo.ParameterType.MakeByRefType());
-                    }
-#endif
                     else
                     {
                         arguments[i] = Convert.ChangeType(_parameters[i], pInfo.ParameterType);
@@ -349,7 +349,7 @@ namespace SpaceCG.Generic
             if (instanceObj == null || String.IsNullOrWhiteSpace(methodName))
                 throw new ArgumentNullException("参数不能为空");
 
-            IEnumerable<MethodInfo> methods = from type in typeof(InstanceExtension).Assembly.GetTypes()
+            IEnumerable<MethodInfo> methods = from type in typeof(InstanceExtensions).Assembly.GetTypes()
                                               where type.IsSealed && !type.IsGenericType && !type.IsNested
                                               from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
                                               where method.Name == methodName && method.IsDefined(typeof(ExtensionAttribute), false) && method.GetParameters()[0].ParameterType == instanceObj.GetType()
@@ -363,9 +363,8 @@ namespace SpaceCG.Generic
 
             return CallInstanceMethod(instanceObj, methods.First(), parameters);
         }
-
         /// <summary>
-        /// 动态调用 静态方法
+        /// 动态调用 类的 静态方法
         /// <para>示例：InstanceExtension.CallClassStaticMethod("System.Threading.Thread", "Sleep", new object[] { "1000" });</para>
         /// </summary>
         /// <param name="classFullName"></param>
@@ -383,127 +382,15 @@ namespace SpaceCG.Generic
                                               where paramInfo.ParameterType.IsValueType || paramInfo.ParameterType.IsArray || paramInfo.ParameterType.IsEnum 
                                               select method;
 
-#if false
-            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                Type type = assembly.GetType(classFullName);
-                if (type == null) continue;
-
-                foreach(MethodInfo method in type.GetMethods(BindingFlags.Static | BindingFlags.Public))
-                {
-                    if (!(method.Name == methodName && method.GetParameters().Length == parameters.Length)) continue;
-                    
-                    foreach(ParameterInfo parameter in method.GetParameters())
-                    {
-                        Console.WriteLine($"{classFullName}, {methodName},,,{parameter.Name}:{parameter.ParameterType},{parameter.ParameterType.IsClass},{parameter.ParameterType.IsValueType}");
-                       //if (parameter.ParameterType.IsAbstract || parameter.ParameterType.IsClass) continue;
-                    }
-
-                }
-            }
-#endif
-
-            //Console.WriteLine($"Count:{methods?.Count()}");
             if(methods?.Count() == 0)
             {
                 Logger.Warn($"在类 {classFullName} 中，没找到匹配的静态函数 {methodName} ，取消执行");
                 return null;
             }
 
-            //if (methods?.Count() == 1)
-            //{
-                //Logger.Warn($"在类 {classFullName} 中，找到匹配的静态函数 {methodName} 有 {methods.Count()} 个");
-                Logger.InfoFormat("在类 {0} 中，找到匹配的静态函数 {1} 有 {2} 个{3}", classFullName, methodName, methods.Count(), methods.Count() > 1 ? ", 存在执行歧异" : "");
-                //return null;
-            //}
+            Logger.Info($"在类 {classFullName} 中，找到匹配的静态函数 {methodName} 有 {methods.Count()} 个{(methods.Count() > 1 ? ", 存在执行歧异" : "")}");
 
             return CallInstanceMethod(null, methods.First(), parameters);
-        }
-
-
-        /// <summary>
-        /// 启动配置文件中的应用程序或相关文档
-        /// <para name="fileNameCfgKey">配置的键值格式：(命名空间.Process属性)，属性 FileName 不可为空。</para>
-        /// <para>例如：Process.FileName, 多个进程操作，可以在命名空间上处理：Process1.FileName ... </para>
-        /// </summary>
-        /// <param name="fileNameCfgKey">配置的键值格式：(命名空间.Process属性)，例如：Process.FileName, 多个进程操作，可以在命名空间上处理：Process1.FileName ... </param>
-        /// <returns></returns>
-        public static Process CreateProcessModule(string fileNameCfgKey)
-        {
-            if (String.IsNullOrWhiteSpace(ConfigurationManager.AppSettings[fileNameCfgKey])) return null;
-
-            String fileName = ConfigurationManager.AppSettings[fileNameCfgKey].Trim();
-            FileInfo fileInfo = new FileInfo(fileName);
-            if (!fileInfo.Exists)
-            {
-                Logger.Warn($"应用程序或文档 \"{fileName}\" 不存在");
-                return null;
-            }
-
-            String nameSpace = fileNameCfgKey.Replace("FileName", "");
-            ProcessStartInfo startInfo = new ProcessStartInfo(fileInfo.FullName);
-            startInfo.WorkingDirectory = fileInfo.DirectoryName;
-
-            SetInstancePropertyValue(startInfo, nameSpace);
-
-            //重复一次，转为使用绝对路径
-            startInfo.FileName = fileInfo.FullName;
-
-            Process process = new Process();
-            process.StartInfo = startInfo;
-            process.EnableRaisingEvents = true;
-            process.Exited += (s, e) => Logger.Warn($"应用程序或文档 \"{fileName}\" 发生退出事件(ExitCode:{process.ExitCode})");
-
-            Task.Run(() =>
-            {
-                try
-                {
-                    if (process.Start())
-                        Logger.Info($"已启动的应用程序或文档 \"{fileName}\"");
-                    else
-                        Logger.Warn($"应用程序或文档 \"{fileName}\" 启动失败");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error($"应用程序或文档 \"{fileName}\" 启动时发生错误：{ex}");
-                }
-            });
-
-            return process;
-        }
-
-        /// <summary>
-        /// 退出并释放进程对象资源
-        /// </summary>
-        /// <param name="process"></param>
-        public static void DisposeProcessModule(ref Process process)
-        {
-            if (process == null) return;
-
-            int code = 0;
-            String name = "";
-
-            try
-            {
-                if (!process.HasExited)
-                {
-                    name = process.ProcessName;
-
-                    process.Kill();
-                    code = process.ExitCode;
-                }
-
-                process.Dispose();
-                Logger.Info($"退出并释放进程模块 {name}(ExitCode:{code}) 完成");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"退出并释放 进程模块资源 对象错误: {ex}");
-            }
-            finally
-            {
-                process = null;
-            }
         }
 
     }

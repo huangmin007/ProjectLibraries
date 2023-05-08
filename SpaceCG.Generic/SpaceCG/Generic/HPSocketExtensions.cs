@@ -10,8 +10,13 @@ using System.Threading.Tasks;
 namespace SpaceCG.Generic
 {
 #if HPSocket
-    public static partial class InstanceExtension
+    public static class HPSocketExtensions
     {
+        /// <summary>
+        /// log4net.Logger 对象
+        /// </summary>
+        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(HPSocketExtensions));
+
         #region 扩展的配置动态调用函数
         /// <summary>
         /// 扩展的配置调用，HPSocket.IServer.Send
@@ -47,12 +52,10 @@ namespace SpaceCG.Generic
             if (data?.Length <= 0) return false;
             return client.Send(data, data.Length);
         }
-
         public static bool SendBytes(this HPSocket.Tcp.TcpClient client, byte[] data) => Send(client, data);
         public static bool SendBytes(this HPSocket.Udp.UdpClient client, byte[] data) => Send(client, data);
         public static bool SendMessage(this HPSocket.Tcp.TcpClient client, string message) => SendBytes(client, Encoding.UTF8.GetBytes(message));
         public static bool SendMessage(this HPSocket.Udp.UdpClient client, string message) => SendBytes(client, Encoding.UTF8.GetBytes(message));
-
         #endregion
 
         /// <summary>
@@ -105,7 +108,7 @@ namespace SpaceCG.Generic
             };
             server.OnShutdown += (HPSocket.IServer sender) =>
             {
-                RemoveInstanceEvents(server);
+                InstanceExtensions.RemoveInstanceEvents(server);
                 return HPSocket.HandleResult.Ok;
             };
 
@@ -190,7 +193,7 @@ namespace SpaceCG.Generic
         public static void DisposeNetworkServer(ref HPSocket.IServer TServer)
         {
             if (TServer == null) return;
-            RemoveInstanceEvents(TServer);
+            InstanceExtensions.RemoveInstanceEvents(TServer);
 
             try
             {
@@ -368,7 +371,7 @@ namespace SpaceCG.Generic
         public static void DisposeNetworkClient(ref HPSocket.IClient TClient)
         {
             if (TClient == null) return;
-            RemoveInstanceEvents(TClient);
+            InstanceExtensions.RemoveInstanceEvents(TClient);
 
             Type type = TClient.GetType();
             TClient.GetListenAddress(out string lHost, out ushort lPort);

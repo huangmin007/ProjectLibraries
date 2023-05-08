@@ -9,8 +9,13 @@ using System.Threading.Tasks;
 
 namespace SpaceCG.Generic
 {
-    public static partial class InstanceExtension
+    public static partial class NetworkExtensions
     {
+        /// <summary>
+        /// log4net.Logger 对象
+        /// </summary>
+        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(NetworkExtensions));
+
         /// <summary>
         /// 获取本机的 IPv4 地址
         /// </summary>

@@ -42,9 +42,6 @@
     <Reference Include="NModbus4, Version=2.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\NModbus4.2.1.0\lib\net40\NModbus4.dll</HintPath>
     </Reference>
-    <Reference Include="SpaceCG.Generic">
-      <HintPath>..\..\..\005_Projects\2021_LEDs Interactive Display\LedControlSystem\LCMS_Modules\SpaceCG.Generic\bin\Release\SpaceCG.Generic.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
@@ -109,6 +106,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\SpaceCG.Generic\SpaceCG.Generic.csproj">
+      <Project>{597fd101-2f46-49c9-8f69-7f633fc55e90}</Project>
+      <Name>SpaceCG.Generic</Name>
+    </ProjectReference>
     <ProjectReference Include="..\SpaceCG.ModbusExtension\SpaceCG.ModbusExtension.csproj">
       <Project>{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}</Project>
       <Name>SpaceCG.ModbusExtension</Name>

@@ -92,8 +92,25 @@ namespace Test
             String registerAddress = $"{RegisterType.CoilsStatus}Address";
             Console.WriteLine(registerAddress);
 
-            deviceManager = new ModbusDeviceManager();
-            deviceManager.LoadDeviceConfig("ModbusDevices.Config");
+            Console.WriteLine(typeof(NumberStyles));
+
+            //deviceManager = new ModbusDeviceManager();
+            //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
+
+            //object[] arr1 = StringExtension.ConvertParameters2("0x01,3,[True,True,False]");
+            object[] arr2 = StringExtensions.SplitParameters("0x01,3,[True,True,False]");
+            Console.WriteLine(arr2.Length);
+
+            bool result = StringExtensions.TryParse("45", out UInt32 v);
+            Console.WriteLine($"{result},,{v}");
+
+            var value = StringExtensions.ConvertParamsToValueType(typeof(Byte), 0x45);
+            var array = StringExtensions.ConvertParamsToArrayType(typeof(Byte[]), new Object[] { "0x45", "0x46", 0x47 });
+            
+            //WindowStyle.None
+            InstanceExtensions.SetInstancePropertyValue(this, "WindowStyle", 0);
+
+            Console.WriteLine(value);
         }
 
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, byte slaveAddress, Register register)
