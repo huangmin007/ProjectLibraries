@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Interop;
 
-namespace SpaceCG.Generic
+namespace SpaceCG.Extensions
 {
     public static partial class SerialPortExtensions
     {

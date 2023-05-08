@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Xml.Linq;
-using SpaceCG.Generic;
+using SpaceCG.Extensions;
 
 namespace SpaceCG.ModbusExtension
 {

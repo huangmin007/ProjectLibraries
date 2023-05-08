@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
-using SpaceCG.Generic;
+using SpaceCG.Extensions;
 using SpaceCG.ModbusExtension;
 
 namespace ModbusDeviceManagerServer

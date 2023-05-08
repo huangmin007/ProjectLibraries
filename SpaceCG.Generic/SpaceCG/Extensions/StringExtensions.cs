@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
-namespace SpaceCG.Generic
+namespace SpaceCG.Extensions
 {
     public static partial class StringExtensions
     {

@@ -7,7 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SpaceCG.Generic
+namespace SpaceCG.Extensions
 {
     public static partial class NetworkExtensions
     {

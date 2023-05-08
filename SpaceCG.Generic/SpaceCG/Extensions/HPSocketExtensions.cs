@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SpaceCG.Generic
+namespace SpaceCG.Extensions
 {
 #if HPSocket
     public static class HPSocketExtensions

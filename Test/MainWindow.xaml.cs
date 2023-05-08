@@ -15,7 +15,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using SpaceCG.Generic;
+using SpaceCG.Extensions;
 using SpaceCG.ModbusExtension;
 
 namespace Test

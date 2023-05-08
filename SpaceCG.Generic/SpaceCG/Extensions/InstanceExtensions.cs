@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace SpaceCG.Generic
+namespace SpaceCG.Extensions
 {
     /// <summary>
     /// 实例功能扩展库

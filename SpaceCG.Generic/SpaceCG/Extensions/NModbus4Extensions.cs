@@ -5,7 +5,7 @@ using System.Configuration;
 using System.IO.Ports;
 using System.Net.Sockets;
 
-namespace SpaceCG.Generic
+namespace SpaceCG.Extensions
 {
     public static partial class NModbus4Extensions
     {

@@ -7,7 +7,7 @@
     <ProjectGuid>{597FD101-2F46-49C9-8F69-7F633FC55E90}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SpaceCG.Generic</RootNamespace>
+    <RootNamespace>SpaceCG</RootNamespace>
     <AssemblyName>SpaceCG.Generic</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -63,14 +63,14 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SpaceCG\Generic\HostDevice.cs" />
-    <Compile Include="SpaceCG\Generic\HPSocketExtensions.cs" />
-    <Compile Include="SpaceCG\Generic\InstanceExtensions.cs" />
-    <Compile Include="SpaceCG\Generic\NetworkExtensions.cs" />
-    <Compile Include="SpaceCG\Generic\NModbus4Extensions.cs" />
-    <Compile Include="SpaceCG\Generic\NModbusExtensions.cs" />
-    <Compile Include="SpaceCG\Generic\ProcessExtensions.cs" />
-    <Compile Include="SpaceCG\Generic\SerialPortExtensions.cs" />
-    <Compile Include="SpaceCG\Generic\StringExtensions.cs" />
+    <Compile Include="SpaceCG\Extensions\HPSocketExtensions.cs" />
+    <Compile Include="SpaceCG\Extensions\InstanceExtensions.cs" />
+    <Compile Include="SpaceCG\Extensions\NetworkExtensions.cs" />
+    <Compile Include="SpaceCG\Extensions\NModbus4Extensions.cs" />
+    <Compile Include="SpaceCG\Extensions\NModbusExtensions.cs" />
+    <Compile Include="SpaceCG\Extensions\ProcessExtensions.cs" />
+    <Compile Include="SpaceCG\Extensions\SerialPortExtensions.cs" />
+    <Compile Include="SpaceCG\Extensions\StringExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Log4Net.Config">

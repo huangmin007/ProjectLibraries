@@ -8,7 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace SpaceCG.Generic.SpaceCG.Generic
+namespace SpaceCG.Generic
 {
     public class HostDevice
     {
