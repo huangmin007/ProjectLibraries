@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 using SpaceCG.Extensions;
-using SpaceCG.ModbusExtension;
+using SpaceCG.Module.Modbus;
 
 namespace ModbusDeviceManagerServer
 {

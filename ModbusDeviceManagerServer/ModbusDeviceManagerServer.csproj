@@ -36,9 +36,6 @@
     <Reference Include="log4net">
       <HintPath>..\..\..\001_Libraries\CSharp\GeneralLibrary\build\Release\log4net.dll</HintPath>
     </Reference>
-    <Reference Include="SpaceCG.Generic">
-      <HintPath>..\..\..\005_Projects\2021_LEDs Interactive Display\LedControlSystem\LCMS_Modules\SpaceCG.Generic\bin\Release\SpaceCG.Generic.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -59,15 +56,15 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SpaceCG.ModbusExtension\SpaceCG.ModbusExtension.csproj">
-      <Project>{0e31eb18-1172-4da6-9eaa-7ae419f0b65d}</Project>
-      <Name>SpaceCG.ModbusExtension</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <Content Include="HPSocket4C.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SpaceCG.Generic\SpaceCG.Generic.csproj">
+      <Project>{597FD101-2F46-49C9-8F69-7F633FC55E90}</Project>
+      <Name>SpaceCG.Generic</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
