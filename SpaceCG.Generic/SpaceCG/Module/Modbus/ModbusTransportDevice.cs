@@ -32,6 +32,7 @@ namespace SpaceCG.Module.Modbus
 
         private Timer EventTimer;
         private bool IOThreadRunning = false;
+        private CancellationTokenSource CancelToken;// = new CancellationTokenSource();
 
         /// <summary>
         /// Read Only 寄存器数据 Change 处理
@@ -153,6 +154,11 @@ namespace SpaceCG.Module.Modbus
         public void StartTransport()
         {
             if (IOThreadRunning) return;
+            if(CancelToken != null)
+            {
+                CancelToken.Dispose();
+                CancelToken = null;
+            }
 
             while (MethodQueues.TryDequeue(out ModbusMethod result))
             {
@@ -162,16 +168,16 @@ namespace SpaceCG.Module.Modbus
             foreach (var device in ModbusDevices)
             {
                 ModbusDevices[device.Key].InitializeDevice(Master);
-
-                //ModbusDevices[device.Key].SyncInputRegisters();
-                //ModbusDevices[device.Key].SyncOutputRegisters();
-                //ModbusDevices[device.Key].InitializeIORegisters();
             }
 
             IOThreadRunning = true;
+            CancelToken = new CancellationTokenSource();
+
             var sc_result = EventTimer.Change(100, 5);
-            var tp_result = ThreadPool.QueueUserWorkItem(new WaitCallback(SyncModbusDevicesStatus), this);
+            //var tp_result = ThreadPool.QueueUserWorkItem(new WaitCallback(SyncModbusDevicesStatus), this);
+            var tp_result = ThreadPool.QueueUserWorkItem(o => SyncModbusDevicesStatus(CancelToken.Token));
             Log.Info($"传输总线 ({this}) 同步数据线程入池状态： {tp_result}, 事件线程状态：{sc_result}");
+
         }
 
         /// <summary>
@@ -181,6 +187,7 @@ namespace SpaceCG.Module.Modbus
         {
             if (!IOThreadRunning) return;
 
+            CancelToken.Cancel();
             IOThreadRunning = false;
             ElapsedMilliseconds = 0;
             EventTimer.Change(Timeout.Infinite, Timeout.Infinite);
@@ -197,7 +204,7 @@ namespace SpaceCG.Module.Modbus
         /// <summary>
         /// 同步寄存器描述状态
         /// </summary>
-        private static void SyncRegisterDescriptionStatus(object modbusTransport)
+        private void SyncRegisterDescriptionStatus(object modbusTransport)
         {
             ModbusTransportDevice transport = (ModbusTransportDevice)modbusTransport;
             
@@ -211,29 +218,35 @@ namespace SpaceCG.Module.Modbus
         /// 同步寄存器数据
         /// </summary>
         /// <param name="modbusTransport"></param>
-        private static void SyncModbusDevicesStatus(object modbusTransport)
+        private void SyncModbusDevicesStatus(CancellationToken token)
         {
-            ModbusTransportDevice transport = (ModbusTransportDevice)modbusTransport;
+            //ModbusTransportDevice transport = this;// (ModbusTransportDevice)modbusTransport;
 
             Stopwatch stopwatch = new Stopwatch();
-            ICollection<ModbusIODevice> devices = transport.ModbusDevices.Values;
+            ICollection<ModbusIODevice> devices = ModbusDevices.Values;
 
-            while(transport.IOThreadRunning)
+            while(IOThreadRunning)
             {
+                if (token.IsCancellationRequested)
+                {
+                    Log.Info($"Cancellation Requested ... {Thread.CurrentThread.ManagedThreadId}");
+                    return;
+                }
+
                 stopwatch.Restart();
 
                 foreach (ModbusIODevice device in devices)
                 {
-                    if (!transport.IOThreadRunning) break;
+                    if (!IOThreadRunning) break;
 
                     device.SyncInputRegisters();
-                    transport.SyncOutputMethodQueues();
+                    this.SyncOutputMethodQueues();
                 }                
 
-                transport.ElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
+                this.ElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
             }
 
-            transport.ElapsedMilliseconds = 0;
+            this.ElapsedMilliseconds = 0;
         }
 
         /// <summary>

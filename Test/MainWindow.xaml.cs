@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -133,6 +134,8 @@ namespace Test
 
             //Console.WriteLine(Convert.ToByte("46", 16));
             //Console.WriteLine(Convert.ToByte("1101", 2));
+
+            Console.WriteLine(Regex.Replace("0B 1101  1101_ 1101_", @"[_ ]",  ""));
         }
 
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice slaveDevice, Register register)
@@ -179,6 +182,7 @@ namespace Test
             }
             else if(button == Button_Test2)
             {
+                
                 //transport.TurnSingleCoil(device.Address, 1);
             }
             else if(button == Button_Start)

@@ -38,32 +38,32 @@ namespace SpaceCG.Extensions
 
             object[] parameters = new object[2];
             MethodInfo ConvertToNumber = methods.First();
-            String numString = numberString.ToUpper().Trim();
+            String numString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
 
             if (numString.IndexOf("0B") == 0)
             {
                 parameters[1] = 2;
-                parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                parameters[0] = numString.Substring(2);
             }
             else if (numString.IndexOf("O") == 0)
             {
                 parameters[1] = 8;
-                parameters[0] = numString.Substring(1).Replace("_", "").Replace(" ", "");
+                parameters[0] = numString.Substring(1);
             }
             else if (numString.IndexOf("0D") == 0)
             {
                 parameters[1] = 10;
-                parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                parameters[0] = numString.Substring(2);
             }
             else if (numString.IndexOf("0X") == 0)
             {
                 parameters[1] = 16;
-                parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                parameters[0] = numString.Substring(2);
             }
             else
             {
                 parameters[1] = 10;
-                parameters[0] = numString.Replace("_", "").Replace(" ", "");
+                parameters[0] = numString;
             }
 
             try
@@ -114,35 +114,36 @@ namespace SpaceCG.Extensions
             {
                 if (String.IsNullOrWhiteSpace(stringArray[i])) continue;
 
-                String numString = stringArray[i].ToUpper().Trim();
+                String numString = stringArray[i].ToUpper().Replace(" ", "").Replace("_", "");
 
                 if (numString.IndexOf("0B") == 0)
                 {
                     parameters[1] = 2;
-                    parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                    parameters[0] = numString.Substring(2);
                 }
                 else if (numString.IndexOf("O") == 0)
                 {
                     parameters[1] = 8;
-                    parameters[0] = numString.Substring(1).Replace("_", "").Replace(" ", "");
+                    parameters[0] = numString.Substring(1);
                 }
                 else if (numString.IndexOf("0D") == 0)
                 {
                     parameters[1] = 10;
-                    parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                    parameters[0] = numString.Substring(2);
                 }
                 else if (numString.IndexOf("0X") == 0)
                 {
                     parameters[1] = 16;
-                    parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                    parameters[0] = numString.Substring(2);
                 }
                 else
                 {
                     parameters[1] = 10;
-                    parameters[0] = numString.Replace("_", "").Replace(" ", "");
+                    parameters[0] = numString;
                 }
 
                 NumberType newValue;
+
                 try
                 {
                     newValue = (NumberType)ConvertToNumber.Invoke(null, parameters);
@@ -158,6 +159,7 @@ namespace SpaceCG.Extensions
 
             return true;
         }
+
 
 #if false
         /// <summary>
@@ -275,55 +277,58 @@ namespace SpaceCG.Extensions
         }
 #endif
 
-        /// <summary>
-        /// 将字符解析为 <see cref="System.Byte"/> 类型数组
-        /// </summary>
-        /// <param name="value"></param>
-        /// <param name="array">如果为空，则字符分割的数组长度返回转换结果，如果不为空，则按 array 的长度返回转换结果</param>
-        /// <param name="separator">分隔字符串中子字符串的字符数组、不包含分隔符的空数组或 null。</param>
-        /// <param name="style">枚举值的按位组合，用于指示可出现在 string 中的样式元素。要指定的一个典型值为 System.Globalization.NumberStyles.Integer。</param>
-        /// <param name="provider">一个对象，提供有关 string 的区域性特定格式设置信息。</param>
-        /// <returns></returns>
-        public static bool ToByteArray(this String value, ref byte[] array, char separator = ',') => TryParse<Byte>(value, ref array, separator);
 
         /// <summary>
-        /// 将字符解析为 <see cref="System.Int16"/> 类型数组
-        /// </summary>
-        /// <param name="value"></param>
-        /// <param name="array">如果为空，则字符分割的数组长度返回转换结果，如果不为空，则按 array 的长度返回转换结果</param>
-        /// <param name="separator">分隔字符串中子字符串的字符数组、不包含分隔符的空数组或 null。</param>
-        /// <param name="style">枚举值的按位组合，用于指示可出现在 string 中的样式元素。要指定的一个典型值为 System.Globalization.NumberStyles.Integer。</param>
-        /// <returns></returns>
-        public static bool ToInt16Array(this String value, ref Int16[] array, char separator = ',') => TryParse<Int16>(value, ref array, separator);
-        /// <summary>
-        /// 将字符解析为 <see cref="System.UInt16"/> 类型数组
-        /// </summary>
-        /// <param name="value"></param>
-        /// <param name="array">如果为空，则字符分割的数组长度返回转换结果，如果不为空，则按 array 的长度返回转换结果</param>
-        /// <param name="separator">分隔字符串中子字符串的字符数组、不包含分隔符的空数组或 null。</param>
-        /// <param name="style">枚举值的按位组合，用于指示可出现在 string 中的样式元素。要指定的一个典型值为 System.Globalization.NumberStyles.Integer。</param>
-        /// <returns></returns>
-        public static bool ToUInt16Array(this String value, ref UInt16[] array, char separator = ',') => TryParse<UInt16>(value, ref array, separator);
-
-        /// <summary>
-        /// 将字符解析为 <see cref="System.Int32"/> 类型数组
-        /// </summary>
-        /// <param name="value"></param>
-        /// <param name="array">如果为空，则按字符串分割的数组长度返回转换结果，如果不为空，则按 array 的长度返回转换结果；</param>
-        /// <param name="separator">分隔字符串中子字符串的字符数组、不包含分隔符的空数组或 null。</param>
-        /// <param name="style">枚举值的按位组合，用于指示可出现在 string 中的样式元素。要指定的一个典型值为 System.Globalization.NumberStyles.Integer。</param>
-        /// <param name="provider">一个对象，提供有关 string 的区域性特定格式设置信息。</param>
-        /// <returns></returns>
-        public static bool ToInt32Array(this String value, ref int[] array, char separator = ',') => TryParse<Int32>(value, ref array, separator);
-        /// <summary>
-        /// 将字符解析为 <see cref="System.UInt32"/> 类型数组
+        /// 将多个 <see cref="System.SByte"/> 格式的字符串解析为 <see cref="System.SByte"/> 类型数组
         /// </summary>
         /// <param name="value"></param>
         /// <param name="array"></param>
         /// <param name="separator"></param>
-        /// <param name="style"></param>
         /// <returns></returns>
-        public static bool ToUInt32Array(this String value, ref uint[] array, char separator = ',') => TryParse<UInt32>(value, ref array, separator);
+        public static bool TryParseToSByteArray(this String value, ref sbyte[] array, char separator = ',') => TryParse<SByte>(value, ref array, separator);
+        /// <summary>
+        /// 将多个 <see cref="System.Byte"/> 格式的字符串解析为 <see cref="System.Byte"/> 类型数组
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="array"></param>
+        /// <param name="separator"></param>
+        /// <returns></returns>
+        public static bool TryParseToByteArray(this String value, ref byte[] array, char separator = ',') => TryParse<Byte>(value, ref array, separator);
+
+        /// <summary>
+        /// 将多个 <see cref="System.Int16"/> 格式的字符串解析为 <see cref="System.Int16"/> 类型数组
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="array"></param>
+        /// <param name="separator"></param>
+        /// <returns></returns>
+        public static bool TryParseToInt16Array(this String value, ref Int16[] array, char separator = ',') => TryParse<Int16>(value, ref array, separator);
+        /// <summary>
+        /// 将多个 <see cref="System.UInt16"/> 格式的字符串解析为 <see cref="System.UInt16"/> 类型数组
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="array"></param>
+        /// <param name="separator"></param>
+        /// <returns></returns>
+        public static bool TryParseToUInt16Array(this String value, ref UInt16[] array, char separator = ',') => TryParse<UInt16>(value, ref array, separator);
+
+        /// <summary>
+        /// 将多个 <see cref="System.Int32"/> 格式的字符串解析为 <see cref="System.Int32"/> 类型数组
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="array"></param>
+        /// <param name="separator"></param>
+        /// <returns></returns>
+        public static bool TryParseToInt32Array(this String value, ref Int32[] array, char separator = ',') => TryParse<Int32>(value, ref array, separator);
+        /// <summary>
+        /// 将多个 <see cref="System.UInt32"/> 格式的字符串解析为 <see cref="System.UInt32"/> 类型数组
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="array"></param>
+        /// <param name="separator"></param>
+        /// <returns></returns>
+        public static bool TryParseToUInt32Array(this String value, ref UInt32[] array, char separator = ',') => TryParse<UInt32>(value, ref array, separator);
+
 
         /// <summary>
         /// 将字符串参数集，分割转换为字符串数组，注意：不支持中文字符串
@@ -409,7 +414,6 @@ namespace SpaceCG.Extensions
 
             return arguments;
         }
-
         /// <summary>
         /// 值类型参数转换
         /// <para>示例：UInt32 value = (UInt32)StringExtension.ConvertParamsToValueType(typeof(UInt32), "45");</para>
