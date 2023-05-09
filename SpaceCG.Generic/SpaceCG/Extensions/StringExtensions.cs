@@ -14,6 +14,64 @@ namespace SpaceCG.Extensions
         /// </summary>
         private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(StringExtensions));
 
+        public static bool TryParse<NumberType>(this String numberString, out NumberType value) 
+            where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
+        {
+            value = default;
+            if (String.IsNullOrWhiteSpace(numberString)) return false;
+
+            String methodName = $"To{typeof(NumberType).Name}";
+            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                              where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
+                                              let m_params = method.GetParameters()
+                                              where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
+                                              select method;
+
+            if (methods?.Count() != 1) return false;
+
+            int fromBase = 10;
+            MethodInfo ConvertToNumber = methods.First();
+            String numString = numberString.ToLower().Trim();
+
+            if (numString.IndexOf("0b") == 0)
+            {
+                fromBase = 2;
+                numString = numString.Substring(2).Replace("_", "").Replace(" ", "");
+            }
+            else if (numString.IndexOf("o") == 0)
+            {
+                fromBase = 8;
+                numString = numString.Substring(1).Replace("_", "").Replace(" ", "");
+            }
+            else if (numString.IndexOf("0d") == 0)
+            {
+                fromBase = 10;
+                numString = numString.Substring(2).Replace("_", "").Replace(" ", "");
+            }
+            else if (numString.IndexOf("0x") == 0)
+            {
+                fromBase = 16;
+                numString = numString.Substring(2).Replace("_", "").Replace(" ", "");
+            }
+            else
+            {
+                fromBase = 10;
+                numString = numString.Replace("_", "").Replace(" ", "");
+            }
+
+            try
+            {
+                value = (NumberType)ConvertToNumber.Invoke(null, new object[] { numString, fromBase });
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex);
+                return false;
+            }
+
+            return true;
+        }
+
         /// <summary>
         /// 将数字字符类型型转为数值类型
         /// </summary>
@@ -35,13 +93,17 @@ namespace SpaceCG.Extensions
 
             if (methods?.Count() != 1) return false;
 
-            String strNum = value.ToLower();
             MethodInfo TryParse = methods.First();
+            String strNum = value.ToLower().Trim();
 
-            if (strNum.IndexOf("0x") != -1)
+            if (strNum.IndexOf("0x") == 0)
             {
                 style = NumberStyles.HexNumber;
                 strNum = strNum.Replace("0x", "");
+            }
+            else if(strNum.IndexOf("0b") == 0)
+            {
+
             }
 
             bool result = false;
@@ -233,6 +295,26 @@ namespace SpaceCG.Extensions
 
             for (int i = 0; i < paramValues.Length; i++)
                 arguments.SetValue(ConvertParamsToValueType(elementType, paramValues[i]), i);
+
+            return arguments;
+        }
+        /// <summary>
+        /// 数组类型参数转换
+        /// <para>示例：var array = StringExtension.ConvertParamsToArrayType(typeof(Byte[]), new Object[] { "0x45", "0x46", 0x47 });</para>
+        /// </summary>
+        /// <param name="paramArrayType"></param>
+        /// <param name="paramValues"></param>
+        /// <returns></returns>
+        public static System.Array ConvertParamsToArrayType(Type paramArrayType, Array paramValues)
+        {
+            if (paramArrayType == null || paramValues?.Length <= 0) return null;
+            if (!paramArrayType.IsArray) throw new ArgumentException(nameof(paramArrayType), "参数应为数组或集合类型数据");
+
+            Type elementType = paramArrayType.GetElementType();
+            Array arguments = Array.CreateInstance(elementType, paramValues.Length);
+
+            for (int i = 0; i < paramValues.Length; i++)
+                arguments.SetValue(ConvertParamsToValueType(elementType, paramValues.GetValue(i)), i);
 
             return arguments;
         }

@@ -292,7 +292,6 @@ namespace SpaceCG.Extensions
                     else
                     {
                         arguments[i] = Convert.ChangeType(_parameters[i], pInfo.ParameterType);
-                        Console.WriteLine(arguments[i]);
                     }
                 }
 

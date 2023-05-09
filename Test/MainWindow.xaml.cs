@@ -88,14 +88,14 @@ namespace Test
             //bool result = byte.TryParse(str, NumberStyles.AllowHexSpecifier | NumberStyles.HexNumber, null, out byte value);
             //Console.WriteLine($"resul: {result} , {value}");
 
-            
-            String registerAddress = $"{RegisterType.CoilsStatus}Address";
-            Console.WriteLine(registerAddress);
 
-            Console.WriteLine(typeof(NumberStyles));
+            //String registerAddress = $"{RegisterType.CoilsStatus}Address";
+            //Console.WriteLine(registerAddress);
 
-            deviceManager = new ModbusDeviceManager(2000);
-            deviceManager.LoadDeviceConfig("ModbusDevices.Config");
+            //Console.WriteLine(typeof(NumberStyles));
+
+            //deviceManager = new ModbusDeviceManager(2000);
+            //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
 
 #if false
             //object[] arr1 = StringExtension.ConvertParameters2("0x01,3,[True,True,False]");
@@ -113,6 +113,23 @@ namespace Test
 
             Console.WriteLine(value);
 #endif
+
+            int v = 0B1101;
+            Byte value = 0x00;
+            //StringExtensions.TryParse("B1101", out value);
+
+            //ushort.TryParse("1101", NumberStyles.Number, null, out ushort result);
+            //Console.WriteLine(result);
+
+            StringExtensions.TryParse("0B1101 1101", out byte result);
+            Console.WriteLine($"Result:::{result}");
+
+            StringExtensions.TryParse("0D4545", out short result2);
+            Console.WriteLine($"Result2:::{result2}");
+
+
+            //Console.WriteLine(Convert.ToByte("46", 16));
+            //Console.WriteLine(Convert.ToByte("1101", 2));
         }
 
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, byte slaveAddress, Register register)
