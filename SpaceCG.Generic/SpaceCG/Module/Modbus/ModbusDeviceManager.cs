@@ -48,23 +48,8 @@ namespace SpaceCG.Module.Modbus
         /// <summary>
         /// Modbus 设备管理对象
         /// </summary>
-        /// <param name="accessName">当前对象可通过反射技术访问的名称</param>
-        public ModbusDeviceManager(ushort localPort = 2023, String accessName = nameof(ModbusDeviceManager))
-        {
-            this.Name = accessName;
-            if(localPort >= 1024)
-            {
-                HPTcpServer = HPSocketExtensions.CreateNetworkServer<HPSocket.Tcp.TcpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
-                HPUdpServer = HPSocketExtensions.CreateNetworkServer<HPSocket.Udp.UdpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
-            }
-        }
-
-        private HandleResult OnServerReceiveEventHandler(IServer sender, IntPtr connId, byte[] data)
-        {
-            String message = Encoding.UTF8.GetString(data);
-            ReceiveNetworkMessageHandler(message);
-
-            return HandleResult.Ok; 
+        public ModbusDeviceManager()
+        {            
         }
 
         /// <summary>
@@ -126,8 +111,9 @@ namespace SpaceCG.Module.Modbus
             ResetAndClear();
 
             Configuration = XElement.Load(configFile);
-            ModbusElements = Configuration.Elements("Modbus"); 
-            
+            ModbusElements = Configuration.Elements("Modbus");
+
+            ParseRootAttributes();
             ParseConnectionsConfig(Configuration.Descendants("Connection"));            
             ParseModbusDevicesConfig(Configuration.Elements("Modbus"));
 
@@ -138,6 +124,22 @@ namespace SpaceCG.Module.Modbus
             {
                 CallEventName(transport.Name, "Initialize");
                 Thread.Sleep(128);
+            }
+        }
+
+        /// <summary>
+        /// 解析配置的 Root 节点的属性值
+        /// </summary>
+        private void ParseRootAttributes()
+        {
+            if (String.IsNullOrWhiteSpace(Configuration?.Attribute("Name")?.Value) || 
+                String.IsNullOrWhiteSpace(Configuration?.Attribute("LocalPort")?.Value)) return;
+
+            if (ushort.TryParse(Configuration?.Attribute("LocalPort")?.Value, out ushort localPort) && localPort >= 1024)
+            {
+                this.Name = Configuration.Attribute("Name").Value;
+                HPTcpServer = HPSocketExtensions.CreateNetworkServer<HPSocket.Tcp.TcpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
+                HPUdpServer = HPSocketExtensions.CreateNetworkServer<HPSocket.Udp.UdpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
             }
         }
         /// <summary>
@@ -214,6 +216,22 @@ namespace SpaceCG.Module.Modbus
                 }
             }
         }
+
+        /// <summary>
+        /// On Server Receive Event Handler
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="connId"></param>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        private HandleResult OnServerReceiveEventHandler(IServer sender, IntPtr connId, byte[] data)
+        {
+            String message = Encoding.UTF8.GetString(data);
+            ReceiveNetworkMessageHandler(message);
+
+            return HandleResult.Ok;
+        }
+
         /// <summary>
         /// 总线 Input 事件处理
         /// </summary>
@@ -373,6 +391,9 @@ namespace SpaceCG.Module.Modbus
         /// </summary>
         private void ResetAndClear()
         {
+            HPSocketExtensions.DisposeNetworkServer(ref HPTcpServer);
+            HPSocketExtensions.DisposeNetworkServer(ref HPUdpServer);
+
             foreach (ModbusTransportDevice transport in TransportDevices)
             {
                 CallEventName(transport.Name, "Dispose");
@@ -409,22 +430,6 @@ namespace SpaceCG.Module.Modbus
             AccessObjects = null;
             TransportDevices = null;
 
-            if(HPTcpServer != null)
-            {
-                List<IntPtr> clients = HPTcpServer.GetAllConnectionIds();
-                foreach (IntPtr client in clients)
-                    HPTcpServer.Disconnect(client, true);
-                HPTcpServer.Dispose();
-                HPTcpServer = null;
-            }
-            if (HPUdpServer != null)
-            {
-                List<IntPtr> clients = HPUdpServer.GetAllConnectionIds();
-                foreach (IntPtr client in clients)
-                    HPUdpServer.Disconnect(client, true);
-                HPUdpServer.Dispose();
-                HPUdpServer = null;
-            }
         }
         /// <inheritdoc/>
         public override string ToString()

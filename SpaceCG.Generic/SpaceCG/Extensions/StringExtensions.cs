@@ -14,10 +14,17 @@ namespace SpaceCG.Extensions
         /// </summary>
         private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(StringExtensions));
 
-        public static bool TryParse<NumberType>(this String numberString, out NumberType value) 
+        /// <summary>
+        /// 将数字字符类型转为数值类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)字符串的转换。
+        /// </summary>
+        /// <typeparam name="NumberType"></typeparam>
+        /// <param name="numberString"></param>
+        /// <param name="result"></param>
+        /// <returns></returns>
+        public static bool TryParse<NumberType>(this String numberString, out NumberType result) 
             where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
         {
-            value = default;
+            result = default;
             if (String.IsNullOrWhiteSpace(numberString)) return false;
 
             String methodName = $"To{typeof(NumberType).Name}";
@@ -29,39 +36,39 @@ namespace SpaceCG.Extensions
 
             if (methods?.Count() != 1) return false;
 
-            int fromBase = 10;
+            object[] parameters = new object[2];
             MethodInfo ConvertToNumber = methods.First();
-            String numString = numberString.ToLower().Trim();
+            String numString = numberString.ToUpper().Trim();
 
-            if (numString.IndexOf("0b") == 0)
+            if (numString.IndexOf("0B") == 0)
             {
-                fromBase = 2;
-                numString = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                parameters[1] = 2;
+                parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
             }
-            else if (numString.IndexOf("o") == 0)
+            else if (numString.IndexOf("O") == 0)
             {
-                fromBase = 8;
-                numString = numString.Substring(1).Replace("_", "").Replace(" ", "");
+                parameters[1] = 8;
+                parameters[0] = numString.Substring(1).Replace("_", "").Replace(" ", "");
             }
-            else if (numString.IndexOf("0d") == 0)
+            else if (numString.IndexOf("0D") == 0)
             {
-                fromBase = 10;
-                numString = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                parameters[1] = 10;
+                parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
             }
-            else if (numString.IndexOf("0x") == 0)
+            else if (numString.IndexOf("0X") == 0)
             {
-                fromBase = 16;
-                numString = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                parameters[1] = 16;
+                parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
             }
             else
             {
-                fromBase = 10;
-                numString = numString.Replace("_", "").Replace(" ", "");
+                parameters[1] = 10;
+                parameters[0] = numString.Replace("_", "").Replace(" ", "");
             }
 
             try
             {
-                value = (NumberType)ConvertToNumber.Invoke(null, new object[] { numString, fromBase });
+                result = (NumberType)ConvertToNumber.Invoke(null, parameters);
             }
             catch (Exception ex)
             {
@@ -73,12 +80,94 @@ namespace SpaceCG.Extensions
         }
 
         /// <summary>
+        /// 将多个数值字符类型(默认以 ',' 分割)型转为数值数组类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)字符串的转换。
+        /// </summary>
+        /// <typeparam name="NumberType"></typeparam>
+        /// <param name="numberString"></param>
+        /// <param name="defaultValues"></param>
+        /// <param name="separator"></param>
+        /// <returns></returns>
+        public static bool TryParse<NumberType>(this String numberString, ref NumberType[] defaultValues, char separator = ',')
+            where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
+        {
+            if (String.IsNullOrWhiteSpace(numberString)) return false;
+
+            string[] stringArray = numberString.Trim().Split(new char[] { separator }, StringSplitOptions.None);
+
+            if (defaultValues == null || defaultValues.Length <= 0)
+                defaultValues = new NumberType[stringArray.Length];
+            int length = Math.Min(stringArray.Length, defaultValues.Length);
+
+            String methodName = $"To{typeof(NumberType).Name}";
+            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                              where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
+                                              let m_params = method.GetParameters()
+                                              where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
+                                              select method;
+
+            if (methods?.Count() != 1) return false;
+
+            object[] parameters = new object[2];
+            MethodInfo ConvertToNumber = methods.First();
+
+            for (int i = 0; i < length; i++)
+            {
+                if (String.IsNullOrWhiteSpace(stringArray[i])) continue;
+
+                String numString = stringArray[i].ToUpper().Trim();
+
+                if (numString.IndexOf("0B") == 0)
+                {
+                    parameters[1] = 2;
+                    parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                }
+                else if (numString.IndexOf("O") == 0)
+                {
+                    parameters[1] = 8;
+                    parameters[0] = numString.Substring(1).Replace("_", "").Replace(" ", "");
+                }
+                else if (numString.IndexOf("0D") == 0)
+                {
+                    parameters[1] = 10;
+                    parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                }
+                else if (numString.IndexOf("0X") == 0)
+                {
+                    parameters[1] = 16;
+                    parameters[0] = numString.Substring(2).Replace("_", "").Replace(" ", "");
+                }
+                else
+                {
+                    parameters[1] = 10;
+                    parameters[0] = numString.Replace("_", "").Replace(" ", "");
+                }
+
+                NumberType newValue;
+                try
+                {
+                    newValue = (NumberType)ConvertToNumber.Invoke(null, parameters);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex);
+                    continue;
+                }
+
+                defaultValues[i] = newValue;
+            }
+
+            return true;
+        }
+
+#if false
+        /// <summary>
         /// 将数字字符类型型转为数值类型
         /// </summary>
         /// <typeparam name="NumberType"></typeparam>
         /// <param name="value"></param>
         /// <param name="number"></param>
         /// <param name="style"></param>
+        [Obsolete("不在使用", true)]
         public static bool TryParse<NumberType>(this String value, out NumberType number, NumberStyles style = NumberStyles.None)
             where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
         {
@@ -131,6 +220,7 @@ namespace SpaceCG.Extensions
         /// <param name="defaultArray"></param>
         /// <param name="separator"></param>
         /// <param name="style"></param>
+        [Obsolete("不在使用", true)]
         public static bool TryParse<NumberType>(this String value, ref NumberType[] defaultArray, char separator = ',', NumberStyles style = NumberStyles.None)
             where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
         {
@@ -183,6 +273,7 @@ namespace SpaceCG.Extensions
             }
             return true;
         }
+#endif
 
         /// <summary>
         /// 将字符解析为 <see cref="System.Byte"/> 类型数组
@@ -193,7 +284,7 @@ namespace SpaceCG.Extensions
         /// <param name="style">枚举值的按位组合，用于指示可出现在 string 中的样式元素。要指定的一个典型值为 System.Globalization.NumberStyles.Integer。</param>
         /// <param name="provider">一个对象，提供有关 string 的区域性特定格式设置信息。</param>
         /// <returns></returns>
-        public static bool ToByteArray(this String value, ref byte[] array, char separator = ',', NumberStyles style = NumberStyles.HexNumber) => TryParse<Byte>(value, ref array, separator, style);
+        public static bool ToByteArray(this String value, ref byte[] array, char separator = ',') => TryParse<Byte>(value, ref array, separator);
 
         /// <summary>
         /// 将字符解析为 <see cref="System.Int16"/> 类型数组
@@ -203,7 +294,7 @@ namespace SpaceCG.Extensions
         /// <param name="separator">分隔字符串中子字符串的字符数组、不包含分隔符的空数组或 null。</param>
         /// <param name="style">枚举值的按位组合，用于指示可出现在 string 中的样式元素。要指定的一个典型值为 System.Globalization.NumberStyles.Integer。</param>
         /// <returns></returns>
-        public static bool ToInt16Array(this String value, ref Int16[] array, char separator = ',', NumberStyles style = NumberStyles.None) => TryParse<Int16>(value, ref array, separator, style);
+        public static bool ToInt16Array(this String value, ref Int16[] array, char separator = ',') => TryParse<Int16>(value, ref array, separator);
         /// <summary>
         /// 将字符解析为 <see cref="System.UInt16"/> 类型数组
         /// </summary>
@@ -212,7 +303,7 @@ namespace SpaceCG.Extensions
         /// <param name="separator">分隔字符串中子字符串的字符数组、不包含分隔符的空数组或 null。</param>
         /// <param name="style">枚举值的按位组合，用于指示可出现在 string 中的样式元素。要指定的一个典型值为 System.Globalization.NumberStyles.Integer。</param>
         /// <returns></returns>
-        public static bool ToUInt16Array(this String value, ref UInt16[] array, char separator = ',', NumberStyles style = NumberStyles.HexNumber) => TryParse<UInt16>(value, ref array, separator, style);
+        public static bool ToUInt16Array(this String value, ref UInt16[] array, char separator = ',') => TryParse<UInt16>(value, ref array, separator);
 
         /// <summary>
         /// 将字符解析为 <see cref="System.Int32"/> 类型数组
@@ -223,7 +314,7 @@ namespace SpaceCG.Extensions
         /// <param name="style">枚举值的按位组合，用于指示可出现在 string 中的样式元素。要指定的一个典型值为 System.Globalization.NumberStyles.Integer。</param>
         /// <param name="provider">一个对象，提供有关 string 的区域性特定格式设置信息。</param>
         /// <returns></returns>
-        public static bool ToInt32Array(this String value, ref int[] array, char separator = ',', NumberStyles style = NumberStyles.None) => TryParse<Int32>(value, ref array, separator, style);
+        public static bool ToInt32Array(this String value, ref int[] array, char separator = ',') => TryParse<Int32>(value, ref array, separator);
         /// <summary>
         /// 将字符解析为 <see cref="System.UInt32"/> 类型数组
         /// </summary>
@@ -232,7 +323,7 @@ namespace SpaceCG.Extensions
         /// <param name="separator"></param>
         /// <param name="style"></param>
         /// <returns></returns>
-        public static bool ToUInt32Array(this String value, ref uint[] array, char separator = ',', NumberStyles style = NumberStyles.HexNumber) => TryParse<UInt32>(value, ref array, separator, style);
+        public static bool ToUInt32Array(this String value, ref uint[] array, char separator = ',') => TryParse<UInt32>(value, ref array, separator);
 
         /// <summary>
         /// 将字符串参数集，分割转换为字符串数组，注意：不支持中文字符串

@@ -61,13 +61,13 @@ namespace Test
 
             Register description = Register.Create(0x0001, RegisterType.HoldingRegister, 4, true);
 
-            var value = ModbusIODevice.GetRegisterValue(registers, description);
+            var value = ModbusIODevice.GetRegisterValue(description);
 
             Console.WriteLine(">>> {0:X16}", value);
 #endif
 #if false
             Console.WriteLine("Loading..");
-            master = InstanceExtension.CreateNModbus4Master("SERIAL", "COM3", 9600);
+            master = NModbus4Extensions.CreateNModbus4Master("SERIAL", "COM3", 9600);
 
             if (master == null) throw new Exception("Master Error.");
 
@@ -88,13 +88,12 @@ namespace Test
             //bool result = byte.TryParse(str, NumberStyles.AllowHexSpecifier | NumberStyles.HexNumber, null, out byte value);
             //Console.WriteLine($"resul: {result} , {value}");
 
-
             //String registerAddress = $"{RegisterType.CoilsStatus}Address";
             //Console.WriteLine(registerAddress);
 
             //Console.WriteLine(typeof(NumberStyles));
 
-            //deviceManager = new ModbusDeviceManager(2000);
+            //deviceManager = new ModbusDeviceManager();
             //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
 
 #if false
@@ -121,28 +120,32 @@ namespace Test
             //ushort.TryParse("1101", NumberStyles.Number, null, out ushort result);
             //Console.WriteLine(result);
 
-            StringExtensions.TryParse("0B1101 1101", out byte result);
+            StringExtensions.TryParse("0B1101_1101", out byte result);
             Console.WriteLine($"Result:::{result}");
 
-            StringExtensions.TryParse("0D4545", out short result2);
+            StringExtensions.TryParse("4545", out short result2);
             Console.WriteLine($"Result2:::{result2}");
 
+            short[] result3 = new short[]{ 0x01, 0x02 };
+            StringExtensions.TryParse<short>("0x4545,0B1101", ref result3);
+
+            Console.WriteLine($"Result3:::{result3}");
 
             //Console.WriteLine(Convert.ToByte("46", 16));
             //Console.WriteLine(Convert.ToByte("1101", 2));
         }
 
-        private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, byte slaveAddress, Register register)
+        private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice slaveDevice, Register register)
         {
             Console.WriteLine(register);
             if(register.Type == RegisterType.CoilsStatus || register.Type == RegisterType.DiscreteInput)
-                Console.WriteLine($"OutputChange {transportDevice} slaveAddress:{slaveAddress}, registerAddress:{register.Address}, newValue:{Convert.ToString((int)register.Value, 2)}, oldValue:{register.LastValue}");
+                Console.WriteLine($"OutputChange {transportDevice} slaveAddress:{slaveDevice.Address}, registerAddress:{register.Address}, newValue:{Convert.ToString((int)register.Value, 2)}, oldValue:{register.LastValue}");
         }
 
-        private void Transport_InputChangeEvent(ModbusTransportDevice transportDevice, byte slaveAddress, Register register)
+        private void Transport_InputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice slaveDevice, Register register)
         {
             Console.WriteLine(register);
-            Console.WriteLine($"InputChange {transportDevice} slaveAddress:{slaveAddress}, registerAddress:{register.Address}, newValue:{Convert.ToString((int)register.Value, 2)}, oldValue:{register.LastValue}");
+            Console.WriteLine($"InputChange {transportDevice} slaveAddress:{slaveDevice.Address}, registerAddress:{register.Address}, newValue:{Convert.ToString((int)register.Value, 2)}, oldValue:{register.LastValue}");
         }
 
 #if false
