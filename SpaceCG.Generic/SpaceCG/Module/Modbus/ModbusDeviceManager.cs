@@ -162,7 +162,7 @@ namespace SpaceCG.Module.Modbus
                 String[] args = parameters.Split(',');
                 if (args.Length != 3 || !int.TryParse(args[2], out int port)) continue;
 
-                switch(type.ToUpper())
+                switch(type.ToUpper().Replace(" ", ""))
                 {
                     case "SERIAL":
                         AddAccessObject(name, new SerialPort(args[1], port));
@@ -227,7 +227,11 @@ namespace SpaceCG.Module.Modbus
         private HandleResult OnServerReceiveEventHandler(IServer sender, IntPtr connId, byte[] data)
         {
             String message = Encoding.UTF8.GetString(data);
-            ReceiveNetworkMessageHandler(message);
+            //ReceiveNetworkMessageHandler(message);
+            if(InstanceExtensions.TryParseCallMethod(message, AccessObjects, out object result))
+            {
+                Log.Info($"Return Result: {result}");
+            }
 
             return HandleResult.Ok;
         }
@@ -288,7 +292,8 @@ namespace SpaceCG.Module.Modbus
                             Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
                         IEnumerable<XElement> actions = evt.Elements("Action");
-                        foreach (XElement action in actions) CallActionElement(action);
+                        //foreach (XElement action in actions) CallActionElement(action);
+                        foreach (XElement action in actions) InstanceExtensions.TryParseCallMethod(action, AccessObjects, out object result);
                         continue;
                     }
                     else if(StringExtensions.TryParse(evt.Attribute("MinValue")?.Value, out ulong minValue) && StringExtensions.TryParse(evt.Attribute("MaxValue")?.Value, out ulong maxValue))
@@ -299,7 +304,8 @@ namespace SpaceCG.Module.Modbus
                                 Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
                             IEnumerable<XElement> actions = evt.Elements("Action");
-                            foreach (XElement action in actions) CallActionElement(action);
+                            //foreach (XElement action in actions) CallActionElement(action);
+                            foreach (XElement action in actions) InstanceExtensions.TryParseCallMethod(action, AccessObjects, out object result);
                         }
                     }
                 }
@@ -323,7 +329,8 @@ namespace SpaceCG.Module.Modbus
                     if (evt.Attribute("Name")?.Value == eventName)
                     {
                         IEnumerable<XElement> actions = evt.Elements("Action");
-                        foreach (XElement action in actions) CallActionElement(action);
+                        //foreach (XElement action in actions) CallActionElement(action);
+                        foreach (XElement action in actions) InstanceExtensions.TryParseCallMethod(action, AccessObjects, out object result);
                     }
                 }
             }
@@ -354,7 +361,8 @@ namespace SpaceCG.Module.Modbus
 
             try
             {
-                this.CallActionElement(element);
+                //this.CallActionElement(element);
+                InstanceExtensions.TryParseCallMethod(element, AccessObjects, out object result);
             }
             catch (Exception ex)
             {
@@ -365,13 +373,13 @@ namespace SpaceCG.Module.Modbus
         /// 分析/调用 Action 配置节点 
         /// </summary>
         /// <param name="action"></param>
-        internal void CallActionElement(XElement action)
+        internal void CallActionElement2(XElement action)
         {
             if (action == null || action.Name != "Action") return;
-            if (String.IsNullOrWhiteSpace(action.Attribute("TargetName")?.Value) ||
+            if (String.IsNullOrWhiteSpace(action.Attribute("Target")?.Value) ||
                 String.IsNullOrWhiteSpace(action.Attribute("Method")?.Value)) return;
 
-            String key = action.Attribute("TargetName").Value;
+            String key = action.Attribute("Target").Value;
             String methodName = action.Attribute("Method").Value;
 
             if (!AccessObjects.TryGetValue(key, out IDisposable targetObj))

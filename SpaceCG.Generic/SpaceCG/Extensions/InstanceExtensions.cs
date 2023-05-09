@@ -227,60 +227,73 @@ namespace SpaceCG.Extensions
         /// <param name="instanceObj"></param>
         /// <param name="methodInfo"></param>
         /// <param name="parameters"></param>
-        /// <returns></returns>
+        /// <returns>调用 Method 的返回值</returns>
         public static object CallInstanceMethod(object instanceObj, MethodInfo methodInfo, params object[] parameters)
         {
+            if (methodInfo == null) return null;
+
             ParameterInfo[] parameterInfos = methodInfo.GetParameters();
 
-            String paramInfo = "";
+            String paramDebugInfo = "";
             if (parameterInfos.Length > 0)
             {
                 foreach (ParameterInfo info in parameterInfos)
-                    paramInfo += info.ToString() + ", ";
-                paramInfo = paramInfo.Substring(0, paramInfo.Length - 2);
+                    paramDebugInfo += info.ToString() + ", ";
+                paramDebugInfo = paramDebugInfo.Substring(0, paramDebugInfo.Length - 2);
             }
 
             object[] _parameters = null;
             int paramsLength = parameters == null ? 0 : parameters.Length;
 
-            //扩展方法
-            if (methodInfo.IsStatic && methodInfo.IsDefined(typeof(ExtensionAttribute), false) && paramsLength != parameterInfos.Length)
+            if(instanceObj != null)
             {
-                _parameters = new object[paramsLength + 1];
-                _parameters[0] = instanceObj;
-                for (int i = 0; i < paramsLength; i++)
-                    _parameters[i + 1] = parameters[i];
+                //实例方法
+                if (!methodInfo.IsStatic)
+                {
+                    _parameters = parameters;
+                    Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的函数(实例函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{paramsLength} 个");
+                }
+                //扩展方法
+                else
+                {
+                    _parameters = new object[paramsLength + 1];
+                    _parameters[0] = instanceObj;
+                    for (int i = 0; i < paramsLength; i++) _parameters[i + 1] = parameters[i];
 
-                Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的扩展函数 {instanceObj.GetType()} {methodInfo.Name}({paramInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
+                    Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的函数(扩展函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
+                }
             }
             //静态方法
-            else if(instanceObj == null && methodInfo.IsStatic)
-            {
-                _parameters = parameters;
-                Logger.Info($"准备执行匹配的静态函数 {methodInfo.Name}({paramInfo}) 参数 {parameterInfos.Length}/{paramsLength} 个");
-            }
-            //实例方法
             else
             {
-                _parameters = parameters;
-                Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的函数 {instanceObj.GetType()} {methodInfo.Name}({paramInfo}), 参数 {parameterInfos.Length}/{paramsLength} 个");
+                if (methodInfo.IsStatic)
+                {
+                    _parameters = parameters;
+                    Logger.Info($"准备执行匹配的函数(静态函数) {methodInfo.Name}({paramDebugInfo}) 参数 {parameterInfos.Length}/{paramsLength} 个");
+                }
+                else
+                {
+                    Logger.Warn($"实例对象 {instanceObj}, 匹配的函数(超出处理范围的函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
+                    return null;
+                }
             }
 
             object[] arguments = _parameters == null ? null : new object[_parameters.Length];
             try
             {
-                //参数转换
+                //参数解析、转换
                 for (int i = 0; i < _parameters?.Length; i++)
                 {
                     ParameterInfo pInfo = parameterInfos[i];
-                    if (_parameters[i] == null || _parameters[i].ToString().ToLower().Trim() == "null")
+                    if (_parameters[i] == null || _parameters[i].ToString().ToLower().Replace(" ", "") == "null")
                     {
                         arguments[i] = null;
                         continue;
                     }
-
-                    //Console.WriteLine($"Convert Type:: {_parameters[i].GetType()} / {pInfo.ParameterType}  IsValueType:{pInfo.ParameterType.IsValueType}  IsArray:{pInfo.ParameterType.IsArray}");
-
+#if false
+                    if(Logger.IsDebugEnabled)
+                        Logger.Debug($"Convert Type:: {_parameters[i].GetType()} / {pInfo.ParameterType}  IsValueType:{pInfo.ParameterType.IsValueType}  IsArray:{pInfo.ParameterType.IsArray}");
+#endif
                     if (pInfo.ParameterType.IsValueType)
                     {
                         arguments[i] = StringExtensions.ConvertParamsToValueType(pInfo.ParameterType, _parameters[i]);
@@ -306,7 +319,7 @@ namespace SpaceCG.Extensions
             }
             catch (Exception ex)
             {
-                Logger.Debug($"函数执行失败: {ex}");
+                Logger.Warn($"函数 {methodInfo.Name} 执行失败: {ex}");
             }
 
             return null;
@@ -317,7 +330,7 @@ namespace SpaceCG.Extensions
         /// <param name="instanceObj"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <returns></returns>
+        /// <returns>调用 Method 的返回值</returns>
         public static object CallInstanceMethod(object instanceObj, String methodName, params object[] parameters)
         {
             if (instanceObj == null || String.IsNullOrWhiteSpace(methodName))
@@ -326,14 +339,36 @@ namespace SpaceCG.Extensions
             int paramLength = parameters == null ? 0 : parameters.Length;
 
             Type type = instanceObj.GetType();
-            IEnumerable<MethodInfo> methods = from method in type.GetMethods()
-                                              where method.Name == methodName
-                                              where method.GetParameters().Length == paramLength
-                                              select method;
+            List<MethodInfo> methods = (from method in type.GetMethods()
+                                        where method.Name == methodName
+                                        where method.GetParameters().Length == paramLength
+                                        select method)?.ToList();
 
-            if (methods.Count() != 1)
+            //过滤一次，检查函数参数类型，ValueType==String, IsArray==IsArray
+            if(methods?.Count > 1)
             {
-                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName} 参数数量 {paramLength} 有 {methods.Count()} 个，取消执行 或 查找扩展函数");
+                for(int i = 0; i < methods.Count; i ++)
+                {
+                    MethodInfo method = methods[i];
+                    ParameterInfo[] paramsInfo = method.GetParameters();
+
+                    for(int k = 0; k < paramsInfo.Length; k ++)
+                    {
+                        Type paramType = parameters[k].GetType();
+                        if((paramsInfo[k].ParameterType.IsValueType && paramType == typeof(String)) || paramsInfo[k].ParameterType.IsArray == paramType.IsArray)
+                        {
+                            continue;
+                        }
+
+                        methods.Remove(method);
+                        break;
+                    }
+                }
+            }
+
+            if (methods.Count != 1)
+            {
+                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName} 参数数量 {paramLength} 有 {methods.Count} 个，准备查找实例对象的扩展函数");
 
                 return CallInstanceExtensionMethod(instanceObj, methodName, parameters);
             }
@@ -347,21 +382,43 @@ namespace SpaceCG.Extensions
         /// <param name="instanceObj"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <returns></returns>
+        /// <returns>调用 Method 的返回值</returns>
         public static object CallInstanceExtensionMethod(object instanceObj, String methodName, params object[] parameters)
         {
             if (instanceObj == null || String.IsNullOrWhiteSpace(methodName))
                 throw new ArgumentNullException("参数不能为空");
 
-            IEnumerable<MethodInfo> methods = from type in typeof(InstanceExtensions).Assembly.GetTypes()
-                                              where type.IsSealed && !type.IsGenericType && !type.IsNested
-                                              from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                                              where method.Name == methodName && method.IsDefined(typeof(ExtensionAttribute), false) && method.GetParameters()[0].ParameterType == instanceObj.GetType()
-                                              select method;
+            List<MethodInfo> methods = (from type in typeof(InstanceExtensions).Assembly.GetTypes()
+                                        where type.IsSealed && !type.IsGenericType && !type.IsNested
+                                        from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                                        where method.Name == methodName && method.IsDefined(typeof(ExtensionAttribute), false) && method.GetParameters()[0].ParameterType == instanceObj.GetType()
+                                        select method).ToList();
 
-            if (methods.Count() != 1)
+            //过滤一次，检查函数参数类型，ValueType==String, IsArray==IsArray
+            if (methods?.Count > 1)
             {
-                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的扩展函数 {methodName} 有 {methods.Count()} 个，取消执行");
+                for (int i = 0; i < methods.Count; i++)
+                {
+                    MethodInfo method = methods[i];
+                    ParameterInfo[] paramsInfo = method.GetParameters();
+
+                    for (int k = 0; k < paramsInfo.Length; k++)
+                    {
+                        Type paramType = parameters[k].GetType();
+                        if ((paramsInfo[k].ParameterType.IsValueType && paramType == typeof(String)) || paramsInfo[k].ParameterType.IsArray == paramType.IsArray)
+                        {
+                            continue;
+                        }
+
+                        methods.Remove(method);
+                        break;
+                    }
+                }
+            }
+
+            if (methods?.Count != 1)
+            {
+                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的扩展函数 {methodName} 有 {methods?.Count} 个，取消执行");
                 return null;
             }
 
@@ -374,28 +431,132 @@ namespace SpaceCG.Extensions
         /// <param name="classFullName"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <returns></returns>
+        /// <returns>调用 Method 的返回值</returns>
         public static object CallClassStaticMethod(String classFullName, String methodName, params object[] parameters)
         {
-            IEnumerable<MethodInfo> methods = from assembly in AppDomain.CurrentDomain.GetAssemblies()
-                                              let type = assembly.GetType(classFullName)
-                                              where type != null
-                                              from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                              where method.Name == methodName && method.GetParameters().Length == parameters.Length
-                                              from paramInfo in method.GetParameters()
-                                              where paramInfo.ParameterType.IsValueType || paramInfo.ParameterType.IsArray || paramInfo.ParameterType.IsEnum 
-                                              select method;
+            if (String.IsNullOrWhiteSpace(classFullName) || String.IsNullOrWhiteSpace(methodName)) return null;
 
-            if(methods?.Count() == 0)
+            List<MethodInfo> methods = (from assembly in AppDomain.CurrentDomain.GetAssemblies()
+                                        let type = assembly.GetType(classFullName)
+                                        where type != null
+                                        from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                        where method.Name == methodName && method.GetParameters().Length == parameters.Length
+                                        from paramInfo in method.GetParameters()
+                                        where paramInfo.ParameterType.IsValueType || paramInfo.ParameterType.IsArray || paramInfo.ParameterType.IsEnum
+                                        select method).ToList();
+
+            //过滤一次，检查函数参数类型，ValueType==String, IsArray==IsArray
+            if (methods?.Count > 1)
             {
-                Logger.Warn($"在类 {classFullName} 中，没找到匹配的静态函数 {methodName} ，取消执行");
-                return null;
+                for (int i = 0; i < methods.Count; i++)
+                {
+                    MethodInfo method = methods[i];
+                    ParameterInfo[] paramsInfo = method.GetParameters();
+
+                    for (int k = 0; k < paramsInfo.Length; k++)
+                    {
+                        Type paramType = parameters[k].GetType();
+                        if ((paramsInfo[k].ParameterType.IsValueType && paramType == typeof(String)) || paramsInfo[k].ParameterType.IsArray == paramType.IsArray)
+                        {
+                            continue;
+                        }
+
+                        methods.Remove(method);
+                        break;
+                    }
+                }
             }
 
-            Logger.Info($"在类 {classFullName} 中，找到匹配的静态函数 {methodName} 有 {methods.Count()} 个{(methods.Count() > 1 ? ", 存在执行歧异" : "")}");
+            int methodCount = methods == null ? 0 : methods.Count();
+            if (methodCount != 1)
+            {
+                Logger.Warn($"在类 {classFullName} 中，找到匹配的静态函数 {methodName} 有 {methodCount} 个, 存在执行歧异, 取消函数执行");
+                return null;
+            }
 
             return CallInstanceMethod(null, methods.First(), parameters);
         }
 
+        /// <summary>
+        /// 试图解析 xml 格式消息，在 Object 字典中查找实例对象，并调用实例对象的方法
+        /// <para>XML 格式："&lt;Action Target='object key name' Method='method name' Params='method params' /&gt;" 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// </summary>
+        /// <param name="xmlMessage">xml 格式消息</param>
+        /// <param name="objectsDictionary">可访问对象的集合</param>
+        /// <param name="returnResult">Method 的返回值</param>
+        /// <returns>Method 调用成功则返回 true, 反之返回 false</returns>
+        public static bool TryParseCallMethod(String xmlMessage, IReadOnlyDictionary<String, IDisposable> objectsDictionary, out object returnResult)
+        {
+            returnResult = null;
+            if (String.IsNullOrWhiteSpace(xmlMessage) || objectsDictionary == null) return false;
+
+            XElement actionElement;
+
+            try
+            {
+                actionElement = XElement.Parse(xmlMessage);
+            }
+            catch(Exception ex)
+            {
+                Logger.Warn($"XML 格式数据解析错误：{ex}");
+                return false;
+            }
+
+            if(actionElement.Name?.LocalName != "Action")
+            {
+                Logger.Warn($"XML 格式数数据错误，节点名称应为 Action");
+                return false;
+            }
+
+            return TryParseCallMethod(actionElement, objectsDictionary, out returnResult);
+        }
+        /// <summary>
+        /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并调用实例对象的方法
+        /// <para>XML 格式：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// </summary>
+        /// <param name="actionElement"></param>
+        /// <param name="objectsDictionary">可访问对象的集合</param>
+        /// <param name="returnResult">Method 的返回值</param>
+        /// <returns>Method 调用成功则返回 true, 反之返回 false</returns>
+        public static bool TryParseCallMethod(XElement actionElement, IReadOnlyDictionary<String, IDisposable> objectsDictionary, out object returnResult)
+        {
+            returnResult = null;
+            if (actionElement == null || objectsDictionary == null) return false;
+
+            if (actionElement.Name?.LocalName != "Action")
+            {
+                Logger.Warn($"XML 格式数数据错误，节点名称应为 Action");
+                return false;
+            }
+
+            try
+            {
+                if (String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||
+                    String.IsNullOrWhiteSpace(actionElement.Attribute("Method")?.Value)) return false;
+
+                String objectName = actionElement.Attribute("Target").Value;
+                String methodName = actionElement.Attribute("Method").Value;
+
+                if (!objectsDictionary.TryGetValue(objectName, out IDisposable targetObject))
+                {
+                    Logger.Warn($"未找到目标实例对象 {objectName} ");
+                    return false;
+                }
+
+                returnResult = Task.Run<Object>(() =>
+                {
+                    return InstanceExtensions.CallInstanceMethod(targetObject, methodName, StringExtensions.SplitParameters(actionElement.Attribute("Params")?.Value));
+                });
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"执行 XML 数据指令错误：{actionElement}");
+                Logger.Error(ex);
+            }
+
+            return false;
+        }
     }
 }
