@@ -444,6 +444,8 @@ namespace SpaceCG.Module.Modbus
         /// <param name="values"></param>
         internal void UpdateRegisterValues(ushort startAddress, RegisterType type, bool[] values)
         {
+            if (values == null || type == RegisterType.Unknown) return;
+
             ushort address, i = 0;
             if (type == RegisterType.CoilsStatus)
             {
@@ -488,6 +490,8 @@ namespace SpaceCG.Module.Modbus
         /// <param name="values"></param>
         internal void UpdateRegisterValues(ushort startAddress, RegisterType type, ushort[] values)
         {
+            if (values == null || type == RegisterType.Unknown) return;
+
             ushort address, i = 0;
             if (type == RegisterType.HoldingRegister)
             {

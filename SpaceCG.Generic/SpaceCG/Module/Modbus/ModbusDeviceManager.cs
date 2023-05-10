@@ -16,7 +16,7 @@ namespace SpaceCG.Module.Modbus
 {
     /// <summary>
     /// Modbus Device Manager 
-    /// <para>遵循自定义的 XML 模型</para>
+    /// <para>遵循自定义的 XML 模型，参考 ModbusDevices.Config</para>
     /// </summary>
     public class ModbusDeviceManager : IDisposable
     {
@@ -34,9 +34,9 @@ namespace SpaceCG.Module.Modbus
         private IEnumerable<XElement> ModbusElements { get; set; } = null;
 
         /// <summary>
-        /// 控制接口
+        /// 控制接口对象
         /// </summary>
-        private ControllerInterface ControlInterface;
+        public ControllerInterface ControlInterface { get; private set; } = new ControllerInterface();
 
         /// <summary>
         /// Transport Devices 列表
@@ -44,33 +44,10 @@ namespace SpaceCG.Module.Modbus
         private List<ModbusTransportDevice> TransportDevices = new List<ModbusTransportDevice>(8);
 
         /// <summary>
-        /// 可通过反射技术访问的对象列表
-        /// </summary>
-        private ConcurrentDictionary<String, IDisposable> AccessObjects = new ConcurrentDictionary<String, IDisposable>();
-
-        /// <summary>
         /// Modbus 设备管理对象
         /// </summary>
         public ModbusDeviceManager()
-        {            
-        }
-
-        /// <summary>
-        /// 添加可访问对象
-        /// </summary>
-        /// <param name="name"></param>
-        /// <param name="obj"></param>
-        /// <returns></returns>
-        public bool AddAccessObject(string name, IDisposable obj)
         {
-            if (String.IsNullOrWhiteSpace(name) || obj == null) return false;
-
-            if (AccessObjects.ContainsKey(name))
-            {
-                Log.Warn($"添加可访问对象 {name}:{obj} 失败");
-                return false;
-            }
-            return AccessObjects.TryAdd(name, obj);
         }
 
         /// <summary>
@@ -138,11 +115,10 @@ namespace SpaceCG.Module.Modbus
 
             if (ushort.TryParse(Configuration?.Attribute("LocalPort")?.Value, out ushort localPort) && localPort >= 1024)
             {
-                this.Name = Configuration.Attribute("Name").Value;
-                if (!String.IsNullOrWhiteSpace(Name)) AddAccessObject(Name, this);
+                ControlInterface.InstallServer(localPort);
 
-                ControlInterface = new ControllerInterface(localPort);
-                ControlInterface.AccessObjects = this.AccessObjects;
+                this.Name = Configuration.Attribute("Name").Value;
+                if (!String.IsNullOrWhiteSpace(Name)) ControlInterface.AddControlObject(Name, this);
             }
         }
         /// <summary>
@@ -168,27 +144,27 @@ namespace SpaceCG.Module.Modbus
                 switch(type.ToUpper().Replace(" ", ""))
                 {
                     case "SERIAL":
-                        AddAccessObject(name, new SerialPort(args[1], port));
+                        ControlInterface.AddControlObject(name, new SerialPort(args[1], port));
                         break;
 
                     case "MODBUS":
-                        AddAccessObject(name, NModbus4Extensions.CreateNModbus4Master(args[0], args[1], port));
+                        ControlInterface.AddControlObject(name, NModbus4Extensions.CreateNModbus4Master(args[0], args[1], port));
                         break;
 
                     case "SERVER":
                         if (args[0].ToUpper() == "TCP")
-                            AddAccessObject(name, HPSocketExtensions.CreateNetworkServer<HPSocket.Tcp.TcpServer>(args[1], (ushort)port, null));
+                            ControlInterface.AddControlObject(name, HPSocketExtensions.CreateNetworkServer<HPSocket.Tcp.TcpServer>(args[1], (ushort)port, null));
                         else if (args[0].ToUpper() == "UDP")
-                            AddAccessObject(name, HPSocketExtensions.CreateNetworkServer<HPSocket.Udp.UdpServer>(args[1], (ushort)port, null));
+                            ControlInterface.AddControlObject(name, HPSocketExtensions.CreateNetworkServer<HPSocket.Udp.UdpServer>(args[1], (ushort)port, null));
                         else
                             Log.Warn($"连接参数错误：{name},{type},{parameters}");
                         break;
 
                     case "CLIENT":
                         if (args[0].ToUpper() == "TCP")
-                            AddAccessObject(name, HPSocketExtensions.CreateNetworkClient<HPSocket.Tcp.TcpClient>(args[1], (ushort)port, null));
+                            ControlInterface.AddControlObject(name, HPSocketExtensions.CreateNetworkClient<HPSocket.Tcp.TcpClient>(args[1], (ushort)port, null));
                         else if (args[0].ToUpper() == "UDP")
-                            AddAccessObject(name, HPSocketExtensions.CreateNetworkClient<HPSocket.Udp.UdpClient>(args[1], (ushort)port, null));
+                            ControlInterface.AddControlObject(name, HPSocketExtensions.CreateNetworkClient<HPSocket.Udp.UdpClient>(args[1], (ushort)port, null));
                         else
                             Log.Warn($"连接参数错误：{name},{type},{parameters}");
                         break;
@@ -211,7 +187,7 @@ namespace SpaceCG.Module.Modbus
                     transport.InputChangeEvent += Transport_InputChangeEvent;
                     transport.OutputChangeEvent += Transport_OutputChangeEvent;
 
-                    AddAccessObject(transport.Name, transport);
+                    ControlInterface.AddControlObject(transport.Name, transport);
                 }
                 else
                 {
@@ -276,7 +252,7 @@ namespace SpaceCG.Module.Modbus
                             Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
                         IEnumerable<XElement> actions = evt.Elements("Action");
-                        foreach (XElement action in actions) ControllerInterface.TryParseCallMethod(action, AccessObjects, out object result);
+                        foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
                         continue;
                     }
                     else if(StringExtensions.TryParse(evt.Attribute("MinValue")?.Value, out ulong minValue) && StringExtensions.TryParse(evt.Attribute("MaxValue")?.Value, out ulong maxValue))
@@ -287,7 +263,7 @@ namespace SpaceCG.Module.Modbus
                                 Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
                             IEnumerable<XElement> actions = evt.Elements("Action");
-                            foreach (XElement action in actions) ControllerInterface.TryParseCallMethod(action, AccessObjects, out object result);
+                            foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
                         }
                     }
                 }
@@ -311,7 +287,7 @@ namespace SpaceCG.Module.Modbus
                     if (evt.Attribute("Name")?.Value == eventName)
                     {
                         IEnumerable<XElement> actions = evt.Elements("Action");
-                        foreach (XElement action in actions) ControllerInterface.TryParseCallMethod(action, AccessObjects, out object result);
+                        foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
                     }
                 }
             }
@@ -322,9 +298,6 @@ namespace SpaceCG.Module.Modbus
         /// </summary>
         private void ResetAndClear()
         {
-            ControlInterface?.Dispose();
-            ControlInterface = null;
-
             foreach (ModbusTransportDevice transport in TransportDevices)
             {
                 CallEventName(transport.Name, "Dispose");
@@ -332,12 +305,18 @@ namespace SpaceCG.Module.Modbus
 
                 transport.StopTransport();
             }
-            foreach (KeyValuePair<String, IDisposable> obj in AccessObjects)
+
+            Type DisposableType = typeof(IDisposable);
+            foreach (KeyValuePair<String, Object> obj in ControlInterface.GetControlObjects())
             {
                 if (obj.Key == this.Name || obj.Value == this) continue;
+
                 try
                 {
-                    obj.Value.Dispose();
+                    if (obj.Value != null && DisposableType.IsAssignableFrom(obj.Value.GetType()))
+                    {
+                        ((IDisposable)(obj.Value))?.Dispose();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -346,8 +325,8 @@ namespace SpaceCG.Module.Modbus
                 }
             }
 
-            AccessObjects.Clear();
             TransportDevices.Clear();
+            ControlInterface.ClearControlObjects();
 
             Configuration = null;
             ModbusElements = null;
@@ -358,9 +337,9 @@ namespace SpaceCG.Module.Modbus
         {
             ResetAndClear();
 
-            AccessObjects = null;
+            ControlInterface?.Dispose();
+            ControlInterface = null;
             TransportDevices = null;
-
         }
         /// <inheritdoc/>
         public override string ToString()

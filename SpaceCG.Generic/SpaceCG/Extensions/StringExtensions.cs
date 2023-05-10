@@ -14,30 +14,11 @@ namespace SpaceCG.Extensions
         /// </summary>
         private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(StringExtensions));
 
-        /// <summary>
-        /// 将数字字符类型转为数值类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)字符串的转换。
-        /// </summary>
-        /// <typeparam name="NumberType"></typeparam>
-        /// <param name="numberString"></param>
-        /// <param name="result"></param>
-        /// <returns></returns>
-        public static bool TryParse<NumberType>(this String numberString, out NumberType result) 
-            where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
+        private static object[] GetNumberStringBase(String numberString)
         {
-            result = default;
-            if (String.IsNullOrWhiteSpace(numberString)) return false;
-
-            String methodName = $"To{typeof(NumberType).Name}";
-            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                              where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
-                                              let m_params = method.GetParameters()
-                                              where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
-                                              select method;
-
-            if (methods?.Count() != 1) return false;
+            if (String.IsNullOrWhiteSpace(numberString)) throw new ArgumentNullException(nameof(numberString), "参数不能为空");
 
             object[] parameters = new object[2];
-            MethodInfo ConvertToNumber = methods.First();
             String numString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
 
             if (numString.IndexOf("0B") == 0)
@@ -65,6 +46,34 @@ namespace SpaceCG.Extensions
                 parameters[1] = 10;
                 parameters[0] = numString;
             }
+
+            return parameters;
+        }
+
+        /// <summary>
+        /// 将数字字符类型转为数值类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)字符串的转换。
+        /// </summary>
+        /// <typeparam name="NumberType"></typeparam>
+        /// <param name="numberString"></param>
+        /// <param name="result"></param>
+        /// <returns></returns>
+        public static bool TryParse<NumberType>(this String numberString, out NumberType result) 
+            where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
+        {
+            result = default;
+            if (String.IsNullOrWhiteSpace(numberString)) return false;
+
+            String methodName = $"To{typeof(NumberType).Name}";
+            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                              where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
+                                              let m_params = method.GetParameters()
+                                              where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
+                                              select method;
+
+            if (methods?.Count() != 1) return false;
+
+            MethodInfo ConvertToNumber = methods.First();
+            object[] parameters = GetNumberStringBase(numberString);
 
             try
             {
@@ -107,42 +116,14 @@ namespace SpaceCG.Extensions
 
             if (methods?.Count() != 1) return false;
 
-            object[] parameters = new object[2];
             MethodInfo ConvertToNumber = methods.First();
 
             for (int i = 0; i < length; i++)
             {
                 if (String.IsNullOrWhiteSpace(stringArray[i])) continue;
 
-                String numString = stringArray[i].ToUpper().Replace(" ", "").Replace("_", "");
-
-                if (numString.IndexOf("0B") == 0)
-                {
-                    parameters[1] = 2;
-                    parameters[0] = numString.Substring(2);
-                }
-                else if (numString.IndexOf("O") == 0)
-                {
-                    parameters[1] = 8;
-                    parameters[0] = numString.Substring(1);
-                }
-                else if (numString.IndexOf("0D") == 0)
-                {
-                    parameters[1] = 10;
-                    parameters[0] = numString.Substring(2);
-                }
-                else if (numString.IndexOf("0X") == 0)
-                {
-                    parameters[1] = 16;
-                    parameters[0] = numString.Substring(2);
-                }
-                else
-                {
-                    parameters[1] = 10;
-                    parameters[0] = numString;
-                }
-
                 NumberType newValue;
+                object[] parameters = GetNumberStringBase(numberString);
 
                 try
                 {
@@ -437,41 +418,33 @@ namespace SpaceCG.Extensions
             }
             else if (paramType == typeof(bool))
             {
-                return bool.TryParse(paramValue.ToString(), out bool value) ? value : false;
+                if (bool.TryParse(paramValue.ToString(), out bool value)) return value;
+                String pv = paramValue.ToString().Replace(" ", "");
+                return pv == "1" || pv == "T";
             }
             else if (paramType == typeof(sbyte) || paramType == typeof(byte) || paramType == typeof(short) || paramType == typeof(ushort) ||
                 paramType == typeof(Int32) || paramType == typeof(UInt32) || paramType == typeof(Int64) || paramType == typeof(UInt64))
             {
-                IEnumerable<MethodInfo> methods = from method in paramType.GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                                  where method.Name == "TryParse" && method.GetParameters().Length == 4 && method.ReturnType == typeof(bool)
+                String methodName = $"To{paramType.Name}";
+                IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                                  where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == paramType
                                                   let m_params = method.GetParameters()
-                                                  where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(NumberStyles) && m_params[3].IsOut
+                                                  where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
                                                   select method;
 
                 if (methods?.Count() != 1) return (ValueType)paramValue;
 
-                MethodInfo TryParse = methods.First();
-                NumberStyles style = NumberStyles.None;
-                String strNum = paramValue.ToString().ToLower();
-
-                if (strNum.IndexOf("0x") != -1)
-                {
-                    style = NumberStyles.HexNumber;
-                    strNum = strNum.Replace("0x", "");
-                }
-
-                object[] parameters = new object[4] { strNum, style, null, Activator.CreateInstance(paramType) };
+                MethodInfo ConvertToNumber = methods.First();
+                object[] parameters = GetNumberStringBase(paramValue.ToString());
 
                 try
                 {
-                    bool result = (bool)TryParse.Invoke(null, parameters);
-                    return (ValueType)parameters[3];
+                    return (ValueType)ConvertToNumber.Invoke(null, parameters);
                 }
                 catch (Exception ex)
                 {
                     Logger.Warn(ex);
-                    Console.WriteLine(ex);
-                    return (ValueType)parameters[3];
+                    return (ValueType)paramValue;
                 }
             }
             else

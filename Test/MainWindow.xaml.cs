@@ -18,13 +18,14 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using SpaceCG.Extensions;
 using SpaceCG.Module.Modbus;
+using SpaceCG.Module.Reflection;
 
 namespace Test
 {
     /// <summary>
     /// MainWindow.xaml 的交互逻辑
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window,IDisposable
     {
         Modbus.Device.IModbusMaster master;
         ModbusTransportDevice transport;
@@ -113,6 +114,9 @@ namespace Test
             Console.WriteLine(value);
 #endif
 
+            //ControllerInterface ControlInterface = new ControllerInterface(2000);
+            //ControlInterface.AccessObjects.TryAdd("a", this);
+
             int v = 0B1101;
             Byte value = 0x00;
             //StringExtensions.TryParse("B1101", out value);
@@ -126,7 +130,7 @@ namespace Test
             StringExtensions.TryParse("4545", out short result2);
             Console.WriteLine($"Result2:::{result2}");
 
-            short[] result3 = new short[]{ 0x01, 0x02 };
+            short[] result3 = new short[] { 0x01, 0x02 };
             StringExtensions.TryParse<short>("0x4545,0B1101", ref result3);
 
             Console.WriteLine($"Result3:::{result3}");
@@ -134,7 +138,8 @@ namespace Test
             //Console.WriteLine(Convert.ToByte("46", 16));
             //Console.WriteLine(Convert.ToByte("1101", 2));
 
-            Console.WriteLine(Regex.Replace("0B 1101  1101_ 1101_", @"[_ ]",  ""));
+            //Console.WriteLine(bool.TryParse("fAlse", out bool rv));
+            //Console.WriteLine(rv);
         }
 
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice slaveDevice, Register register)
@@ -192,6 +197,11 @@ namespace Test
             {
                 //transport.StopTransport();
             }
+        }
+
+        public void Dispose()
+        {
+            throw new NotImplementedException();
         }
     }
 }
