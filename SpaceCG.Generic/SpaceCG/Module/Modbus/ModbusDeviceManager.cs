@@ -100,7 +100,7 @@ namespace SpaceCG.Module.Modbus
         }
 
         /// <summary>
-        /// 加载设备配置文件
+        /// 加载设备配置文件，配置文件参考 ModbusDevices.Config
         /// </summary>
         /// <param name="configFile"></param>
         public void LoadDeviceConfig(String configFile)
