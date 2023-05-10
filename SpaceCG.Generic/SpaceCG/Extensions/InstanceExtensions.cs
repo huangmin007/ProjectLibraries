@@ -234,6 +234,7 @@ namespace SpaceCG.Extensions
             {
                 MethodInfo method = methods[i];
                 ParameterInfo[] paramsInfo = method.GetParameters();
+                if (paramsInfo.Length != parameters.Length) continue;
 
                 for (int k = 0; k < paramsInfo.Length; k++)
                 {
@@ -447,88 +448,5 @@ namespace SpaceCG.Extensions
             return CallInstanceMethod(null, methods.First(), parameters);
         }
 
-#if false
-        /// <summary>
-        /// 试图解析 xml 格式消息，在 Object 字典中查找实例对象，并调用实例对象的方法
-        /// <para>XML 格式："&lt;Action Target='object key name' Method='method name' Params='method params' /&gt;" 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// </summary>
-        /// <param name="xmlMessage">xml 格式消息</param>
-        /// <param name="accessObjects">可访问对象的集合</param>
-        /// <param name="returnResult">Method 的返回值</param>
-        /// <returns>Method 调用成功则返回 true, 反之返回 false</returns>
-        public static bool TryParseCallMethod(String xmlMessage, IReadOnlyDictionary<String, IDisposable> accessObjects, out object returnResult)
-        {
-            returnResult = null;
-            if (String.IsNullOrWhiteSpace(xmlMessage) || accessObjects == null) return false;
-
-            XElement actionElement;
-
-            try
-            {
-                actionElement = XElement.Parse(xmlMessage);
-            }
-            catch(Exception ex)
-            {
-                Logger.Warn($"XML 格式数据解析错误：{ex}");
-                return false;
-            }
-
-            if(actionElement.Name?.LocalName != "Action")
-            {
-                Logger.Warn($"XML 格式数数据错误，节点名称应为 Action");
-                return false;
-            }
-
-            return TryParseCallMethod(actionElement, accessObjects, out returnResult);
-        }
-        /// <summary>
-        /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并调用实例对象的方法
-        /// <para>XML 格式：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// </summary>
-        /// <param name="actionElement"></param>
-        /// <param name="accessObjects">可访问对象的集合</param>
-        /// <param name="returnResult">Method 的返回值</param>
-        /// <returns>Method 调用成功则返回 true, 反之返回 false</returns>
-        public static bool TryParseCallMethod(XElement actionElement, IReadOnlyDictionary<String, IDisposable> accessObjects, out object returnResult)
-        {
-            returnResult = null;
-            if (actionElement == null || accessObjects == null) return false;
-
-            if (actionElement.Name?.LocalName != "Action")
-            {
-                Logger.Warn($"XML 格式数数据错误，节点名称应为 Action");
-                return false;
-            }
-
-            try
-            {
-                if (String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||
-                    String.IsNullOrWhiteSpace(actionElement.Attribute("Method")?.Value)) return false;
-
-                String objectName = actionElement.Attribute("Target").Value;
-                String methodName = actionElement.Attribute("Method").Value;
-
-                if (!accessObjects.TryGetValue(objectName, out IDisposable targetObject))
-                {
-                    Logger.Warn($"未找到目标实例对象 {objectName} ");
-                    return false;
-                }
-
-                returnResult = Task.Run<Object>(() =>
-                {
-                    return InstanceExtensions.CallInstanceMethod(targetObject, methodName, StringExtensions.SplitParameters(actionElement.Attribute("Params")?.Value));
-                });
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"执行 XML 数据指令错误：{actionElement}");
-                Logger.Error(ex);
-            }
-
-            return false;
-        }
-#endif
     }
 }

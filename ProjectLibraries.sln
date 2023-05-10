@@ -7,8 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "Test\Test.csproj", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Log4Net.Window", "Log4Net.Window\Log4Net.Window.csproj", "{27B5F1F3-17F2-4210-9179-DD6348FB6F4C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceCG.ModbusExtension", "SpaceCG.ModbusExtension\SpaceCG.ModbusExtension.csproj", "{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModbusDeviceManagerServer", "ModbusDeviceManagerServer\ModbusDeviceManagerServer.csproj", "{856322E3-12C3-42C8-AB12-806B4A230434}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceCG.Generic", "SpaceCG.Generic\SpaceCG.Generic.csproj", "{597FD101-2F46-49C9-8F69-7F633FC55E90}"
@@ -45,18 +43,6 @@ Global
 		{27B5F1F3-17F2-4210-9179-DD6348FB6F4C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{27B5F1F3-17F2-4210-9179-DD6348FB6F4C}.Release|x64.ActiveCfg = Release|Any CPU
 		{27B5F1F3-17F2-4210-9179-DD6348FB6F4C}.Release|x86.ActiveCfg = Release|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Debug|x64.Build.0 = Debug|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Debug|x86.Build.0 = Debug|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Release|x64.ActiveCfg = Release|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Release|x64.Build.0 = Release|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Release|x86.ActiveCfg = Release|Any CPU
-		{0E31EB18-1172-4DA6-9EAA-7AE419F0B65D}.Release|x86.Build.0 = Release|Any CPU
 		{856322E3-12C3-42C8-AB12-806B4A230434}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{856322E3-12C3-42C8-AB12-806B4A230434}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{856322E3-12C3-42C8-AB12-806B4A230434}.Debug|x64.ActiveCfg = Debug|Any CPU

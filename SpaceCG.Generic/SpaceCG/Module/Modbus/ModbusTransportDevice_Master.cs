@@ -343,12 +343,18 @@ namespace SpaceCG.Module.Modbus
 
         }
 
-        public void TestEcho(String message = null)
+        public bool TestEcho(String message)
         {
             if (String.IsNullOrWhiteSpace(message))
+            {
                 Log.Info("Test...Echo....");
+                return false;
+            }
             else
+            {
                 Log.Info($"Test...Echo...{message}");
+                return true;
+            }
         }
     }
 }
