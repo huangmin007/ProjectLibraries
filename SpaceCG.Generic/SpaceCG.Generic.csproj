@@ -65,6 +65,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SpaceCG\Extensions\HostDevice.cs" />
+    <Compile Include="SpaceCG\Module\Reflection\ControllerInterface.cs" />
     <Compile Include="SpaceCG\Generic\HostDevice.cs" />
     <Compile Include="SpaceCG\Extensions\HPSocketExtensions.cs" />
     <Compile Include="SpaceCG\Extensions\InstanceExtensions.cs" />

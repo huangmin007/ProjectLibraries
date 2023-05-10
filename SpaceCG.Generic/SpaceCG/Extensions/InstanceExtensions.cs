@@ -219,7 +219,36 @@ namespace SpaceCG.Extensions
                 RemoveInstanceEvent(instanceObj, info.Name);
 #endif
         }
-        
+
+        /// <summary>
+        /// 移出不匹配参数的 MethodInfo 对象
+        /// <para>检查函数参数类型，ValueType==ValueType||String, IsArray==IsArray</para>
+        /// </summary>
+        /// <param name="methods"></param>
+        /// <param name="parameters"></param>
+        private static void MoveOutMethodInfo(ref List<MethodInfo> methods, params object[] parameters)
+        {
+            if (methods?.Count <= 1) return;
+
+            for (int i = 0; i < methods.Count; i++)
+            {
+                MethodInfo method = methods[i];
+                ParameterInfo[] paramsInfo = method.GetParameters();
+
+                for (int k = 0; k < paramsInfo.Length; k++)
+                {
+                    Type paramType = parameters[k].GetType();
+                    if ((paramsInfo[k].ParameterType.IsArray && paramType.IsArray) ||
+                        (paramsInfo[k].ParameterType.IsValueType && (paramType.IsValueType || paramType == typeof(String))))
+                    {
+                        continue;
+                    }
+
+                    methods.Remove(method);
+                    break;
+                }
+            }
+        }        
         /// <summary>
         /// 动态调用对象的方法
         /// <para>按顺序查找方法：扩展方法 > 静态方法 > 实例方法</para>
@@ -344,32 +373,12 @@ namespace SpaceCG.Extensions
                                         where method.GetParameters().Length == paramLength
                                         select method)?.ToList();
 
-            //过滤一次，检查函数参数类型，ValueType==String, IsArray==IsArray
-            if(methods?.Count > 1)
+            MoveOutMethodInfo(ref methods);
+            int methodCount = methods == null ? 0 : methods.Count();
+
+            if (methodCount != 1)
             {
-                for(int i = 0; i < methods.Count; i ++)
-                {
-                    MethodInfo method = methods[i];
-                    ParameterInfo[] paramsInfo = method.GetParameters();
-
-                    for(int k = 0; k < paramsInfo.Length; k ++)
-                    {
-                        Type paramType = parameters[k].GetType();
-                        if((paramsInfo[k].ParameterType.IsValueType && paramType == typeof(String)) || paramsInfo[k].ParameterType.IsArray == paramType.IsArray)
-                        {
-                            continue;
-                        }
-
-                        methods.Remove(method);
-                        break;
-                    }
-                }
-            }
-
-            if (methods.Count != 1)
-            {
-                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName} 参数数量 {paramLength} 有 {methods.Count} 个，准备查找实例对象的扩展函数");
-
+                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName} 参数数量 {paramLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
                 return CallInstanceExtensionMethod(instanceObj, methodName, parameters);
             }
             
@@ -394,31 +403,12 @@ namespace SpaceCG.Extensions
                                         where method.Name == methodName && method.IsDefined(typeof(ExtensionAttribute), false) && method.GetParameters()[0].ParameterType == instanceObj.GetType()
                                         select method).ToList();
 
-            //过滤一次，检查函数参数类型，ValueType==String, IsArray==IsArray
-            if (methods?.Count > 1)
+            MoveOutMethodInfo(ref methods);
+            int methodCount = methods == null ? 0 : methods.Count();
+
+            if (methodCount != 1)
             {
-                for (int i = 0; i < methods.Count; i++)
-                {
-                    MethodInfo method = methods[i];
-                    ParameterInfo[] paramsInfo = method.GetParameters();
-
-                    for (int k = 0; k < paramsInfo.Length; k++)
-                    {
-                        Type paramType = parameters[k].GetType();
-                        if ((paramsInfo[k].ParameterType.IsValueType && paramType == typeof(String)) || paramsInfo[k].ParameterType.IsArray == paramType.IsArray)
-                        {
-                            continue;
-                        }
-
-                        methods.Remove(method);
-                        break;
-                    }
-                }
-            }
-
-            if (methods?.Count != 1)
-            {
-                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的扩展函数 {methodName} 有 {methods?.Count} 个，取消执行");
+                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的扩展函数 {methodName} 有 {methodCount} 个，取消执行");
                 return null;
             }
 
@@ -445,29 +435,9 @@ namespace SpaceCG.Extensions
                                         where paramInfo.ParameterType.IsValueType || paramInfo.ParameterType.IsArray || paramInfo.ParameterType.IsEnum
                                         select method).ToList();
 
-            //过滤一次，检查函数参数类型，ValueType==String, IsArray==IsArray
-            if (methods?.Count > 1)
-            {
-                for (int i = 0; i < methods.Count; i++)
-                {
-                    MethodInfo method = methods[i];
-                    ParameterInfo[] paramsInfo = method.GetParameters();
-
-                    for (int k = 0; k < paramsInfo.Length; k++)
-                    {
-                        Type paramType = parameters[k].GetType();
-                        if ((paramsInfo[k].ParameterType.IsValueType && paramType == typeof(String)) || paramsInfo[k].ParameterType.IsArray == paramType.IsArray)
-                        {
-                            continue;
-                        }
-
-                        methods.Remove(method);
-                        break;
-                    }
-                }
-            }
-
+            MoveOutMethodInfo(ref methods);
             int methodCount = methods == null ? 0 : methods.Count();
+
             if (methodCount != 1)
             {
                 Logger.Warn($"在类 {classFullName} 中，找到匹配的静态函数 {methodName} 有 {methodCount} 个, 存在执行歧异, 取消函数执行");
@@ -477,18 +447,19 @@ namespace SpaceCG.Extensions
             return CallInstanceMethod(null, methods.First(), parameters);
         }
 
+#if false
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典中查找实例对象，并调用实例对象的方法
         /// <para>XML 格式："&lt;Action Target='object key name' Method='method name' Params='method params' /&gt;" 跟据调用的 Method 决定 Params 可选属性值</para>
         /// </summary>
         /// <param name="xmlMessage">xml 格式消息</param>
-        /// <param name="objectsDictionary">可访问对象的集合</param>
+        /// <param name="accessObjects">可访问对象的集合</param>
         /// <param name="returnResult">Method 的返回值</param>
         /// <returns>Method 调用成功则返回 true, 反之返回 false</returns>
-        public static bool TryParseCallMethod(String xmlMessage, IReadOnlyDictionary<String, IDisposable> objectsDictionary, out object returnResult)
+        public static bool TryParseCallMethod(String xmlMessage, IReadOnlyDictionary<String, IDisposable> accessObjects, out object returnResult)
         {
             returnResult = null;
-            if (String.IsNullOrWhiteSpace(xmlMessage) || objectsDictionary == null) return false;
+            if (String.IsNullOrWhiteSpace(xmlMessage) || accessObjects == null) return false;
 
             XElement actionElement;
 
@@ -508,20 +479,20 @@ namespace SpaceCG.Extensions
                 return false;
             }
 
-            return TryParseCallMethod(actionElement, objectsDictionary, out returnResult);
+            return TryParseCallMethod(actionElement, accessObjects, out returnResult);
         }
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并调用实例对象的方法
         /// <para>XML 格式：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
         /// </summary>
         /// <param name="actionElement"></param>
-        /// <param name="objectsDictionary">可访问对象的集合</param>
+        /// <param name="accessObjects">可访问对象的集合</param>
         /// <param name="returnResult">Method 的返回值</param>
         /// <returns>Method 调用成功则返回 true, 反之返回 false</returns>
-        public static bool TryParseCallMethod(XElement actionElement, IReadOnlyDictionary<String, IDisposable> objectsDictionary, out object returnResult)
+        public static bool TryParseCallMethod(XElement actionElement, IReadOnlyDictionary<String, IDisposable> accessObjects, out object returnResult)
         {
             returnResult = null;
-            if (actionElement == null || objectsDictionary == null) return false;
+            if (actionElement == null || accessObjects == null) return false;
 
             if (actionElement.Name?.LocalName != "Action")
             {
@@ -537,7 +508,7 @@ namespace SpaceCG.Extensions
                 String objectName = actionElement.Attribute("Target").Value;
                 String methodName = actionElement.Attribute("Method").Value;
 
-                if (!objectsDictionary.TryGetValue(objectName, out IDisposable targetObject))
+                if (!accessObjects.TryGetValue(objectName, out IDisposable targetObject))
                 {
                     Logger.Warn($"未找到目标实例对象 {objectName} ");
                     return false;
@@ -558,5 +529,6 @@ namespace SpaceCG.Extensions
 
             return false;
         }
+#endif
     }
 }

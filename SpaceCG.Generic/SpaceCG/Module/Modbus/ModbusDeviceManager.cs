@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Xml.Linq;
 using HPSocket;
 using SpaceCG.Extensions;
+using SpaceCG.Module.Reflection;
 
 namespace SpaceCG.Module.Modbus
 {
@@ -32,8 +33,10 @@ namespace SpaceCG.Module.Modbus
         private XElement Configuration { get; set; } = null;
         private IEnumerable<XElement> ModbusElements { get; set; } = null;
 
-        HPSocket.IServer HPTcpServer;
-        HPSocket.IServer HPUdpServer;
+        /// <summary>
+        /// 控制接口
+        /// </summary>
+        private ControllerInterface ControlInterface;
 
         /// <summary>
         /// Transport Devices 列表
@@ -117,8 +120,6 @@ namespace SpaceCG.Module.Modbus
             ParseConnectionsConfig(Configuration.Descendants("Connection"));            
             ParseModbusDevicesConfig(Configuration.Elements("Modbus"));
 
-            if (!String.IsNullOrWhiteSpace(Name)) AddAccessObject(Name, this);
-
             //Initialize
             foreach (ModbusTransportDevice transport in TransportDevices)
             {
@@ -138,8 +139,10 @@ namespace SpaceCG.Module.Modbus
             if (ushort.TryParse(Configuration?.Attribute("LocalPort")?.Value, out ushort localPort) && localPort >= 1024)
             {
                 this.Name = Configuration.Attribute("Name").Value;
-                HPTcpServer = HPSocketExtensions.CreateNetworkServer<HPSocket.Tcp.TcpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
-                HPUdpServer = HPSocketExtensions.CreateNetworkServer<HPSocket.Udp.UdpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
+                if (!String.IsNullOrWhiteSpace(Name)) AddAccessObject(Name, this);
+
+                ControlInterface = new ControllerInterface(localPort);
+                ControlInterface.AccessObjects = this.AccessObjects;
             }
         }
         /// <summary>
@@ -218,25 +221,6 @@ namespace SpaceCG.Module.Modbus
         }
 
         /// <summary>
-        /// On Server Receive Event Handler
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="connId"></param>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        private HandleResult OnServerReceiveEventHandler(IServer sender, IntPtr connId, byte[] data)
-        {
-            String message = Encoding.UTF8.GetString(data);
-            //ReceiveNetworkMessageHandler(message);
-            if(InstanceExtensions.TryParseCallMethod(message, AccessObjects, out object result))
-            {
-                Log.Info($"Return Result: {result}");
-            }
-
-            return HandleResult.Ok;
-        }
-
-        /// <summary>
         /// 总线 Input 事件处理
         /// </summary>
         /// <param name="transportDevice"></param>
@@ -292,8 +276,7 @@ namespace SpaceCG.Module.Modbus
                             Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
                         IEnumerable<XElement> actions = evt.Elements("Action");
-                        //foreach (XElement action in actions) CallActionElement(action);
-                        foreach (XElement action in actions) InstanceExtensions.TryParseCallMethod(action, AccessObjects, out object result);
+                        foreach (XElement action in actions) ControllerInterface.TryParseCallMethod(action, AccessObjects, out object result);
                         continue;
                     }
                     else if(StringExtensions.TryParse(evt.Attribute("MinValue")?.Value, out ulong minValue) && StringExtensions.TryParse(evt.Attribute("MaxValue")?.Value, out ulong maxValue))
@@ -304,8 +287,7 @@ namespace SpaceCG.Module.Modbus
                                 Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
                             IEnumerable<XElement> actions = evt.Elements("Action");
-                            //foreach (XElement action in actions) CallActionElement(action);
-                            foreach (XElement action in actions) InstanceExtensions.TryParseCallMethod(action, AccessObjects, out object result);
+                            foreach (XElement action in actions) ControllerInterface.TryParseCallMethod(action, AccessObjects, out object result);
                         }
                     }
                 }
@@ -329,69 +311,10 @@ namespace SpaceCG.Module.Modbus
                     if (evt.Attribute("Name")?.Value == eventName)
                     {
                         IEnumerable<XElement> actions = evt.Elements("Action");
-                        //foreach (XElement action in actions) CallActionElement(action);
-                        foreach (XElement action in actions) InstanceExtensions.TryParseCallMethod(action, AccessObjects, out object result);
+                        foreach (XElement action in actions) ControllerInterface.TryParseCallMethod(action, AccessObjects, out object result);
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// 接收网络消息并处理
-        /// </summary>
-        /// <param name="message"></param>
-        internal void ReceiveNetworkMessageHandler(String message)
-        {
-            if (String.IsNullOrWhiteSpace(message)) return;
-            Log.Info($"Receive Network Message: {message}");
-
-            XElement element = null;
-
-            try
-            {
-                element = XElement.Parse(message);
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"数据解析错误：{ex}");
-                return;
-            }
-
-            if (element.Name?.LocalName != "Action") return;
-
-            try
-            {
-                //this.CallActionElement(element);
-                InstanceExtensions.TryParseCallMethod(element, AccessObjects, out object result);
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"执行网络消息错误：{ex}");
-            }
-        }
-        /// <summary>
-        /// 分析/调用 Action 配置节点 
-        /// </summary>
-        /// <param name="action"></param>
-        internal void CallActionElement2(XElement action)
-        {
-            if (action == null || action.Name != "Action") return;
-            if (String.IsNullOrWhiteSpace(action.Attribute("Target")?.Value) ||
-                String.IsNullOrWhiteSpace(action.Attribute("Method")?.Value)) return;
-
-            String key = action.Attribute("Target").Value;
-            String methodName = action.Attribute("Method").Value;
-
-            if (!AccessObjects.TryGetValue(key, out IDisposable targetObj))
-            {
-                Log.Warn($"未找到时目标对象实例 {key} ");
-                return;
-            }
-
-            Task.Run(() =>
-            {
-                InstanceExtensions.CallInstanceMethod(targetObj, methodName, StringExtensions.SplitParameters(action.Attribute("Params")?.Value));
-            });
         }
 
         /// <summary>
@@ -399,8 +322,8 @@ namespace SpaceCG.Module.Modbus
         /// </summary>
         private void ResetAndClear()
         {
-            HPSocketExtensions.DisposeNetworkServer(ref HPTcpServer);
-            HPSocketExtensions.DisposeNetworkServer(ref HPUdpServer);
+            ControlInterface?.Dispose();
+            ControlInterface = null;
 
             foreach (ModbusTransportDevice transport in TransportDevices)
             {
