@@ -14,6 +14,11 @@ namespace SpaceCG.Extensions
         /// </summary>
         private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(StringExtensions));
 
+        /// <summary>
+        /// 获取数值型的字符串进位基数
+        /// </summary>
+        /// <param name="numberString"></param>
+        /// <returns></returns>
         private static object[] GetNumberStringBase(String numberString)
         {
             if (String.IsNullOrWhiteSpace(numberString)) throw new ArgumentNullException(nameof(numberString), "参数不能为空");
@@ -49,7 +54,6 @@ namespace SpaceCG.Extensions
 
             return parameters;
         }
-
         /// <summary>
         /// 将数字字符类型转为数值类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)字符串的转换。
         /// </summary>
@@ -87,7 +91,6 @@ namespace SpaceCG.Extensions
 
             return true;
         }
-
         /// <summary>
         /// 将多个数值字符类型(默认以 ',' 分割)型转为数值数组类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)字符串的转换。
         /// </summary>
@@ -123,7 +126,7 @@ namespace SpaceCG.Extensions
                 if (String.IsNullOrWhiteSpace(stringArray[i])) continue;
 
                 NumberType newValue;
-                object[] parameters = GetNumberStringBase(numberString);
+                object[] parameters = GetNumberStringBase(stringArray[i]);
 
                 try
                 {
@@ -412,20 +415,23 @@ namespace SpaceCG.Extensions
             if (paramType.GetType() == paramType) return (ValueType)paramValue;
             if (paramValue.GetType() != typeof(String)) return (ValueType)Convert.ChangeType(paramValue, paramType);
 
+            //Enum
             if (paramType.IsEnum)
             {
                 return (ValueType)Enum.Parse(paramType, paramValue.ToString(), true);
             }
+            //Boolean
             else if (paramType == typeof(bool))
             {
                 if (bool.TryParse(paramValue.ToString(), out bool value)) return value;
                 String pv = paramValue.ToString().Replace(" ", "");
                 return pv == "1" || pv == "T";
             }
+            //Number
             else if (paramType == typeof(sbyte) || paramType == typeof(byte) || paramType == typeof(short) || paramType == typeof(ushort) ||
                 paramType == typeof(Int32) || paramType == typeof(UInt32) || paramType == typeof(Int64) || paramType == typeof(UInt64))
             {
-                String methodName = $"To{paramType.Name}";
+                String methodName = $"To{paramType.Name}";                
                 IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                                   where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == paramType
                                                   let m_params = method.GetParameters()
@@ -447,6 +453,7 @@ namespace SpaceCG.Extensions
                     return (ValueType)paramValue;
                 }
             }
+            //Other
             else
             {
                 Logger.Warn($"暂不支持的类型转换 {paramType},{paramValue}");
