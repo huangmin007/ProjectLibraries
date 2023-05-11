@@ -27,6 +27,11 @@ namespace SpaceCG.Module.Reflection
         private HPSocket.IClient UdpClient;
 
         /// <summary>
+        /// 网络接口控制时，是否返回执行结果信息，默认为 true
+        /// </summary>
+        public bool NetworkReturnResult { get; set; } = true;
+
+        /// <summary>
         /// 可访问或可控制对象的集合，可以通过反射技术访问的对象集合
         /// <para>值键对 &lt;name, object&gt; </para>
         /// </summary>
@@ -138,8 +143,13 @@ namespace SpaceCG.Module.Reflection
             else
                 Logger.Warn($"Call Failed! {returnMessage}");
 
-            byte[] bytes = Encoding.UTF8.GetBytes(returnMessage);
-            return sender.Send(bytes, bytes.Length) ? HandleResult.Ok : HandleResult.Error;
+            if (NetworkReturnResult)
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(returnMessage);
+                return sender.Send(bytes, bytes.Length) ? HandleResult.Ok : HandleResult.Error;
+            }
+
+            return HandleResult.Ok;
         }
         /// <summary>
         /// On Server Receive Event Handler
@@ -159,8 +169,13 @@ namespace SpaceCG.Module.Reflection
             else
                 Logger.Warn($"Call Failed! {returnMessage}");
 
-            byte[] bytes = Encoding.UTF8.GetBytes(returnMessage);
-            return sender.Send(connId, bytes, bytes.Length) ? HandleResult.Ok : HandleResult.Error;
+            if (NetworkReturnResult)
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(returnMessage);
+                return sender.Send(connId, bytes, bytes.Length) ? HandleResult.Ok : HandleResult.Error;
+            }
+
+            return HandleResult.Ok;
         }
 
         /// <summary>
@@ -212,13 +227,13 @@ namespace SpaceCG.Module.Reflection
         }
 
         /// <summary>
-        /// 试图解析 xml 格式消息，在 Object 字典中查找实例对象，并调用实例对象的方法
+        /// 试图解析 xml 格式的控制消息，在 Object 字典中查找实例对象，并调用实例对象的方法
         /// <para>XML 格式："&lt;Action Target='object key name' Method='method name' Params='method params' /&gt;" 跟据调用的 Method 决定 Params 可选属性值</para>
         /// <para>XML 格式："&lt;Action Target='object key name' Property='property name' Value='value' /&gt;" 如果 Value 属性不存在，则表示获取属性的值</para>
         /// </summary>
         /// <param name="xmlMessage">xml 格式消息</param>
         /// <param name="accessObjects">可访问对象的集合</param>
-        /// <param name="returnResult">Method 的返回值</param>
+        /// <param name="returnResult"> Method 或 Property 的返回值</param>
         /// <returns>Method 调用成功则返回 true, 反之返回 false</returns>
         public static bool TryParseControlMessage(String xmlMessage, IReadOnlyDictionary<String, Object> accessObjects, out object returnResult)
         {
@@ -269,7 +284,7 @@ namespace SpaceCG.Module.Reflection
         /// </summary>
         /// <param name="actionElement"></param>
         /// <param name="accessObjects">可访问对象的集合</param>
-        /// <param name="returnResult">Method 的返回值</param>
+        /// <param name="returnResult">Method 执行的返回结果</param>
         /// <returns>Method 调用成功则返回 true, 反之返回 false</returns>
         public static bool TryParseCallMethod(XElement actionElement, IReadOnlyDictionary<String, Object> accessObjects, out object returnResult)
         {
@@ -316,8 +331,8 @@ namespace SpaceCG.Module.Reflection
         /// </summary>
         /// <param name="actionElement"></param>
         /// <param name="accessObjects"></param>
-        /// <param name="returnResult"></param>
-        /// <returns></returns>
+        /// <param name="returnResult">设置或获取属性的返回结果</param>
+        /// <returns>Property 调用成功则返回 true, 反之返回 false</returns>
         public static bool TryParseChangeValue(XElement actionElement, IReadOnlyDictionary<String, Object> accessObjects, out object returnResult)
         {
             returnResult = null;
