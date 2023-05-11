@@ -12,6 +12,11 @@ namespace SpaceCG.Extensions
 #if HPSocket
     public static class HPSocketExtensions
     {
+        static HPSocketExtensions()
+        {
+            //嵌入 HPSocket4C.Dll
+        }
+
         /// <summary>
         /// log4net.Logger 对象
         /// </summary>

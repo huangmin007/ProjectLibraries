@@ -165,7 +165,7 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn(ex);
+                    Logger.Warn($"{ex.Message} {stringArray[i]}/{typeof(NumberType)}");
                     continue;
                 }
 
