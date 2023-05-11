@@ -22,41 +22,42 @@ namespace SpaceCG.Extensions
         /// <returns></returns>
         private static object[] GetNumberStringBase(String numberString)
         {
-            if (String.IsNullOrWhiteSpace(numberString)) throw new ArgumentNullException(nameof(numberString), "参数不能为空");
+            if (string.IsNullOrWhiteSpace(numberString)) 
+                throw new ArgumentNullException(nameof(numberString), "参数不能为空");
 
             object[] parameters = new object[2];
-            String numString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
+            //numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
 
-            if (numString.IndexOf("0B") == 0)
+            if (numberString.IndexOf("0B") == 0)
             {
                 parameters[1] = 2;
-                parameters[0] = numString.Substring(2);
+                parameters[0] = numberString.Substring(2);
             }
-            else if (numString.IndexOf("O") == 0)
+            else if (numberString.IndexOf("O") == 0)
             {
                 parameters[1] = 8;
-                parameters[0] = numString.Substring(1);
+                parameters[0] = numberString.Substring(1);
             }
-            else if (numString.IndexOf("0D") == 0)
+            else if (numberString.IndexOf("0D") == 0)
             {
                 parameters[1] = 10;
-                parameters[0] = numString.Substring(2);
+                parameters[0] = numberString.Substring(2);
             }
-            else if (numString.IndexOf("0X") == 0)
+            else if (numberString.IndexOf("0X") == 0)
             {
                 parameters[1] = 16;
-                parameters[0] = numString.Substring(2);
+                parameters[0] = numberString.Substring(2);
             }
             else
             {
                 parameters[1] = 10;
-                parameters[0] = numString;
+                parameters[0] = numberString;
             }
 
             return parameters;
         }
         /// <summary>
-        /// 将数字字符类型转为数值类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)字符串的转换。
+        /// 将数字字符类型转为数值类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)、Double、Float 字符串的转换。
         /// </summary>
         /// <typeparam name="NumberType"></typeparam>
         /// <param name="numberString"></param>
@@ -68,32 +69,47 @@ namespace SpaceCG.Extensions
             result = default;
             if (String.IsNullOrWhiteSpace(numberString)) return false;
 
+            object[] parameters;
+            bool isFloatType = false;
+            IEnumerable<MethodInfo> methods;
             String methodName = $"To{typeof(NumberType).Name}";
-            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                              where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
-                                              let m_params = method.GetParameters()
-                                              where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
-                                              select method;
+            if (typeof(NumberType) == typeof(double) || typeof(NumberType) == typeof(float))
+            {
+                isFloatType = true;
+                methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                          where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == typeof(NumberType)
+                          let m_params = method.GetParameters()
+                          where m_params[0].ParameterType == typeof(String)
+                          select method;
+            }
+            else
+            {
+                isFloatType = false;
+                methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                          where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
+                          let m_params = method.GetParameters()
+                          where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
+                          select method;
+            }
 
             if (methods?.Count() != 1) return false;
-
-            MethodInfo ConvertToNumber = methods.First();
-            object[] parameters = GetNumberStringBase(numberString);
+            numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
+            parameters = isFloatType ? new object[] { numberString } : GetNumberStringBase(numberString);
 
             try
             {
-                result = (NumberType)ConvertToNumber.Invoke(null, parameters);
+                result = (NumberType)methods.First().Invoke(null, parameters);
             }
             catch (Exception ex)
             {
-                Logger.Warn(ex);
+                Logger.Warn($"{ex.Message} {numberString}/{typeof(NumberType)}");
                 return false;
             }
 
             return true;
         }
         /// <summary>
-        /// 将多个数值字符类型(默认以 ',' 分割)型转为数值数组类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)字符串的转换。
+        /// 将多个数值字符类型(默认以 ',' 分割)型转为数值数组类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)、double、float 字符串的转换。
         /// </summary>
         /// <typeparam name="NumberType"></typeparam>
         /// <param name="numberString"></param>
@@ -105,19 +121,33 @@ namespace SpaceCG.Extensions
         {
             if (String.IsNullOrWhiteSpace(numberString)) return false;
 
+            bool isFloatType = false;
+            IEnumerable<MethodInfo> methods;
             String methodName = $"To{typeof(NumberType).Name}";
-            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                              where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
-                                              let m_params = method.GetParameters()
-                                              where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
-                                              select method;
+            if (typeof(NumberType) == typeof(double) || typeof(NumberType) == typeof(float))
+            {
+                isFloatType = true;
+                methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                          where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == typeof(NumberType)
+                          let m_params = method.GetParameters()
+                          where m_params[0].ParameterType == typeof(String)
+                          select method;
+            }
+            else
+            {
+                isFloatType = false;
+                methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                          where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
+                          let m_params = method.GetParameters()
+                          where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
+                          select method;
+            }
 
             if (methods?.Count() != 1) return false;
+            numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
 
-            string[] stringArray = numberString.Trim().Split(new char[] { separator }, StringSplitOptions.None);
-
-            if (defaultValues == null || defaultValues.Length <= 0)
-                defaultValues = new NumberType[stringArray.Length];
+            string[] stringArray = numberString.Split(new char[] { separator }, StringSplitOptions.None);
+            if (defaultValues == null || defaultValues.Length <= 0) defaultValues = new NumberType[stringArray.Length];
 
             MethodInfo ConvertToNumber = methods.First();
             int length = Math.Min(stringArray.Length, defaultValues.Length);
@@ -126,8 +156,8 @@ namespace SpaceCG.Extensions
             {
                 if (String.IsNullOrWhiteSpace(stringArray[i])) continue;
 
-                NumberType newValue;
-                object[] parameters = GetNumberStringBase(stringArray[i]);
+                NumberType newValue = default;
+                object[] parameters = isFloatType ? new object[] { stringArray[i] } : GetNumberStringBase(stringArray[i]);
 
                 try
                 {
@@ -328,10 +358,9 @@ namespace SpaceCG.Extensions
             //Other
             else
             {
-                Logger.Warn($"暂不支持的类型转换 {paramType},{paramValue}");
+                //Logger.Warn($"暂未处理的类型转换 {paramType},{paramValue}");
+                return (ValueType)Convert.ChangeType(paramValue, paramType);
             }
-
-            return (ValueType)Convert.ChangeType(paramValue, paramType);
         }
     }
 }

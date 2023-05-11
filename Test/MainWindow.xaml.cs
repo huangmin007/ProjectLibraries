@@ -94,8 +94,8 @@ namespace Test
 
             //Console.WriteLine(typeof(NumberStyles));
 
-            deviceManager = new ModbusDeviceManager();
-            deviceManager.LoadDeviceConfig("ModbusDevices.Config");
+            //deviceManager = new ModbusDeviceManager();
+            //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
 
 #if false
             //object[] arr1 = StringExtension.ConvertParameters2("0x01,3,[True,True,False]");
@@ -140,6 +140,14 @@ namespace Test
 
             //Console.WriteLine(bool.TryParse("fAlse", out bool rv));
             //Console.WriteLine(rv);
+
+            int[] arr = new int[] { 0, 20, 1920, 1080 };
+            var r = StringExtensions.TryParse(",,453,600", ref arr);
+
+            foreach (var t in arr) Console.Write($"{t},");
+            Console.WriteLine("");
+
+            Console.WriteLine(typeof(float).Name);
         }
 
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice slaveDevice, Register register)
