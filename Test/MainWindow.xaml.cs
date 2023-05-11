@@ -94,8 +94,8 @@ namespace Test
 
             //Console.WriteLine(typeof(NumberStyles));
 
-            //deviceManager = new ModbusDeviceManager();
-            //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
+            deviceManager = new ModbusDeviceManager();
+            deviceManager.LoadDeviceConfig("ModbusDevices.Config");
 
 #if false
             //object[] arr1 = StringExtension.ConvertParameters2("0x01,3,[True,True,False]");

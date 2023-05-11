@@ -93,11 +93,13 @@ namespace SpaceCG.Module.Reflection
 
             if (AccessObjects.ContainsKey(name))
             {
-                Logger.Warn($"添加可访问控制对象 {name}:{obj} 失败, 已包含对象");
+                Logger.Warn($"添加可访问控制对象 {name}:{obj} 失败, 该对象已存在");
                 return false;
             }
 
-            return AccessObjects.TryAdd(name, obj);
+            bool result = AccessObjects.TryAdd(name, obj);
+            Logger.Info($"添加可访问控制对象 {name}/{obj}/{obj.GetType()} 状态：{result}");
+            return result;           
         }
         /// <summary>
         /// 移除控制对象
@@ -114,7 +116,9 @@ namespace SpaceCG.Module.Reflection
                 return false;
             }
 
-            return AccessObjects.TryRemove(name, out Object value);
+            bool result = AccessObjects.TryRemove(name, out Object obj);
+            Logger.Info($"移除可访问控制对象 {name}/{obj}/{obj?.GetType()} 状态：{result}");
+            return result;
         }
         /// <summary>
         /// 将所有控制对象移除

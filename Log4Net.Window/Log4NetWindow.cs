@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Windows;
-using System.Windows.Interop;
-using System.Windows.Controls;
 using System.ComponentModel;
 using System.Windows.Media;
 using log4net.Core;
 using Win32API.User32;
+using System.Windows.Interop;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace SpaceCG.Generic
@@ -34,6 +34,11 @@ namespace SpaceCG.Generic
         protected int MaxLines = 512;
 
         /// <summary>
+        /// 关闭窗体时并销毁窗体
+        /// </summary>
+        private bool CloseDispose = false;
+
+        /// <summary>
         /// Logger Window
         /// <para>使用 Ctrl+L 显示激活窗体/隐藏窗体 </para>
         /// </summary>
@@ -43,11 +48,38 @@ namespace SpaceCG.Generic
             this.MaxLines = maxLines;
             OnInitializeControls();
         }
+
+        /// <summary>
+        /// 强制关闭窗体，并销毁
+        /// </summary>
+        /// <param name="force"></param>
+        public void Close(bool force)
+        {
+            CloseDispose = force;
+            this.Close();
+        }
+
+        /// <inheritdoc/>
+        protected override void OnPreviewKeyUp(KeyEventArgs e)
+        {
+            base.OnPreviewKeyUp(e);
+
+            switch (e.Key)
+            {
+                case Key.T:
+                    if (e.KeyboardDevice.Modifiers == ModifierKeys.Control)
+                    {
+                        this.Topmost = !this.Topmost;
+                    }
+                    break;
+            }
+        }
         /// <inheritdoc/>
         protected override void OnClosing(CancelEventArgs e)
         {
-            this.Hide();
-            e.Cancel = true;
+            if(!CloseDispose) this.Hide();
+
+            e.Cancel = !CloseDispose;
 			base.OnClosing(e);
         }
         /// <inheritdoc/>
@@ -62,7 +94,7 @@ namespace SpaceCG.Generic
             if (Handle != null)
             {
                 bool result = User32.UnregisterHotKey(Handle, 0);
-                result = result || User32.UnregisterHotKey(Handle, 1);
+                //result = result || User32.UnregisterHotKey(Handle, 1);
 
                 Handle = IntPtr.Zero;
             }
@@ -181,8 +213,8 @@ namespace SpaceCG.Generic
 
             bool result = User32.RegisterHotKey(Handle, 0, RhkModifier.CONTROL | RhkModifier.SHIFT, VirtualKeyCode.VK_W);
             Log.Info($"注册系统全局热键 CTRL+SHIFT+W 日志窗体显示/隐藏 ... {(result ? "OK" : "Failed")}");
-            result = result || User32.RegisterHotKey(Handle, 1, RhkModifier.CONTROL | RhkModifier.SHIFT, VirtualKeyCode.VK_D);
-            Log.Info($"注册系统全局热键 CTRL+SHIFT+D 日志级别切换 ... {(result ? "OK" : "Failed")}");
+            //result = result || User32.RegisterHotKey(Handle, 1, RhkModifier.CONTROL | RhkModifier.SHIFT, VirtualKeyCode.VK_D);
+            //Log.Info($"注册系统全局热键 CTRL+SHIFT+D 日志级别切换 ... {(result ? "OK" : "Failed")}");
 
             if (result)
             {
@@ -199,6 +231,10 @@ namespace SpaceCG.Generic
         /// </summary>
         protected void ChangeLoggerLevel()
         {
+            log4net.Repository.Hierarchy.Logger root = ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root;
+            root.Level = (root.Level == log4net.Core.Level.Info) ? log4net.Core.Level.Debug : log4net.Core.Level.Info;
+            Log.Warn($"Root Logger Current Level: {root.Level}");
+#if false
             if (((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root.Level == log4net.Core.Level.Info)
                 ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root.Level = log4net.Core.Level.Debug;
             else
@@ -206,6 +242,7 @@ namespace SpaceCG.Generic
 
             log4net.Core.Level level = ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root.Level;
             Log.Info($"Current Logger Level: {level}");
+#endif
         }
 
         /// <summary>
@@ -241,7 +278,7 @@ namespace SpaceCG.Generic
                             this.Hide();
                         }
                     }
-                    if(key == VirtualKeyCode.VK_D)
+                    else if(key == VirtualKeyCode.VK_D)
                     {
                         ChangeLoggerLevel();
                     }
