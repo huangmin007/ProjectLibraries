@@ -65,16 +65,19 @@ namespace SpaceCG.Module.Reflection
         {
             if (String.IsNullOrWhiteSpace(type) || String.IsNullOrWhiteSpace(address) || port <= 1024) return false;
 
+            address = address.Replace(" ", "");
+            type = type.ToUpper().Replace(" ", "");
+
             String configKey = $"{type}:{address}:{port}";
             if (NetworkServices.ContainsKey(configKey)) return false;
 
-            if (type.ToUpper().IndexOf("SERVER") != -1)
+            if (type.IndexOf("-SERVER") != -1)
             {
                 IServer Server = HPSocketExtensions.CreateNetworkServer(configKey, OnServerReceiveEventHandler);
                 if (Server != null) NetworkServices.Add(configKey, Server);
                 else return false;
             }
-            else if(type.ToUpper().IndexOf("CLIENT") != -1)
+            else if(type.IndexOf("-CLIENT") != -1)
             {
                 IClient Client = HPSocketExtensions.CreateNetworkClient(configKey, OnClientReceiveEventHandler);
                 if (Client != null) NetworkServices.Add(configKey, Client);
@@ -82,9 +85,10 @@ namespace SpaceCG.Module.Reflection
             }
             else
             {
-                IServer Server = HPSocketExtensions.CreateNetworkServer(configKey, OnServerReceiveEventHandler);
-                if (Server != null) NetworkServices.Add(configKey, Server);
-                else return false;
+                //IServer Server = HPSocketExtensions.CreateNetworkServer(configKey, OnServerReceiveEventHandler);
+                //if (Server != null) NetworkServices.Add(configKey, Server);
+                //else return false;
+                return false;
             }
 
             return true;
