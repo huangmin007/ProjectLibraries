@@ -16,7 +16,7 @@ namespace Win32API.User32
     /// <para>鼠标类消息：https://docs.microsoft.com/en-us/windows/win32/inputdev/mouse-input-notifications </para>
     /// <para>钩子类消息：https://docs.microsoft.com/en-us/windows/win32/winmsg/hook-notifications </para>
     /// </summary>
-    public enum MessageType:uint
+    internal enum MessageType:uint
     {
         
         #region WM General

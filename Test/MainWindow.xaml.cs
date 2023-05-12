@@ -1,24 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
+using System.IO.Ports;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using System.Windows.Interop;
 using SpaceCG.Extensions;
 using SpaceCG.Module.Modbus;
 using SpaceCG.Module.Reflection;
+using SpaceCG.WindowsAPI.User32;
 
 namespace Test
 {
@@ -27,11 +18,14 @@ namespace Test
     /// </summary>
     public partial class MainWindow : Window,IDisposable
     {
+        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(SerialPortExtensions));
+
         Modbus.Device.IModbusMaster master;
         ModbusTransportDevice transport;
         ModbusIODevice device;
 
         ModbusDeviceManager deviceManager;
+        ControllerInterface ControllerInterface = new ControllerInterface(0);
 
         public MainWindow()
         {
@@ -44,8 +38,19 @@ namespace Test
             deviceManager?.Dispose();
         }
 
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+            if(e.KeyboardDevice.Modifiers == ModifierKeys.Shift)
+            {
+                
+            }
+        }
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            //ControllerInterface.InstallKeyboardService(true);
+
 #if false
             ushort[] addresses = {1,2,5,6,8,9,10,20,21,22,23 };
             Dictionary<ushort, ushort>  result = ModbusDevice.SpliteAddresses(addresses);
@@ -94,8 +99,8 @@ namespace Test
 
             //Console.WriteLine(typeof(NumberStyles));
 
-            deviceManager = new ModbusDeviceManager();
-            deviceManager.LoadDeviceConfig("ModbusDevices.Config");
+            //deviceManager = new ModbusDeviceManager();
+            //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
 
 #if false
             //object[] arr1 = StringExtension.ConvertParameters2("0x01,3,[True,True,False]");
@@ -140,15 +145,13 @@ namespace Test
 
             //Console.WriteLine(bool.TryParse("fAlse", out bool rv));
             //Console.WriteLine(rv);
-
-            int[] arr = new int[] { 0, 20, 1920, 1080 };
-            var r = StringExtensions.TryParse(",,453,600", ref arr);
-
-            foreach (var t in arr) Console.Write($"{t},");
-            Console.WriteLine("");
-
-            Console.WriteLine(typeof(float).Name);
+            
+            //serialPort = new SerialPort("Com3", 115200);
+            //AutoReconnection2(serialPort, this);
+            //SerialPortExtensions.AutoReconnection(serialPort);
+            //serialPort.Open();
         }
+        SerialPort serialPort;
 
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice slaveDevice, Register register)
         {

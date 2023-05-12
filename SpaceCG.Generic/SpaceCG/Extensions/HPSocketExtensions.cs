@@ -84,7 +84,8 @@ namespace SpaceCG.Extensions
             catch (Exception ex)
             {
                 Logger.Error(ex);
-                return default;
+                server.Dispose();
+                return null;
             }
 
             Logger.Info($"已启本地 ({server.GetType()}) 服务端口：{localPort}");
@@ -124,57 +125,52 @@ namespace SpaceCG.Extensions
         }
         /// <summary>
         /// 快速创建并启动本地 Server 对象
-        /// <para>配置的键值格式：[ip,]port 或 [ip:]port</para>
+        /// <para>配置格式： [ip:]port 或 [ip,]port</para>
         /// </summary>
         /// <typeparam name="TServer"></typeparam>
-        /// <param name="cfgKey"></param>
+        /// <param name="config"></param>
         /// <param name="onServerReceiveEventHandler"></param>
         /// <returns></returns>
-        public static TServer CreateNetworkServer<TServer>(string cfgKey, HPSocket.ServerReceiveEventHandler onServerReceiveEventHandler = null) where TServer : class, HPSocket.IServer, new()
+        public static TServer CreateNetworkServer<TServer>(string config, HPSocket.ServerReceiveEventHandler onServerReceiveEventHandler = null) where TServer : class, HPSocket.IServer, new()
         {
-            if (String.IsNullOrWhiteSpace(ConfigurationManager.AppSettings[cfgKey])) return default;
+            if (String.IsNullOrWhiteSpace(config)) return null;
 
-            String configInfo = ConfigurationManager.AppSettings[cfgKey];
-            if (String.IsNullOrWhiteSpace(configInfo)) return default;
-
-            String[] info = configInfo.IndexOf(':') != -1 ?
-                configInfo.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries) :
-                configInfo.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (info.Length <= 0 || info.Length > 2) return default;
+            String[] info = config.IndexOf(':') != -1 ?
+                config.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries) :
+                config.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (info.Length <= 0 || info.Length > 2) return null;
 
             if (info.Length == 1)
             {
-                if (!ushort.TryParse(info[0], out ushort localPort)) return default;
+                if (!ushort.TryParse(info[0], out ushort localPort)) return null;
                 return CreateNetworkServer<TServer>("0.0.0.0", localPort, onServerReceiveEventHandler);
             }
             else if (info.Length == 2)
             {
-                if (!ushort.TryParse(info[1], out ushort localPort)) return default;
+                if (!ushort.TryParse(info[1], out ushort localPort)) return null;
                 return CreateNetworkServer<TServer>(info[0], localPort, onServerReceiveEventHandler);
             }
 
-            return default;
+            return null;
         }
         /// <summary>
         /// 快速创建并启动本地 Server 对象
-        /// <para>配置的键值格式：type,ip,port 示例：TCP,0.0.0.0,5330</para>
+        /// <para>配置的键值格式：type,ip,port 或 type:ip:port, type:TCP/UDP,  示例：TCP,0.0.0.0,5330</para>
         /// </summary>
-        /// <param name="cfgKey"></param>
+        /// <param name="config"></param>
         /// <param name="onServerReceiveEventHandler"></param>
         /// <returns></returns>
-        public static HPSocket.IServer CreateNetworkServer(string cfgKey, HPSocket.ServerReceiveEventHandler onServerReceiveEventHandler = null)
+        public static HPSocket.IServer CreateNetworkServer(string config, HPSocket.ServerReceiveEventHandler onServerReceiveEventHandler = null)
         {
-            if (String.IsNullOrWhiteSpace(ConfigurationManager.AppSettings[cfgKey])) return default;
+            if (String.IsNullOrWhiteSpace(config)) return default;
 
-            String configInfo = ConfigurationManager.AppSettings[cfgKey];
-            if (String.IsNullOrWhiteSpace(configInfo)) return default;
+            String[] info = config.IndexOf(':') != -1 ?
+                config.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries) :
+                config.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 
-            String[] info = configInfo.IndexOf(':') != -1 ?
-                configInfo.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries) :
-                configInfo.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             if (info.Length != 3)
             {
-                Logger.Error($"服务端配置错误：{cfgKey}:{configInfo} ");
+                Logger.Error($"服务端配置错误：{config} ");
                 return default;
             }
 
@@ -182,11 +178,11 @@ namespace SpaceCG.Extensions
 
             if (info[0].ToUpper().IndexOf("TCP") != -1)
             {
-                return CreateNetworkServer<HPSocket.Tcp.TcpServer>("0.0.0.0", localPort, onServerReceiveEventHandler);
+                return CreateNetworkServer<HPSocket.Tcp.TcpServer>(info[1], localPort, onServerReceiveEventHandler);
             }
             else if (info[0].ToUpper().IndexOf("UDP") != -1)
             {
-                return CreateNetworkServer<HPSocket.Udp.UdpServer>("0.0.0.0", localPort, onServerReceiveEventHandler);
+                return CreateNetworkServer<HPSocket.Udp.UdpServer>(info[1], localPort, onServerReceiveEventHandler);
             }
 
             return default;
@@ -245,13 +241,24 @@ namespace SpaceCG.Extensions
             client.FreeBufferPoolSize = 32;
             client.FreeBufferPoolHold = client.FreeBufferPoolSize * 3;
 
+            int reconnectCount = 0;
             String connType = client is HPSocket.Tcp.TcpClient ? "TCP" : "UDP";
 
             client.OnClose += (HPSocket.IClient sender, HPSocket.SocketOperation enOperation, int errorCode) =>
             {
+                reconnectCount++;
                 client.GetRemoteHost(out string rHost, out ushort rPort);
                 client.GetListenAddress(out string lHost, out ushort lPort);
-                Logger.Warn($"客户端({connType}) {lHost}:{lPort} 已断开与远程服务 {rHost}:{rPort} 的连接，等待重新连接 ... ");
+
+                if(reconnectCount <= 1)
+                    Logger.Warn($"客户端({connType}) {lHost}:{lPort} 已断开与远程服务 {rHost}:{rPort} 的连接，等待重新连接 ... ");
+
+                //重复连接超过 3 分钟就不在连接了
+                if (reconnectCount >= 180)
+                {
+                    Logger.Error($"客户端({connType}) {lHost}:{lPort} 尝试与远程服务 {rHost}:{rPort} 连接超过 {reconnectCount}s 不在重新连接 ... ");
+                    return HPSocket.HandleResult.Ok;
+                }
 
                 Task.Run(() =>
                 {
@@ -268,8 +275,9 @@ namespace SpaceCG.Extensions
             {
                 client.GetRemoteHost(out string rHost, out ushort rPort);
                 client.GetListenAddress(out string lHost, out ushort lPort);
-                Logger.Info($"客户端({connType}) {lHost}:{lPort} 已连接远程服务 {rHost}:{rPort} ");
+                Logger.Info($"客户端({connType}) {lHost}:{lPort} 已连接远程服务 {rHost}:{rPort} (ReconnectCount : {reconnectCount})");
 
+                reconnectCount = 0;
                 return HPSocket.HandleResult.Ok;
             };
             client.OnReceive += (HPSocket.IClient sender, byte[] data) =>
@@ -282,6 +290,7 @@ namespace SpaceCG.Extensions
                     Logger.Debug($"客户端({connType}) {lHost}:{lPort} 收到远程服务 {rHost}:{rPort} 的数据，长度：{data.Length}(Bytes)");
                 }
 
+                reconnectCount = 0;
                 return HPSocket.HandleResult.Ok;
             };
 
@@ -290,6 +299,7 @@ namespace SpaceCG.Extensions
             try
             {
                 client.Connect();
+                reconnectCount = 0;
             }
             catch (Exception ex)
             {
@@ -304,19 +314,16 @@ namespace SpaceCG.Extensions
         /// <para>配置的键值格式：ip,port 或 ip:port </para>
         /// </summary>
         /// <typeparam name="TClient"></typeparam>
-        /// <param name="cfgKey">format(remote address : remote port)，示例：127.0.0.1:5331</param>
+        /// <param name="config">format(remote address : remote port)，示例：127.0.0.1:5331</param>
         /// <param name="onClientReceiveEventHandler"></param>
         /// <returns></returns>
-        public static TClient CreateNetworkClient<TClient>(string cfgKey, HPSocket.ClientReceiveEventHandler onClientReceiveEventHandler = null) where TClient : class, HPSocket.IClient, new()
+        public static TClient CreateNetworkClient<TClient>(string config, HPSocket.ClientReceiveEventHandler onClientReceiveEventHandler = null) where TClient : class, HPSocket.IClient, new()
         {
-            if (String.IsNullOrWhiteSpace(ConfigurationManager.AppSettings[cfgKey])) return default;
+            if (String.IsNullOrWhiteSpace(config)) return default;
 
-            String configInfo = ConfigurationManager.AppSettings[cfgKey];
-            if (String.IsNullOrWhiteSpace(configInfo)) return default;
-
-            String[] info = configInfo.IndexOf(':') != -1 ?
-                configInfo.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries) :
-                configInfo.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            String[] info = config.IndexOf(':') != -1 ?
+                config.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries) :
+                config.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             if (info.Length <= 0 || info.Length > 2) return default;
 
             if (info.Length == 1)
@@ -336,23 +343,20 @@ namespace SpaceCG.Extensions
         /// 快速创建并连接远程服务端的 Client 对象
         /// <para>配置的键值格式：type,ip,port 或 type:ip:port </para>
         /// </summary>
-        /// <param name="cfgKey"></param>
+        /// <param name="config"></param>
         /// <param name="onClientReceiveEventHandler"></param>
         /// <returns></returns>
-        public static HPSocket.IClient CreateNetworkClient(string cfgKey, HPSocket.ClientReceiveEventHandler onClientReceiveEventHandler = null)
+        public static HPSocket.IClient CreateNetworkClient(string config, HPSocket.ClientReceiveEventHandler onClientReceiveEventHandler = null)
         {
-            if (String.IsNullOrWhiteSpace(ConfigurationManager.AppSettings[cfgKey])) return default;
+            if (String.IsNullOrWhiteSpace(config)) return default;
 
-            String configInfo = ConfigurationManager.AppSettings[cfgKey];
-            if (String.IsNullOrWhiteSpace(configInfo)) return default;
-
-            String[] info = configInfo.IndexOf(':') != -1 ?
-                configInfo.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries) :
-                configInfo.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            String[] info = config.IndexOf(':') != -1 ?
+                config.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries) :
+                config.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 
             if (info.Length != 3)
             {
-                Logger.Error($"客户端配置错误：{cfgKey}:{configInfo} ");
+                Logger.Error($"客户端配置错误：{config} ");
                 return default;
             }
 

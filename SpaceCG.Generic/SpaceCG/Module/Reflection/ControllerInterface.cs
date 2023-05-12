@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using System.Xml.Linq;
+using Gma.System.MouseKeyHook;
 using HPSocket;
 using SpaceCG.Extensions;
 
@@ -20,22 +22,25 @@ namespace SpaceCG.Module.Reflection
     {
         private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(ControllerInterface));
 
-        private HPSocket.IServer TcpServer;
-        private HPSocket.IServer UdpServer;
-
-        private HPSocket.IClient TcpClient;
-        private HPSocket.IClient UdpClient;
+        /// <summary>
+        /// 网络控制接口服务参数，是否返回网络执行结果信息，默认为 true
+        /// </summary>
+        public bool ReturnNetworkResult { get; set; } = true;
+        /// <summary>
+        /// 网络控制接口服务对象
+        /// </summary>
+        private Dictionary<String, Object> NetworkServices = new Dictionary<string, Object>(8);
 
         /// <summary>
-        /// 网络接口控制时，是否返回执行结果信息，默认为 true
+        /// 组合控制消息的集合
         /// </summary>
-        public bool NetworkReturnResult { get; set; } = true;
+        private ConcurrentDictionary<int, String[]> GroupMessages = new ConcurrentDictionary<int, String[]>(2, 8);
 
         /// <summary>
         /// 可访问或可控制对象的集合，可以通过反射技术访问的对象集合
         /// <para>值键对 &lt;name, object&gt; </para>
         /// </summary>
-        internal ConcurrentDictionary<String, Object> AccessObjects { get; set; } = new ConcurrentDictionary<String, Object>(2, 8);
+        private ConcurrentDictionary<String, Object> ControlObjects = new ConcurrentDictionary<String, Object>(2, 8);
 
         /// <summary>
         /// 反射控制接口对象
@@ -43,93 +48,102 @@ namespace SpaceCG.Module.Reflection
         /// <para>控制协议(XML)：&lt;Action Target="object key name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
         /// </summary>
         /// <param name="localPort">服务端口，小于 1024 则不启动服务接口</param>
-        public ControllerInterface(ushort localPort = 0)
+        public ControllerInterface(ushort localPort = 2023)
         {
-            InstallServer(localPort);
+            InstallNetworkService("TCP-SERVER", "0.0.0.0", localPort);
         }
 
         /// <summary>
-        /// 安装 TCP/UDP 服务接口
+        /// 安装网络 (TCP/UDP-Server/Client) 控制接口服务
+        /// <para>网络类型支持：TCP-Server, UDP-Server, TCP-Client, UDP-Client</para>
         /// </summary>
-        /// <param name="localPort">服务端口，小于 1024 则不启动服务接口</param>
+        /// <param name="type">TCP-Server, UDP-Server, TCP-Client, UDP-Client</param>
+        /// <param name="address"></param>
+        /// <param name="port">端口不得小于 1024 否则返回 false </param>
         /// <returns></returns>
-        public bool InstallServer(ushort localPort)
+        public bool InstallNetworkService(String type, String address, ushort port)
         {
-            if (TcpServer == null && UdpServer == null && localPort > 1024)
+            if (String.IsNullOrWhiteSpace(type) || String.IsNullOrWhiteSpace(address) || port <= 1024) return false;
+
+            String configKey = $"{type}:{address}:{port}";
+            if (NetworkServices.ContainsKey(configKey)) return false;
+
+            if (type.ToUpper().IndexOf("SERVER") != -1)
             {
-                TcpServer = HPSocketExtensions.CreateNetworkServer<HPSocket.Tcp.TcpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
-                UdpServer = HPSocketExtensions.CreateNetworkServer<HPSocket.Udp.UdpServer>("0.0.0.0", localPort, OnServerReceiveEventHandler);
-                return true;
+                IServer Server = HPSocketExtensions.CreateNetworkServer(configKey, OnServerReceiveEventHandler);
+                if (Server != null) NetworkServices.Add(configKey, Server);
+                else return false;
             }
+            else if(type.ToUpper().IndexOf("CLIENT") != -1)
+            {
+                IClient Client = HPSocketExtensions.CreateNetworkClient(configKey, OnClientReceiveEventHandler);
+                if (Client != null) NetworkServices.Add(configKey, Client);
+                else return false;
+            }
+            else
+            {
+                IServer Server = HPSocketExtensions.CreateNetworkServer(configKey, OnServerReceiveEventHandler);
+                if (Server != null) NetworkServices.Add(configKey, Server);
+                else return false;
+            }
+
+            return true;
+        }
+        /// <summary>
+        /// 卸载指定的网络服务接口
+        /// <para>KeyName == $"{type}:{address}:{port}"</para>
+        /// </summary>
+        /// <param name="keyName"></param>
+        /// <returns></returns>
+        public bool UninstallNetworkService(String keyName)
+        {
+            if (NetworkServices?.Count() == 0) return false;
+            if (!NetworkServices.ContainsKey(keyName)) return false;
+
+            foreach (var obj in NetworkServices)
+            {
+                if (obj.Key != keyName) continue;
+
+                if (typeof(HPSocket.IServer).IsAssignableFrom(obj.Value.GetType()))
+                {
+                    HPSocket.IServer server = (HPSocket.IServer)obj.Value;
+                    HPSocketExtensions.DisposeNetworkServer(ref server);
+                    return NetworkServices.Remove(keyName);
+                }
+                else if (typeof(HPSocket.IClient).IsAssignableFrom(obj.Value.GetType()))
+                {
+                    HPSocket.IClient client = (HPSocket.IClient)obj.Value;
+                    HPSocketExtensions.DisposeNetworkClient(ref client);
+                    return NetworkServices.Remove(keyName);
+                }
+            }
+
             return false;
         }
         /// <summary>
-        /// 安装 TCP/UDP 客户端接口
+        /// 卸载所有网络服务接口
         /// </summary>
-        /// <param name="remoteAddress"></param>
-        /// <param name="remotePort"></param>
-        /// <returns></returns>
-        public bool InstallClient(String remoteAddress, ushort remotePort)
+        public void UninstallNetworkServices()
         {
-            if (TcpClient == null && UdpClient == null && remotePort > 1024)
+            if (NetworkServices?.Count() == 0) return;
+
+            foreach (var obj in NetworkServices)
             {
-                TcpClient = HPSocketExtensions.CreateNetworkClient<HPSocket.Tcp.TcpClient>(remoteAddress, remotePort, OnClientReceiveEventHandler);
-                UdpClient = HPSocketExtensions.CreateNetworkClient<HPSocket.Udp.UdpClient>(remoteAddress, remotePort, OnClientReceiveEventHandler);
-                return true;
+                if (typeof(HPSocket.IServer).IsAssignableFrom(obj.Value.GetType()))
+                {
+                    HPSocket.IServer server = (HPSocket.IServer)obj.Value;
+                    HPSocketExtensions.DisposeNetworkServer(ref server);
+                }
+                else if (typeof(HPSocket.IClient).IsAssignableFrom(obj.Value.GetType()))
+                {
+                    HPSocket.IClient client = (HPSocket.IClient)obj.Value;
+                    HPSocketExtensions.DisposeNetworkClient(ref client);
+                }
             }
 
-            return false;
+            NetworkServices?.Clear();
         }
-
-        /// <summary>
-        /// 添加控制对象
-        /// </summary>
-        /// <param name="name"></param>
-        /// <param name="obj"></param>
-        /// <returns></returns>
-        public bool AddControlObject(String name, Object obj)
-        {
-            if (String.IsNullOrWhiteSpace(name) || obj == null) return false;
-
-            if (AccessObjects.ContainsKey(name))
-            {
-                Logger.Warn($"添加可访问控制对象 {name}:{obj} 失败, 该对象已存在");
-                return false;
-            }
-
-            bool result = AccessObjects.TryAdd(name, obj);
-            Logger.Info($"添加可访问控制对象 {name}/{obj}/{obj.GetType()} 状态：{result}");
-            return result;           
-        }
-        /// <summary>
-        /// 移除控制对象
-        /// </summary>
-        /// <param name="name"></param>
-        /// <returns></returns>
-        public bool RemoveControlObject(String name)
-        {
-            if (String.IsNullOrWhiteSpace(name)) return false;
-
-            if (!AccessObjects.ContainsKey(name))
-            {
-                Logger.Warn($"移除可访问控制对象 {name} 失败, 不存在该对象");
-                return false;
-            }
-
-            bool result = AccessObjects.TryRemove(name, out Object obj);
-            Logger.Info($"移除可访问控制对象 {name}/{obj}/{obj?.GetType()} 状态：{result}");
-            return result;
-        }
-        /// <summary>
-        /// 将所有控制对象移除
-        /// </summary>
-        public void ClearControlObjects() => AccessObjects.Clear();
-        /// <summary>
-        /// 获取可控制对象的集合
-        /// </summary>
-        /// <returns></returns>
-        public IReadOnlyDictionary<String, Object> GetControlObjects() => AccessObjects;
-
+        
         /// <summary>
         /// On Client Receive Event Handler
         /// </summary>
@@ -147,7 +161,7 @@ namespace SpaceCG.Module.Reflection
             else
                 Logger.Warn($"Call Failed! {returnMessage}");
 
-            if (NetworkReturnResult)
+            if (ReturnNetworkResult)
             {
                 byte[] bytes = Encoding.UTF8.GetBytes(returnMessage);
                 return sender.Send(bytes, bytes.Length) ? HandleResult.Ok : HandleResult.Error;
@@ -173,7 +187,7 @@ namespace SpaceCG.Module.Reflection
             else
                 Logger.Warn($"Call Failed! {returnMessage}");
 
-            if (NetworkReturnResult)
+            if (ReturnNetworkResult)
             {
                 byte[] bytes = Encoding.UTF8.GetBytes(returnMessage);
                 return sender.Send(connId, bytes, bytes.Length) ? HandleResult.Ok : HandleResult.Error;
@@ -181,6 +195,151 @@ namespace SpaceCG.Module.Reflection
 
             return HandleResult.Ok;
         }
+
+#if false
+        private IKeyboardMouseEvents KeyboardMouseHook;
+        /// <summary>
+        /// 安装键盘控制接口服务
+        /// </summary>
+        /// <param name="global"></param>
+        /// <returns></returns>
+        public bool InstallKeyboardService(bool global)
+        {
+            if (KeyboardMouseHook != null) return true;
+
+            KeyboardMouseHook = global?  Hook.GlobalEvents() : Hook.AppEvents();
+            KeyboardMouseHook.KeyUp += KeyboardMouseHook_KeyUp;
+            //KeyboardMouseHook.KeyDown += KeyboardMouseHook_KeyDown;
+            //KeyboardMouseHook.KeyPress += KeyboardMouseHook_KeyPress;
+
+            return true;
+        }
+        private void KeyboardMouseHook_KeyUp(object sender, KeyEventArgs e)
+        {
+            Console.WriteLine($"KeyDown: KeyValue:{e.KeyValue}  Code:{e.KeyCode} KeyData:{e.KeyData}  {(int)e.KeyData}");
+
+            int key = (int)e.KeyData;
+            CallGroupMessages((int)e.KeyData);
+        }
+        private void KeyboardMouseHook_KeyDown(object sender, System.Windows.Forms.KeyEventArgs e)
+        {
+            Keys key = Keys.A | Keys.Control;
+            Console.WriteLine($"KeyDown: KeyValue:{e.KeyValue}  Code:{e.KeyCode} KeyData:{e.KeyData == key}  {(int)e.KeyData}");
+        }
+        private void KeyboardMouseHook_KeyPress(object sender, System.Windows.Forms.KeyPressEventArgs e)
+        {
+            Console.WriteLine("KeyPress: \t{0} {1}", (int)e.KeyChar, e.KeyChar);
+        }
+        /// <summary>
+        /// 卸载键盘控制接口服务
+        /// </summary>
+        /// <returns></returns>
+        public bool UnistallKeyboardServices()
+        {
+            if (KeyboardMouseHook == null) return true;
+
+            KeyboardMouseHook.KeyUp -= KeyboardMouseHook_KeyUp;
+            //KeyboardMouseHook.KeyDown -= KeyboardMouseHook_KeyDown;
+            //KeyboardMouseHook.KeyPress -= KeyboardMouseHook_KeyPress;
+            KeyboardMouseHook.Dispose();
+            KeyboardMouseHook = null;
+
+            return true;
+        }
+#endif
+
+        /// <summary>
+        /// 添加组合消息配置。keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息
+        /// </summary>
+        /// <param name="keyValue">可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息</param>
+        /// <param name="xmlControlMessages">控制消息或控制消息的集合</param>
+        /// <returns>如果添加成功，返回 true, 反之 false </returns>
+        public bool AddGroupMessage(int keyValue, params String[] xmlControlMessages) => GroupMessages.TryAdd(keyValue, xmlControlMessages);
+        /// <summary>
+        /// 移除指定的组合消息。keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息
+        /// </summary>
+        /// <param name="keyValue">keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息</param>
+        /// <returns>如果成功地移除，则为 true；否则为 false。</returns>
+        public bool RemoveGroupMessage(int keyValue) => GroupMessages.TryRemove(keyValue, out String[] messages);
+        /// <summary>
+        /// 称除所有的组合消息
+        /// </summary>
+        public void RemoveGroupMessages() => GroupMessages?.Clear();
+        /// <summary>
+        /// 获取所有的组合消息
+        /// </summary>
+        /// <returns></returns>
+        public IReadOnlyDictionary<int, String[]> GetGroupMessages() => GroupMessages;
+        /// <summary>
+        /// 执行/调用组合消息。keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息
+        /// </summary>
+        /// <param name="keyValue"></param>
+        public bool CallGroupMessages(int keyValue)
+        {
+            if (GroupMessages.ContainsKey(keyValue) && GroupMessages.TryGetValue(keyValue, out String[] messages))
+            {
+                bool result = false;
+                foreach (String message in messages)
+                {
+                    result |= this.TryParseControlMessage(message, out object returnValue);
+                    String returnMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\">";
+                    Logger.Info($"KeyValue:{keyValue}  {returnMessage}");
+                }
+                return result;
+            }
+            return false;
+        }
+
+
+        /// <summary>
+        /// 添加控制对象
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        public bool AddControlObject(String name, Object obj)
+        {
+            if (String.IsNullOrWhiteSpace(name) || obj == null) return false;
+
+            if (ControlObjects.ContainsKey(name))
+            {
+                Logger.Warn($"添加可访问控制对象 {name}:{obj} 失败, 该对象已存在");
+                return false;
+            }
+
+            bool result = ControlObjects.TryAdd(name, obj);
+            Logger.Info($"添加可访问控制对象 {name}/{obj}/{obj.GetType()} 状态：{result}");
+            return result;           
+        }
+        /// <summary>
+        /// 移除控制对象
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public bool RemoveControlObject(String name)
+        {
+            if (String.IsNullOrWhiteSpace(name)) return false;
+
+            if (!ControlObjects.ContainsKey(name))
+            {
+                Logger.Warn($"移除可访问控制对象 {name} 失败, 不存在该对象");
+                return false;
+            }
+
+            bool result = ControlObjects.TryRemove(name, out Object obj);
+            Logger.Info($"移除可访问控制对象 {name}/{obj}/{obj?.GetType()} 状态：{result}");
+            return result;
+        }
+        /// <summary>
+        /// 将所有控制对象移除
+        /// </summary>
+        public void RemoveControlObjects() => ControlObjects.Clear();
+        /// <summary>
+        /// 获取可控制对象的集合
+        /// </summary>
+        /// <returns></returns>
+        public IReadOnlyDictionary<String, Object> GetControlObjects() => ControlObjects;
+
 
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典中查找实例对象，并调用实例对象的方法
@@ -192,7 +351,7 @@ namespace SpaceCG.Module.Reflection
         /// <returns></returns>
         public bool TryParseControlMessage(String xmlMessage, out object returnResult)
         {
-            return ControllerInterface.TryParseControlMessage(xmlMessage, AccessObjects, out returnResult);
+            return ControllerInterface.TryParseControlMessage(xmlMessage, ControlObjects, out returnResult);
         }
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并调用实例对象的方法
@@ -203,7 +362,7 @@ namespace SpaceCG.Module.Reflection
         /// <returns></returns>
         public bool TryParseCallMethod(XElement actionElement, out object returnResult)
         {
-            return ControllerInterface.TryParseCallMethod(actionElement, AccessObjects, out returnResult);
+            return ControllerInterface.TryParseCallMethod(actionElement, ControlObjects, out returnResult);
         }
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并设置/获取实例对象属性的值
@@ -214,20 +373,22 @@ namespace SpaceCG.Module.Reflection
         /// <returns></returns>
         public bool TryParseChangeValue(XElement actionElement, out object returnResult)
         {
-            return ControllerInterface.TryParseChangeValue(actionElement, AccessObjects, out returnResult);
+            return ControllerInterface.TryParseChangeValue(actionElement, ControlObjects, out returnResult);
         }
 
         /// <inheritdoc/>
         public void Dispose()
         {
-            AccessObjects?.Clear();
-            AccessObjects = null;
+            UninstallNetworkServices();
 
-            HPSocketExtensions.DisposeNetworkClient(ref TcpClient);
-            HPSocketExtensions.DisposeNetworkClient(ref UdpClient);
+            NetworkServices?.Clear();
+            NetworkServices = null;
 
-            HPSocketExtensions.DisposeNetworkServer(ref TcpServer);
-            HPSocketExtensions.DisposeNetworkServer(ref UdpServer);
+            ControlObjects?.Clear();
+            ControlObjects = null;
+
+            GroupMessages?.Clear();
+            GroupMessages = null;
         }
 
         /// <summary>

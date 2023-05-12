@@ -19,7 +19,7 @@ namespace Win32API.User32
     /// <para>参考 https://docs.microsoft.com/zh-cn/windows/win32/api/winuser/nf-winuser-registerhotkey </para>
     /// </summary>
     [Flags]
-    public enum RhkModifier:uint
+    internal enum RhkModifier:uint
     {
         /// <summary>
         /// 必须按住 ALT 键。
@@ -60,7 +60,7 @@ namespace Win32API.User32
     /// <summary>
     /// 
     /// </summary>
-    public static partial class User32
+    internal static partial class User32
     {
         /// <summary>
         /// 定义系统范围的热键。
@@ -89,11 +89,5 @@ namespace Win32API.User32
         public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     }
 
-    /// <summary>
-    /// WindowsAPI User32库，扩展常用/通用，功能/函数，扩展示例，以及使用方式ad
-    /// </summary>
-    public static partial class User32Extension
-    {
-    }
 
 }

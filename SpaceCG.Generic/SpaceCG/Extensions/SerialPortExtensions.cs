@@ -1,15 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Configuration;
 using System.IO.Ports;
 using System.Linq;
 using System.Management;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Interop;
-using SpaceCG.WindowsAPI.User32;
+//using System.Windows.Interop;
+//using SpaceCG.WindowsAPI.User32;
 
 namespace SpaceCG.Extensions
 {
@@ -130,14 +127,14 @@ namespace SpaceCG.Extensions
             DeletionEvent.Start();
         }
 
-#if true
+#if false //需要窗体相关的库，以及 Win32 API
         /// <summary>
         /// 串口设备热插拔自动重新连接
         /// <para>使用 HwndSource Hook Window Message #WM_DEVICECHANGE 事件监听模式</para>
         /// </summary>
         /// <param name="serialPort"></param>
         /// <param name="window">IsLoaded 为 True 的窗口对象</param>
-        public static void AutoReconnection(this SerialPort serialPort, Window window)
+        public static void AutoReconnection(this SerialPort serialPort, System.Windows.Window window)
         {
             if (serialPort == null || window == null) throw new ArgumentException("参数不能为空");
             if (!window.IsLoaded) throw new InvalidOperationException("Window 对象 IsLoaded 为 True 时才能获取窗口句柄");

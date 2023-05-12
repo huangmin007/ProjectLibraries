@@ -38,6 +38,8 @@ namespace ModbusDeviceManagerServer
             ModbusDeviceManager = new ModbusDeviceManager();
             ModbusDeviceManager.LoadDeviceConfig("ModbusDevices.Config");
 
+            //ModbusDeviceManager.ControlInterface.InstallKeyboardService(true);
+
             while (Running)
             {
                 ConsoleKeyInfo info = Console.ReadKey(true);

@@ -7,7 +7,7 @@ namespace Win32API.User32
     /// <para>虚拟键代码的符号/常数/名称，十六进制值以及鼠标或键盘等效项</para>
     /// <para>参考：https://docs.microsoft.com/zh-cn/windows/win32/inputdev/virtual-key-codes </para>
     /// </summary>
-    public enum VirtualKeyCode:ushort
+    internal enum VirtualKeyCode:ushort
     {
         /// <summary>
         /// Left mouse button

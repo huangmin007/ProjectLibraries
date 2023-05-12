@@ -48,6 +48,9 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Gma.System.MouseKeyHook, Version=5.6.130.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MouseKeyHook.5.6.0\lib\net40\Gma.System.MouseKeyHook.dll</HintPath>
+    </Reference>
     <Reference Include="HPSocket.Net, Version=2.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\HPSocket.Net.5.8.8.3\lib\net40\HPSocket.Net.dll</HintPath>
     </Reference>
@@ -63,12 +66,11 @@
     <Reference Include="NModbus4, Version=2.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\NModbus4.2.1.0\lib\net40\NModbus4.dll</HintPath>
     </Reference>
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Management" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -103,6 +105,7 @@
     <None Include="ModbusDevices.Config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="HPSocket4C.dll">
@@ -110,12 +113,6 @@
     </Content>
     <Content Include="HPSocket\hpsocket_cn.txt" />
     <Content Include="HPSocket\hpsocket_en.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\SpaceCG.Win32APIs\SpaceCG.Win32APIs.csproj">
-      <Project>{BF71A004-3614-4E0D-A157-840057337865}</Project>
-      <Name>SpaceCG.Win32APIs</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\HPSocket.Net.5.8.8.3\build\HPSocket.Net.targets" Condition="Exists('..\packages\HPSocket.Net.5.8.8.3\build\HPSocket.Net.targets')" />

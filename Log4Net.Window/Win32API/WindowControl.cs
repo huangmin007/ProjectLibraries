@@ -842,7 +842,7 @@ namespace Win32API.User32
     #endregion
 
 
-    public static partial class User32
+    internal static partial class User32
     {
 
         #region Window Position

@@ -112,6 +112,10 @@
       <Project>{597FD101-2F46-49C9-8F69-7F633FC55E90}</Project>
       <Name>SpaceCG.Generic</Name>
     </ProjectReference>
+    <ProjectReference Include="..\SpaceCG.Win32APIs\SpaceCG.Win32APIs.csproj">
+      <Project>{BF71A004-3614-4E0D-A157-840057337865}</Project>
+      <Name>SpaceCG.Win32APIs</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="HPSocket4C.dll" />

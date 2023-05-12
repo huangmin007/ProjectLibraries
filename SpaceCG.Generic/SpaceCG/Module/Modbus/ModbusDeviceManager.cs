@@ -36,7 +36,7 @@ namespace SpaceCG.Module.Modbus
         /// <summary>
         /// 控制接口对象
         /// </summary>
-        public ControllerInterface ControlInterface { get; private set; } = new ControllerInterface();
+        public ControllerInterface ControlInterface { get; private set; } = new ControllerInterface(0);
 
         /// <summary>
         /// Transport Devices 列表
@@ -115,7 +115,7 @@ namespace SpaceCG.Module.Modbus
 
             if (ushort.TryParse(Configuration?.Attribute("LocalPort")?.Value, out ushort localPort) && localPort >= 1024)
             {
-                ControlInterface.InstallServer(localPort);
+                ControlInterface.InstallNetworkService($"TCP-SERVER", "0.0.0.0", localPort);
 
                 this.Name = Configuration.Attribute("Name").Value;
                 if (!String.IsNullOrWhiteSpace(Name)) ControlInterface.AddControlObject(Name, this);
@@ -326,7 +326,8 @@ namespace SpaceCG.Module.Modbus
             }
 
             TransportDevices.Clear();
-            ControlInterface.ClearControlObjects();
+            ControlInterface.RemoveControlObjects();
+            ControlInterface.UninstallNetworkServices();
 
             Configuration = null;
             ModbusElements = null;
