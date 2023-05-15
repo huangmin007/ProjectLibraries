@@ -25,7 +25,7 @@ namespace Test
         ModbusIODevice device;
 
         ModbusDeviceManager deviceManager;
-        ControllerInterface ControllerInterface = new ControllerInterface(0);
+        ControllerInterface ControllerInterface = new ControllerInterface(2023);
 
         public MainWindow()
         {
@@ -50,7 +50,7 @@ namespace Test
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             //ControllerInterface.InstallKeyboardService(true);
-
+            ControllerInterface.AddControlObject("Window", this);
 #if false
             ushort[] addresses = {1,2,5,6,8,9,10,20,21,22,23 };
             Dictionary<ushort, ushort>  result = ModbusDevice.SpliteAddresses(addresses);
@@ -210,9 +210,15 @@ namespace Test
             }
         }
 
+        public int Add(int a, int b)
+        {
+            Console.WriteLine($"AAA {a}, {b}");
+            return a + b;
+        }
+
         public void Dispose()
         {
-            throw new NotImplementedException();
+            
         }
     }
 }

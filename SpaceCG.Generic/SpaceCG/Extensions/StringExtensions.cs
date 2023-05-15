@@ -26,7 +26,7 @@ namespace SpaceCG.Extensions
                 throw new ArgumentNullException(nameof(numberString), "参数不能为空");
 
             object[] parameters = new object[2];
-            //numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
+            numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
 
             if (numberString.IndexOf("0B") == 0)
             {
@@ -311,7 +311,7 @@ namespace SpaceCG.Extensions
         {
             if (paramType == null || paramValue == null || 
                 String.IsNullOrWhiteSpace(paramValue.ToString()) || paramValue.ToString().ToLower().Trim() == "null") return null;
-
+            
             if (!paramType.IsValueType) throw new ArgumentException(nameof(paramType), "参数类型应为值类型参数");
 
             if (paramValue.GetType() == paramType) return (ValueType)paramValue;
@@ -339,6 +339,30 @@ namespace SpaceCG.Extensions
                                                   let m_params = method.GetParameters()
                                                   where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
                                                   select method;
+                
+                if (methods?.Count() != 1) return (ValueType)paramValue;
+                
+                MethodInfo ConvertToNumber = methods.First(); 
+                object[] parameters = GetNumberStringBase(paramValue.ToString());
+
+                try
+                {
+                    return (ValueType)ConvertToNumber.Invoke(null, parameters);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex);
+                    return (ValueType)paramValue;
+                }
+            }
+            else if(paramType == typeof(double) || paramType == typeof(float))
+            {
+                String methodName = $"To{paramType.Name}";
+                IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                                    where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == paramType
+                                                    let m_params = method.GetParameters()
+                                                    where m_params[0].ParameterType == typeof(String)
+                                                    select method;
 
                 if (methods?.Count() != 1) return (ValueType)paramValue;
 
