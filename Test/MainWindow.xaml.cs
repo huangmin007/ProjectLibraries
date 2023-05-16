@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO.Ports;
 using System.Runtime.InteropServices;
@@ -102,54 +103,69 @@ namespace Test
             //deviceManager = new ModbusDeviceManager();
             //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
 
-#if false
-            //object[] arr1 = StringExtension.ConvertParameters2("0x01,3,[True,True,False]");
-            object[] arr2 = StringExtensions.SplitParameters("0x01,3,[True,True,False]");
+#if true
+            //object[] arr2 = StringExtension.ConvertParameters2("0x01,3,[True,True,False]");
+            //object[] arr2 = StringExtensions.SplitParameters("0x03");
+            //object[] arr2 = StringExtensions.SplitParameters("'hello,world','ni,hao'");
+            object[] arr2 = StringExtensions.SplitParameters("'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15");
             Console.WriteLine(arr2.Length);
 
-            bool result = StringExtensions.TryParse("45", out UInt32 v);
-            Console.WriteLine($"{result},,{v}");
+            List<int> list = new List<int>();
 
-            var value = StringExtensions.ConvertParamsToValueType(typeof(Byte), 0x45);
-            var array = StringExtensions.ConvertParamsToArrayType(typeof(Byte[]), new Object[] { "0x45", "0x46", 0x47 });
+            Console.WriteLine(list.GetType().IsArray);
+            Console.WriteLine(typeof(String).IsValueType);
+
+            //String s = "\'aaaa,bbbb\'";
+            //object[] objs = StringExtensions.SplitParameters(s);
+            //foreach (var o in objs)
+            {
+                //Console.WriteLine($"=>{o}");
+            }
+
+            //bool result = StringExtensions.TryParse("45", out UInt32 v);
+            //Console.WriteLine($"{result},,{v}");
+
+            //var value = StringExtensions.ConvertParamsToValueType(typeof(Byte), 0x45);
+            //var array = StringExtensions.ConvertParamsToArrayType(typeof(Byte[]), new Object[] { "0x45", "0x46", 0x47 });
             
             //WindowStyle.None
-            InstanceExtensions.SetInstancePropertyValue(this, "WindowStyle", 0);
+            //InstanceExtensions.SetInstancePropertyValue(this, "WindowStyle", 0);
 
-            Console.WriteLine(value);
+            //Console.WriteLine(value);
 #endif
 
             //ControllerInterface ControlInterface = new ControllerInterface(2000);
             //ControlInterface.AccessObjects.TryAdd("a", this);
 
-            int v = 0B1101;
-            Byte value = 0x00;
+            //int v = 0B1101;
+            //Byte value = 0x00;
             //StringExtensions.TryParse("B1101", out value);
 
             //ushort.TryParse("1101", NumberStyles.Number, null, out ushort result);
             //Console.WriteLine(result);
 
-            StringExtensions.TryParse("0B1101_1101", out byte result);
-            Console.WriteLine($"Result:::{result}");
+            //StringExtensions.TryParse("0B1101_1101", out byte result);
+            //Console.WriteLine($"Result:::{result}");
 
-            StringExtensions.TryParse("4545", out short result2);
-            Console.WriteLine($"Result2:::{result2}");
+            //StringExtensions.TryParse("4545", out short result2);
+            //Console.WriteLine($"Result2:::{result2}");
 
-            short[] result3 = new short[] { 0x01, 0x02 };
-            StringExtensions.TryParse<short>("0x4545,0B1101", ref result3);
+            //short[] result3 = new short[] { 0x01, 0x02 };
+            //StringExtensions.TryParse<short>("0x4545,0B1101", ref result3);
 
-            Console.WriteLine($"Result3:::{result3}");
+            //Console.WriteLine($"Result3:::{result3}");
 
             //Console.WriteLine(Convert.ToByte("46", 16));
             //Console.WriteLine(Convert.ToByte("1101", 2));
 
             //Console.WriteLine(bool.TryParse("fAlse", out bool rv));
             //Console.WriteLine(rv);
-            
+
             //serialPort = new SerialPort("Com3", 115200);
             //AutoReconnection2(serialPort, this);
             //SerialPortExtensions.AutoReconnection(serialPort);
             //serialPort.Open();
+
         }
         SerialPort serialPort;
 
@@ -210,10 +226,16 @@ namespace Test
             }
         }
 
-        public int Add(int a, int b)
+        public int Add(int a, int b = 100)
         {
             Console.WriteLine($"AAA {a}, {b}");
             return a + b;
+        }
+
+        public void echo(String msg, String a)
+        {
+            Console.WriteLine($"ECHO::{msg} say::{a}");
+            //<Action Target="Window" Method="echo" Params="\'hellowol\'" />
         }
 
         public void Dispose()

@@ -503,7 +503,6 @@ namespace SpaceCG.Extensions
             return CallInstanceMethod(instanceObj, methods.First(), parameters);
         }
 
-
         /// <summary>
         /// 动态调用 对象扩展 的方法
         /// <para>按顺序查找方法：实例的扩展方法 </para>

@@ -343,7 +343,6 @@ namespace SpaceCG.Module.Reflection
         /// <returns></returns>
         public IReadOnlyDictionary<String, Object> GetControlObjects() => ControlObjects;
 
-
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典中查找实例对象，并调用实例对象的方法
         /// <para>XML 格式："&lt;Action Target='object key name' Method='method name' Params='method params' /&gt;" 跟据调用的 Method 决定 Params 可选属性值</para>
@@ -416,18 +415,18 @@ namespace SpaceCG.Module.Reflection
             }
             catch (Exception ex)
             {
-                Logger.Warn($"XML 格式数据解析错误：{ex}");
+                Logger.Warn($"XML 格式数据 {xmlMessage} 解析错误：{ex}");
                 return false;
             }
 
             if (actionElement.Name?.LocalName != "Action")
             {
-                Logger.Warn($"XML 格式数数据错误，节点名称应为 Action");
+                Logger.Warn($"XML 格式数据 {xmlMessage} 错误，节点名称应为 Action");
                 return false;
             }
             if(String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value))
             {
-                Logger.Warn($"XML 格式数数据错误，节点属性 Target 不能为空");
+                Logger.Warn($"XML 格式数据 {xmlMessage} 错误，节点属性 Target 不能为空");
                 return false;
             }
 

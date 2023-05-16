@@ -226,12 +226,12 @@ namespace SpaceCG.Extensions
         /// <returns></returns>
         public static bool TryParseToUInt32Array(this String value, ref UInt32[] array, char separator = ',') => TryParse<UInt32>(value, ref array, separator);
 
-
         /// <summary>
-        /// 将字符串参数集，分割转换为字符串数组，注意：不支持中文字符串
+        /// 将字符串参数集，分割转换为字符串数组，注意：不支持中文字符串,不支持多级数组与字符串
         /// <para>示例字符串："0x01,True,32,False"，输出数组：["0x01","True","32","False"]</para>
         /// <para>示例字符串："0x01,3,[True,True,False]"，输出数组：["0x01","3",["True","True","False"]]</para>
         /// <para>示例字符串："0x01,[0,3,4,7],[True,True,False,True]"，输出数组：["0x01",["0","3","4","7"],["True","True","False","True"]]</para>
+        /// <para>示例字符串：" 'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15"，输出数组：["hello,world","0x01","3","ni?,hao,[aa,bb]",["True","True","False","True"],['aaa,bb,c','ni,hao'],"15,"aa,aaa",15"]</para>
         /// </summary>
         /// <param name="parameters"></param>
         /// <returns></returns>
@@ -239,33 +239,48 @@ namespace SpaceCG.Extensions
         {
             if (String.IsNullOrWhiteSpace(parameters)) return new object[] { }; // null
 
-            //Console.WriteLine(parameters);
-            //Regex regex = new Regex(@"\w\a");
+            //String pattern = @"\[([\w\s\#\.,]+)\]|([\w\s\#\.]+),|([\w\#\.]+)";
+            //String pattern = @"\'([\w\s\#\.,\[\]]+)\'|\[([\w\s\#\.,]+)\]|([\w\s\#\.]+),|([\w\#\.]+)";
 
-            String pattern = @"\[([\w\s\#\.,]+)\]|([\w\s\#\.]+),|([\w\#\.]+)";
+            String pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //以'~',"~"
+            String pattern_array    = @"\[([^\[\]]+)\]";                    //以[~]
+            String pattern_parent   = @"\(([^\(\)]+)\)";                    //以(~)
+            String pattern_split    = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";   //以 ',' 分割, 或结尾部份
+            String pattern = $@"{pattern_string}|{pattern_array}|{pattern_split}";
+
             MatchCollection matchs = Regex.Matches(parameters, pattern, RegexOptions.Compiled | RegexOptions.Singleline);
+            //Console.WriteLine($"Match Count: {matchs.Count}");
 
             List<object> args = new List<object>();
+            
             foreach (Match match in matchs)
             {
-                String value = match.Value;
-                //Console.WriteLine($"Match:: {match.Success}({match.Groups.Count}) {match.Value}");
+                //Console.WriteLine($"Match:: {match.Success}({match.Groups.Count}) {match.Captures.Count} {match.Value}");
+                if (!match.Success) continue;
+                String trimValue = match.Value.Trim();
 
-                foreach (Group group in match.Groups)
+                if((trimValue.IndexOf('\'') == 0 && trimValue.LastIndexOf('\'') == trimValue.Length - 1) ||
+                   (trimValue.IndexOf('\"') == 0 && trimValue.LastIndexOf('\"') == trimValue.Length - 1))
                 {
-                    if (group.Success && group.Value != match.Value)
-                    {
-                        value = group.Value;
-                        //Console.WriteLine($"\t-{group.Value}-");
-                        break;
-                    }
+                    args.Add(trimValue.Substring(1, trimValue.Length - 2));
+                    //Console.WriteLine(trimValue.Substring(1, trimValue.Length - 2));
+                }
+                else if(trimValue.IndexOf('[') == 0 && trimValue.LastIndexOf(']') == trimValue.Length - 1)
+                {
+                    args.Add(trimValue.Substring(1, trimValue.Length - 2).Split(','));
+                    //Console.WriteLine(trimValue.Substring(1, trimValue.Length - 2));
+                }
+                else if(trimValue.LastIndexOf(',') == trimValue.Length - 1)
+                {
+                    args.Add(trimValue.Substring(0, trimValue.Length - 1));
+                    //Console.WriteLine(trimValue.Substring(0, trimValue.Length - 1));
+                }
+                else
+                {
+                    args.Add(match.Value);
                 }
 
-                //Console.WriteLine($"NewValue::{value}");
-                if (value.IndexOf(',') != -1)
-                    args.Add(value.Split(','));
-                else
-                    args.Add(value);
+                //Console.WriteLine($"SplitValue::{args[args.Count - 1]}");
             }
 
             return args.ToArray();
@@ -281,6 +296,7 @@ namespace SpaceCG.Extensions
         public static System.Array ConvertParamsToArrayType(Type paramType, Array paramValues)
         {
             if (paramType == null || paramValues?.Length <= 0) return null;
+            
             if (!paramType.IsArray) throw new ArgumentException(nameof(paramType), "参数应为数组或集合类型数据");
 
             Type elementType = paramType.GetElementType();
@@ -355,6 +371,7 @@ namespace SpaceCG.Extensions
                     return (ValueType)paramValue;
                 }
             }
+            //Double,Float
             else if(paramType == typeof(double) || paramType == typeof(float))
             {
                 String methodName = $"To{paramType.Name}";
@@ -367,7 +384,7 @@ namespace SpaceCG.Extensions
                 if (methods?.Count() != 1) return (ValueType)paramValue;
 
                 MethodInfo ConvertToNumber = methods.First();
-                object[] parameters = GetNumberStringBase(paramValue.ToString());
+                object[] parameters = new object[] { paramValue.ToString().Replace(" ", "").Replace("_", "") };
 
                 try
                 {
