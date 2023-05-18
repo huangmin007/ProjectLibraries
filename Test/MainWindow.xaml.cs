@@ -2,7 +2,10 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO.Ports;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,6 +13,7 @@ using System.Windows.Interop;
 using SpaceCG.Extensions;
 using SpaceCG.Module.Modbus;
 using SpaceCG.Module.Reflection;
+using SpaceCG.Net;
 using SpaceCG.WindowsAPI.User32;
 
 namespace Test
@@ -31,12 +35,18 @@ namespace Test
         public MainWindow()
         {
             InitializeComponent();
+#if DEBUG
+            ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root.Level = log4net.Core.Level.Debug;
+#endif
         }
 
         protected override void OnClosing(CancelEventArgs e)
         {
             base.OnClosing(e);
             deviceManager?.Dispose();
+
+            Client?.Dispose();
+            Server?.Dispose();
         }
 
         protected override void OnKeyUp(KeyEventArgs e)
@@ -127,7 +137,7 @@ namespace Test
 
             //var value = StringExtensions.ConvertParamsToValueType(typeof(Byte), 0x45);
             //var array = StringExtensions.ConvertParamsToArrayType(typeof(Byte[]), new Object[] { "0x45", "0x46", 0x47 });
-            
+
             //WindowStyle.None
             //InstanceExtensions.SetInstancePropertyValue(this, "WindowStyle", 0);
 
@@ -166,8 +176,78 @@ namespace Test
             //SerialPortExtensions.AutoReconnection(serialPort);
             //serialPort.Open();
 
+            //Server = new AsyncUdpServer(2201);
+            Server = new AsyncTcpServer(2200);
+            Server.ClientConnected += Server_ClientConnected;
+            Server.ClientDisconnected += Server_ClientDisconnected;
+            Server.ClientDataReceived += Server_ClientDataReceived;
+            //Server.Start();
+
+            //Client = new AsyncTcpClient();
+            Client = new AsyncUdpClient();
+            Client.Connected += Client_Connected;
+            Client.Disconnected += Client_Disconnected;
+            Client.DataReceived += Client_DataReceived;
+            Client.Exception += Client_Exception;
+            //Client.Connect("192.168.40.212", 2204);
         }
+
+        private void Client_Exception(object sender, AsyncExceptionEventArgs e)
+        {
+            Console.WriteLine($"Exception::{e.EndPoint},{e.Exception.GetType()}");
+            //SocketException ex = (SocketException)e.Exception;
+            //Console.WriteLine($"{ex.ErrorCode},,{ex.SocketErrorCode},,{ex.Message}");
+        }
+
+        private void Client_DataReceived(object sender, AsyncDataEventArgs e)
+        {
+            Console.WriteLine($"Data::{e.EndPoint}");
+            String msg = Encoding.UTF8.GetString(e.Bytes);
+            Console.WriteLine($"Message::{msg}");
+        }
+
+        private void Client_Disconnected(object sender, AsyncEventArgs e)
+        {
+            Console.WriteLine($"Disconnected::{e.EndPoint}");
+        }
+
+        private void Client_Connected(object sender, AsyncEventArgs e)
+        {
+            Console.WriteLine($"Connected::{e.EndPoint}");
+        }
+
+        IAsyncClient Client;
+        IAsyncServer Server;
         SerialPort serialPort;
+
+        private void Server_ClientDataReceived(object sender, AsyncDataEventArgs e)
+        {
+            Console.WriteLine($"Data::{e.EndPoint} {Encoding.UTF8.GetString(e.Bytes)}");
+
+            IPEndPoint endPoint = (IPEndPoint)e.EndPoint;
+            ((IAsyncServer)sender).SendBytes(Encoding.UTF8.GetBytes("Hellowwww"), endPoint);
+            
+            //Console.WriteLine($"{endPoint.Address},,{endPoint.Port}");
+            //((IAsyncServer)sender).Send(endPoint.Address.ToString(), endPoint.Port, Encoding.UTF8.GetBytes("Hellowwww"));
+        }
+
+        private void Server_ClientDisconnected(object sender, AsyncEventArgs e)
+        {
+            Console.WriteLine($"Disconnected::{e.EndPoint}");
+        }
+
+        private void Server_ClientConnected(object sender, AsyncEventArgs e)
+        {
+            Console.WriteLine($"Connected::{e.EndPoint}");
+        }
+
+        private void UdpServer_DataReceived(AsyncUdpServer arg1, EndPoint arg2, byte[] arg3)
+        {
+            String msg = Encoding.UTF8.GetString(arg3);
+            Console.WriteLine($"{arg2} say: {msg}");
+        }
+
+
 
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice slaveDevice, Register register)
         {
@@ -207,22 +287,41 @@ namespace Test
             Button button = (Button)sender;
             if(button == Button_Test1)
             {
-                deviceManager.LoadDeviceConfig("ModbusDevices.Config");
+                //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
                 //transport.TurnSingleCoil(device.Address, 0);
                 //transport.WriteSingleCoil(device.Address, 0, true);
+
+                //ICollection<EndPoint> clients = Server.Clients;
+                //Console.WriteLine(clients.IsReadOnly);
+
+                //ICollection<EndPoint> clients2 = Server.Clients;
+                //Console.WriteLine(clients2.IsReadOnly);
+
+                
             }
             else if(button == Button_Test2)
             {
-                
+                Byte[] data = Encoding.UTF8.GetBytes("Hello World");
+                //udpServer.SendBytes("127.0.0.1", 10000, data);
                 //transport.TurnSingleCoil(device.Address, 1);
+
+                Client.SendBytes(data);
+                //((AsyncUdpClient)Client).SendTo(data, "192.168.40.212", 10000);
+                //((AsyncTcpClient)Client).TestSendTo("192.168.40.212", 38952, data);
             }
             else if(button == Button_Start)
             {
+                //server.Start();
+
                 //transport.StartTransport();
+                Client.Connect("127.0.0.1", 2205);
             }
             else if(button == Button_Stop)
             {
+                //server.Stop();
+
                 //transport.StopTransport();
+                Client.Close();
             }
         }
 

@@ -2,10 +2,10 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Xml.Linq;
 using Gma.System.MouseKeyHook;
 using HPSocket;
 using SpaceCG.Extensions;
@@ -26,6 +26,7 @@ namespace SpaceCG.Module.Reflection
         /// 网络控制接口服务参数，是否返回网络执行结果信息，默认为 true
         /// </summary>
         public bool ReturnNetworkResult { get; set; } = true;
+
         /// <summary>
         /// 网络控制接口服务对象
         /// </summary>

@@ -242,10 +242,10 @@ namespace SpaceCG.Extensions
             //String pattern = @"\[([\w\s\#\.,]+)\]|([\w\s\#\.]+),|([\w\#\.]+)";
             //String pattern = @"\'([\w\s\#\.,\[\]]+)\'|\[([\w\s\#\.,]+)\]|([\w\s\#\.]+),|([\w\#\.]+)";
 
-            String pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //以'~',"~"
-            String pattern_array    = @"\[([^\[\]]+)\]";                    //以[~]
-            String pattern_parent   = @"\(([^\(\)]+)\)";                    //以(~)
-            String pattern_split    = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";   //以 ',' 分割, 或结尾部份
+            String pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //匹配'~',"~"
+            String pattern_array    = @"\[([^\[\]]+)\]";                    //匹配[~]
+            String pattern_parent   = @"\(([^\(\)]+)\)";                    //匹配(~)
+            String pattern_split    = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";   //匹配 ',' 分割, 或结尾部份
             String pattern = $@"{pattern_string}|{pattern_array}|{pattern_split}";
 
             MatchCollection matchs = Regex.Matches(parameters, pattern, RegexOptions.Compiled | RegexOptions.Singleline);

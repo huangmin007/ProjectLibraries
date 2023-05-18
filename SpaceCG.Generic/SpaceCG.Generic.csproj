@@ -96,6 +96,12 @@
     <Compile Include="SpaceCG\Module\Modbus\ModbusIODevice.cs" />
     <Compile Include="SpaceCG\Module\Modbus\ModbusTransportDevice.cs" />
     <Compile Include="SpaceCG\Module\Modbus\ModbusTransportDevice_Master.cs" />
+    <Compile Include="SpaceCG\Net\AsyncUdpClient.cs" />
+    <Compile Include="SpaceCG\Net\IAsyncClient.cs" />
+    <Compile Include="SpaceCG\Net\IAsyncServer.cs" />
+    <Compile Include="SpaceCG\Net\AsyncTcpClient.cs" />
+    <Compile Include="SpaceCG\Net\AsyncTcpServer.cs" />
+    <Compile Include="SpaceCG\Net\AsyncUdpServer.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Log4Net.Config">
