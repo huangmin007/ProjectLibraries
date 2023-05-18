@@ -5,17 +5,16 @@ using System.Linq;
 using System.Xml.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using Gma.System.MouseKeyHook;
-using HPSocket;
 using SpaceCG.Extensions;
+using SpaceCG.Net;
+using System.Net;
 
-namespace SpaceCG.Module.Reflection
+namespace SpaceCG.Generic
 {
     /// <summary>
     /// 控制器接口对象
-    /// <para>控制协议(XML)：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-    /// <para>控制协议(XML)：&lt;Action Target="object key name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
+    /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+    /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
     /// <para>网络接口返回(XML)：&lt;Return Result="True/False" Value="value" /&gt; 属性 Result 表示远程执行返回状态(成功/失败)，Value 表示远程执行返回值 (Method 返回值，或是 Property 值)</para>
     /// </summary>
     public sealed class ControllerInterface : IDisposable
@@ -30,12 +29,12 @@ namespace SpaceCG.Module.Reflection
         /// <summary>
         /// 网络控制接口服务对象
         /// </summary>
-        private Dictionary<String, Object> NetworkServices = new Dictionary<string, Object>(8);
+        private Dictionary<String, IDisposable> NetworkServices = new Dictionary<String, IDisposable>(8);
 
         /// <summary>
         /// 组合控制消息的集合
         /// </summary>
-        private ConcurrentDictionary<int, String[]> GroupMessages = new ConcurrentDictionary<int, String[]>(2, 8);
+        private ConcurrentDictionary<int, String[]> MessageGroups = new ConcurrentDictionary<int, String[]>(2, 8);
 
         /// <summary>
         /// 可访问或可控制对象的集合，可以通过反射技术访问的对象集合
@@ -45,82 +44,79 @@ namespace SpaceCG.Module.Reflection
 
         /// <summary>
         /// 反射控制接口对象
-        /// <para>控制协议(XML)：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// <para>控制协议(XML)：&lt;Action Target="object key name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
+        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
         /// </summary>
         /// <param name="localPort">服务端口，小于 1024 则不启动服务接口</param>
         public ControllerInterface(ushort localPort = 2023)
         {
-            InstallNetworkService("TCP-SERVER", "0.0.0.0", localPort);
+            InstallNetworkService(localPort);
         }
 
         /// <summary>
-        /// 安装网络 (TCP/UDP-Server/Client) 控制接口服务
-        /// <para>网络类型支持：TCP-Server, UDP-Server, TCP-Client, UDP-Client</para>
+        /// 安装网络 (TCP Server/Client) 控制接口服务，可以安装多个不同类型(TCP)网络服务接口
+        /// <para>地址为 "0.0.0.0" 或解析失败时, 则创建 Tcp 服务端，反之创建 Tcp 客户端</para>
         /// </summary>
-        /// <param name="type">TCP-Server, UDP-Server, TCP-Client, UDP-Client</param>
+        /// <param name="port">端口不得小于 1024 否则返回 false</param>
         /// <param name="address"></param>
-        /// <param name="port">端口不得小于 1024 否则返回 false </param>
         /// <returns></returns>
-        public bool InstallNetworkService(String type, String address, ushort port)
+        public bool InstallNetworkService(ushort port, String address = null)
         {
-            if (String.IsNullOrWhiteSpace(type) || String.IsNullOrWhiteSpace(address) || port <= 1024) return false;
+            if (port <= 1024) return false;
 
-            address = address.Replace(" ", "");
-            type = type.ToUpper().Replace(" ", "");
-
-            String configKey = $"{type}:{address}:{port}";
-            if (NetworkServices.ContainsKey(configKey)) return false;
-
-            if (type.IndexOf("-SERVER") != -1)
+            try
             {
-                IServer Server = HPSocketExtensions.CreateNetworkServer(configKey, OnServerReceiveEventHandler);
-                if (Server != null) NetworkServices.Add(configKey, Server);
-                else return false;
+                if (!String.IsNullOrWhiteSpace(address) && IPAddress.TryParse(address, out IPAddress ipAddress) && ipAddress.ToString() != "0.0.0.0")
+                {
+                    IAsyncClient Client = new AsyncTcpClient();
+                    if (Client.Connect(ipAddress, port))
+                    {
+                        NetworkServices.Add($"{ipAddress}:{port}", Client);
+                        Client.DataReceived += Client_DataReceived;
+                        return true;
+                    }
+                    Client?.Dispose();
+                }
+                else
+                {
+                    IAsyncServer Server = new AsyncTcpServer(port);
+                    if (Server.Start())
+                    {
+                        NetworkServices.Add($"0.0.0.0:{port}", Server);
+                        Server.ClientDataReceived += Server_ClientDataReceived;
+                        return true;
+                    }
+                    Server?.Dispose();
+                }
             }
-            else if(type.IndexOf("-CLIENT") != -1)
+            catch (Exception ex)
             {
-                IClient Client = HPSocketExtensions.CreateNetworkClient(configKey, OnClientReceiveEventHandler);
-                if (Client != null) NetworkServices.Add(configKey, Client);
-                else return false;
+                Logger.Error(ex);
             }
-            else
-            {
-                //IServer Server = HPSocketExtensions.CreateNetworkServer(configKey, OnServerReceiveEventHandler);
-                //if (Server != null) NetworkServices.Add(configKey, Server);
-                //else return false;
-                return false;
-            }
-
-            return true;
+            return false;
         }
         /// <summary>
         /// 卸载指定的网络服务接口
-        /// <para>KeyName == $"{type}:{address}:{port}"</para>
+        /// <para>IPEndPoint == $"{address}:{port}"</para>
         /// </summary>
-        /// <param name="keyName"></param>
+        /// <param name="endPoint"></param>
         /// <returns></returns>
-        public bool UninstallNetworkService(String keyName)
+        public bool UninstallNetworkService(IPEndPoint endPoint)
         {
             if (NetworkServices?.Count() == 0) return false;
-            if (!NetworkServices.ContainsKey(keyName)) return false;
+            if (!NetworkServices.ContainsKey(endPoint.ToString())) return false;
 
+            String keyName = endPoint.ToString();
             foreach (var obj in NetworkServices)
             {
                 if (obj.Key != keyName) continue;
 
-                if (typeof(HPSocket.IServer).IsAssignableFrom(obj.Value.GetType()))
+                if (typeof(IDisposable).IsAssignableFrom(obj.Value.GetType()))
                 {
-                    HPSocket.IServer server = (HPSocket.IServer)obj.Value;
-                    HPSocketExtensions.DisposeNetworkServer(ref server);
+                    IDisposable server = (IDisposable)obj.Value;
+                    server?.Dispose();
                     return NetworkServices.Remove(keyName);
-                }
-                else if (typeof(HPSocket.IClient).IsAssignableFrom(obj.Value.GetType()))
-                {
-                    HPSocket.IClient client = (HPSocket.IClient)obj.Value;
-                    HPSocketExtensions.DisposeNetworkClient(ref client);
-                    return NetworkServices.Remove(keyName);
-                }
+                }                
             }
 
             return false;
@@ -134,30 +130,24 @@ namespace SpaceCG.Module.Reflection
 
             foreach (var obj in NetworkServices)
             {
-                if (typeof(HPSocket.IServer).IsAssignableFrom(obj.Value.GetType()))
+                if (typeof(IDisposable).IsAssignableFrom(obj.Value.GetType()))
                 {
-                    HPSocket.IServer server = (HPSocket.IServer)obj.Value;
-                    HPSocketExtensions.DisposeNetworkServer(ref server);
-                }
-                else if (typeof(HPSocket.IClient).IsAssignableFrom(obj.Value.GetType()))
-                {
-                    HPSocket.IClient client = (HPSocket.IClient)obj.Value;
-                    HPSocketExtensions.DisposeNetworkClient(ref client);
-                }
+                    IDisposable server = (IDisposable)obj.Value;
+                    server?.Dispose();
+                }               
             }
 
             NetworkServices?.Clear();
         }
-        
+
         /// <summary>
         /// On Client Receive Event Handler
         /// </summary>
         /// <param name="sender"></param>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        private HandleResult OnClientReceiveEventHandler(IClient sender, byte[] data)
+        /// <param name="e"></param>
+        private void Client_DataReceived(object sender, AsyncDataEventArgs e)
         {
-            String message = Encoding.UTF8.GetString(data);
+            String message = Encoding.Default.GetString(e.Bytes);
             bool result = this.TryParseControlMessage(message, out object returnValue);
             String returnMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\">";
 
@@ -168,22 +158,17 @@ namespace SpaceCG.Module.Reflection
 
             if (ReturnNetworkResult)
             {
-                byte[] bytes = Encoding.UTF8.GetBytes(returnMessage);
-                return sender.Send(bytes, bytes.Length) ? HandleResult.Ok : HandleResult.Error;
+                ((IAsyncClient)sender).SendMessage(returnMessage);
             }
-
-            return HandleResult.Ok;
         }
         /// <summary>
         /// On Server Receive Event Handler
         /// </summary>
         /// <param name="sender"></param>
-        /// <param name="connId"></param>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        private HandleResult OnServerReceiveEventHandler(IServer sender, IntPtr connId, byte[] data)
+        /// <param name="e"></param>
+        private void Server_ClientDataReceived(object sender, AsyncDataEventArgs e)
         {
-            String message = Encoding.UTF8.GetString(data);
+            String message = Encoding.Default.GetString(e.Bytes);
             bool result = this.TryParseControlMessage(message, out object returnValue);
             String returnMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\">";
 
@@ -194,15 +179,11 @@ namespace SpaceCG.Module.Reflection
 
             if (ReturnNetworkResult)
             {
-                byte[] bytes = Encoding.UTF8.GetBytes(returnMessage);
-                return sender.Send(connId, bytes, bytes.Length) ? HandleResult.Ok : HandleResult.Error;
+                byte[] bytes = Encoding.Default.GetBytes(returnMessage);
+                ((IAsyncServer)sender).SendBytes(bytes, e.EndPoint);
             }
-
-            return HandleResult.Ok;
         }
 
-#if false
-        private IKeyboardMouseEvents KeyboardMouseHook;
         /// <summary>
         /// 安装键盘控制接口服务
         /// </summary>
@@ -210,15 +191,33 @@ namespace SpaceCG.Module.Reflection
         /// <returns></returns>
         public bool InstallKeyboardService(bool global)
         {
-            if (KeyboardMouseHook != null) return true;
+            //if (KeyboardMouseHook != null) return true;
 
-            KeyboardMouseHook = global?  Hook.GlobalEvents() : Hook.AppEvents();
-            KeyboardMouseHook.KeyUp += KeyboardMouseHook_KeyUp;
-            //KeyboardMouseHook.KeyDown += KeyboardMouseHook_KeyDown;
-            //KeyboardMouseHook.KeyPress += KeyboardMouseHook_KeyPress;
+            //KeyboardMouseHook = global?  Hook.GlobalEvents() : Hook.AppEvents();
+            //KeyboardMouseHook.KeyUp += KeyboardMouseHook_KeyUp;
+            //-KeyboardMouseHook.KeyDown += KeyboardMouseHook_KeyDown;
+            //-KeyboardMouseHook.KeyPress += KeyboardMouseHook_KeyPress;
+
+            return false;
+        }
+        /// <summary>
+        /// 卸载键盘控制接口服务
+        /// </summary>
+        /// <returns></returns>
+        public bool UnistallKeyboardServices()
+        {
+            //if (KeyboardMouseHook == null) return true;
+
+            //KeyboardMouseHook.KeyUp -= KeyboardMouseHook_KeyUp;
+            //-KeyboardMouseHook.KeyDown -= KeyboardMouseHook_KeyDown;
+            //-KeyboardMouseHook.KeyPress -= KeyboardMouseHook_KeyPress;
+            //KeyboardMouseHook.Dispose();
+            //KeyboardMouseHook = null;
 
             return true;
         }
+#if false
+        private IKeyboardMouseEvents KeyboardMouseHook;
         private void KeyboardMouseHook_KeyUp(object sender, KeyEventArgs e)
         {
             Console.WriteLine($"KeyDown: KeyValue:{e.KeyValue}  Code:{e.KeyCode} KeyData:{e.KeyData}  {(int)e.KeyData}");
@@ -235,53 +234,38 @@ namespace SpaceCG.Module.Reflection
         {
             Console.WriteLine("KeyPress: \t{0} {1}", (int)e.KeyChar, e.KeyChar);
         }
-        /// <summary>
-        /// 卸载键盘控制接口服务
-        /// </summary>
-        /// <returns></returns>
-        public bool UnistallKeyboardServices()
-        {
-            if (KeyboardMouseHook == null) return true;
-
-            KeyboardMouseHook.KeyUp -= KeyboardMouseHook_KeyUp;
-            //KeyboardMouseHook.KeyDown -= KeyboardMouseHook_KeyDown;
-            //KeyboardMouseHook.KeyPress -= KeyboardMouseHook_KeyPress;
-            KeyboardMouseHook.Dispose();
-            KeyboardMouseHook = null;
-
-            return true;
-        }
 #endif
 
         /// <summary>
         /// 添加组合消息配置。keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息
+        /// <para>如果该键已存在，则返回 false</para>
         /// </summary>
         /// <param name="keyValue">可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息</param>
         /// <param name="xmlControlMessages">控制消息或控制消息的集合</param>
         /// <returns>如果添加成功，返回 true, 反之 false </returns>
-        public bool AddGroupMessage(int keyValue, params String[] xmlControlMessages) => GroupMessages.TryAdd(keyValue, xmlControlMessages);
+        public bool AddMessageGroup(int keyValue, params String[] xmlControlMessages) => MessageGroups.TryAdd(keyValue, xmlControlMessages);
         /// <summary>
         /// 移除指定的组合消息。keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息
         /// </summary>
         /// <param name="keyValue">keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息</param>
         /// <returns>如果成功地移除，则为 true；否则为 false。</returns>
-        public bool RemoveGroupMessage(int keyValue) => GroupMessages.TryRemove(keyValue, out String[] messages);
+        public bool RemoveMessageGroup(int keyValue) => MessageGroups.TryRemove(keyValue, out String[] messages);
         /// <summary>
         /// 称除所有的组合消息
         /// </summary>
-        public void RemoveGroupMessages() => GroupMessages?.Clear();
+        public void RemoveMessageGroups() => MessageGroups?.Clear();
         /// <summary>
         /// 获取所有的组合消息
         /// </summary>
         /// <returns></returns>
-        public IReadOnlyDictionary<int, String[]> GetGroupMessages() => GroupMessages;
+        public IReadOnlyDictionary<int, String[]> GetMessageGroups() => MessageGroups;
         /// <summary>
         /// 执行/调用组合消息。keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息
         /// </summary>
         /// <param name="keyValue"></param>
-        public bool CallGroupMessages(int keyValue)
+        public bool CallMessageGroup(int keyValue)
         {
-            if (GroupMessages.ContainsKey(keyValue) && GroupMessages.TryGetValue(keyValue, out String[] messages))
+            if (MessageGroups.ContainsKey(keyValue) && MessageGroups.TryGetValue(keyValue, out String[] messages))
             {
                 bool result = false;
                 foreach (String message in messages)
@@ -390,8 +374,8 @@ namespace SpaceCG.Module.Reflection
             ControlObjects?.Clear();
             ControlObjects = null;
 
-            GroupMessages?.Clear();
-            GroupMessages = null;
+            MessageGroups?.Clear();
+            MessageGroups = null;
         }
 
         /// <summary>

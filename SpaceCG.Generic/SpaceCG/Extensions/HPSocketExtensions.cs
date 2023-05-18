@@ -1,4 +1,4 @@
-﻿#define HPSocket
+﻿//#define HPSocket
 
 using System;
 using System.Collections.Generic;

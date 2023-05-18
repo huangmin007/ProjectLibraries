@@ -1,4 +1,5 @@
-﻿#define NModbus
+﻿//#define NModbus
+//#define NModbus_Serial
 
 using System;
 using System.Configuration;
@@ -7,7 +8,6 @@ using System.Net.Sockets;
 
 namespace SpaceCG.Extensions
 {
-
     public static partial class NModbusExtensions
     {
         /// <summary>
@@ -148,9 +148,11 @@ namespace SpaceCG.Extensions
                 }
                 else if (type.IndexOf("SERIAL") >= 0)
                 {
+#if NModbus_Serial
                     SerialPort serialPort = new SerialPort(hostORcom, portORbaudRate);
                     serialPort.Open();
                     master = NModbus.Serial.ModbusFactoryExtensions.CreateRtuMaster(factory, serialPort);
+#endif
                 }
                 else
                 {
@@ -198,5 +200,5 @@ namespace SpaceCG.Extensions
             }
         }
 #endif
-    }
+                }
 }

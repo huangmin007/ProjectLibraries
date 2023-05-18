@@ -11,8 +11,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using SpaceCG.Extensions;
+using SpaceCG.Generic;
 using SpaceCG.Module.Modbus;
-using SpaceCG.Module.Reflection;
 using SpaceCG.Net;
 using SpaceCG.WindowsAPI.User32;
 

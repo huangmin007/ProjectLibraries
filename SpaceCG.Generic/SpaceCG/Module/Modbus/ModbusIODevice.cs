@@ -7,7 +7,6 @@ using System.Text;
 using System.Threading;
 using System.Xml.Linq;
 using SpaceCG.Extensions;
-using NModbus.Device;
 using Modbus.Device;
 
 namespace SpaceCG.Module.Modbus

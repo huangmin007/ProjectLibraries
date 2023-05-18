@@ -24,6 +24,11 @@ namespace SpaceCG.Extensions
         /// </summary>
         private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(InstanceExtensions));
 
+        static InstanceExtensions()
+        {
+            //嵌入 log4net.dll
+        }
+
         /// <summary>
         /// 动态的获取实例的字段对象。注意：包括私有对象
         /// </summary>

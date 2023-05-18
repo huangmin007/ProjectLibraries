@@ -8,9 +8,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using HPSocket;
 using SpaceCG.Extensions;
-using SpaceCG.Module.Reflection;
+using SpaceCG.Generic;
+using SpaceCG.Net;
 
 namespace SpaceCG.Module.Modbus
 {
@@ -115,7 +115,7 @@ namespace SpaceCG.Module.Modbus
 
             if (ushort.TryParse(Configuration?.Attribute("LocalPort")?.Value, out ushort localPort) && localPort >= 1024)
             {
-                ControlInterface.InstallNetworkService($"TCP-SERVER", "0.0.0.0", localPort);
+                ControlInterface.InstallNetworkService(localPort, "0.0.0.0");
 
                 this.Name = Configuration.Attribute("Name").Value;
                 if (!String.IsNullOrWhiteSpace(Name)) ControlInterface.AddControlObject(Name, this);
@@ -152,21 +152,43 @@ namespace SpaceCG.Module.Modbus
                         break;
 
                     case "SERVER":
-                        if (args[0].ToUpper() == "TCP")
-                            ControlInterface.AddControlObject(name, HPSocketExtensions.CreateNetworkServer<HPSocket.Tcp.TcpServer>(args[1], (ushort)port, null));
-                        else if (args[0].ToUpper() == "UDP")
-                            ControlInterface.AddControlObject(name, HPSocketExtensions.CreateNetworkServer<HPSocket.Udp.UdpServer>(args[1], (ushort)port, null));
-                        else
-                            Log.Warn($"连接参数错误：{name},{type},{parameters}");
+                        try
+                        {
+                            IAsyncServer Server = null;
+                            if (args[0].ToUpper() == "TCP")
+                                Server = new AsyncTcpServer(port);
+                            else if (args[0].ToUpper() == "UDP")
+                                Server = new AsyncUdpServer(port);
+                            else
+                                Log.Warn($"连接参数错误：{name},{type},{parameters}");
+
+                            if (Server != null && Server.Start())
+                                ControlInterface.AddControlObject(name, Server);
+                        }
+                        catch(Exception ex)
+                        {
+                            Log.Error($"创建服务端 {args} 错误：{ex}");
+                        }
                         break;
 
                     case "CLIENT":
-                        if (args[0].ToUpper() == "TCP")
-                            ControlInterface.AddControlObject(name, HPSocketExtensions.CreateNetworkClient<HPSocket.Tcp.TcpClient>(args[1], (ushort)port, null));
-                        else if (args[0].ToUpper() == "UDP")
-                            ControlInterface.AddControlObject(name, HPSocketExtensions.CreateNetworkClient<HPSocket.Udp.UdpClient>(args[1], (ushort)port, null));
-                        else
-                            Log.Warn($"连接参数错误：{name},{type},{parameters}");
+                        try
+                        {
+                            IAsyncClient Client = null;
+                            if (args[0].ToUpper() == "TCP")
+                                Client = new AsyncTcpClient();
+                            else if (args[0].ToUpper() == "UDP")
+                                Client = new AsyncUdpClient();
+                            else
+                                Log.Warn($"连接参数错误：{name},{type},{parameters}");
+
+                            if (Client != null && Client.Connect(args[1], port))
+                                ControlInterface.AddControlObject(name, Client);
+                        }
+                        catch(Exception ex)
+                        {
+                            Log.Error($"创建客户端 {args} 错误：{ex}");
+                        }
                         break;
                 }
             }
