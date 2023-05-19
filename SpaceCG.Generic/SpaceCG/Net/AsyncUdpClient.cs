@@ -75,11 +75,11 @@ namespace SpaceCG.Net
             return true;
         }
         /// <inheritdoc/>
-        public bool Connect(IPEndPoint remoteEP) => Connect(remoteEP.Address, remoteEP.Port);
+        public bool Connect(IPEndPoint remoteEP) => Connect(remoteEP.Address, (ushort)remoteEP.Port);
         /// <inheritdoc/>
-        public bool Connect(string remoteIPAddress, int remotePort) => Connect(IPAddress.Parse(remoteIPAddress), remotePort);
+        public bool Connect(string remoteIPAddress, ushort remotePort) => Connect(IPAddress.Parse(remoteIPAddress), remotePort);
         /// <inheritdoc/>
-        public bool Connect(IPAddress remoteAddress, int remotePort)
+        public bool Connect(IPAddress remoteAddress, ushort remotePort)
         {
             if (_UdpClient == null)
             {
@@ -97,7 +97,6 @@ namespace SpaceCG.Net
                     
                     LocalPort = ((IPEndPoint)(_UdpClient.Client.LocalEndPoint)).Port;
                     LocalAddress = ((IPEndPoint)(_UdpClient.Client.LocalEndPoint)).Address;
-                    //Logger.Info($"LocalEndPoint > {LocalAddress}:{LocalPort}");
                 }
                 catch(Exception ex)
                 {

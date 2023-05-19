@@ -64,7 +64,7 @@ namespace SpaceCG.Net
         /// 异步 TCP 客户端对象
         /// </summary>
         public AsyncTcpClient() 
-        {            
+        {
         }
 
         /// <inheritdoc/>
@@ -93,11 +93,11 @@ namespace SpaceCG.Net
             }
         }
         /// <inheritdoc/>
-        public bool Connect(IPEndPoint remoteEP) => Connect(remoteEP.Address, remoteEP.Port);
+        public bool Connect(IPEndPoint remoteEP) => Connect(remoteEP.Address, (ushort)remoteEP.Port);
         /// <inheritdoc/>
-        public bool Connect(string remoteIpAddress, int remotePort) => Connect(IPAddress.Parse(remoteIpAddress), remotePort);
+        public bool Connect(string remoteIpAddress, ushort remotePort) => Connect(IPAddress.Parse(remoteIpAddress), remotePort);
         /// <inheritdoc/>
-        public bool Connect(IPAddress remoteAddress, int remotePort)
+        public bool Connect(IPAddress remoteAddress, ushort remotePort)
         {
             if (_TcpClient != null && _TcpClient.Connected) return true;
             if (_TcpClient != null && _ConnectStatus == "Connecting") return false;
@@ -217,6 +217,7 @@ namespace SpaceCG.Net
             {
                 Logger.Warn(ex);
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                return;
             }
         }
 

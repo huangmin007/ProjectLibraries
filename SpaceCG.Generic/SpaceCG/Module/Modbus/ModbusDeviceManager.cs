@@ -156,9 +156,9 @@ namespace SpaceCG.Module.Modbus
                         {
                             IAsyncServer Server = null;
                             if (args[0].ToUpper() == "TCP")
-                                Server = new AsyncTcpServer(port);
+                                Server = new AsyncTcpServer((ushort)port);
                             else if (args[0].ToUpper() == "UDP")
-                                Server = new AsyncUdpServer(port);
+                                Server = new AsyncUdpServer((ushort)port);
                             else
                                 Log.Warn($"连接参数错误：{name},{type},{parameters}");
 
@@ -182,7 +182,7 @@ namespace SpaceCG.Module.Modbus
                             else
                                 Log.Warn($"连接参数错误：{name},{type},{parameters}");
 
-                            if (Client != null && Client.Connect(args[1], port))
+                            if (Client != null && Client.Connect(args[1], (ushort)port))
                                 ControlInterface.AddControlObject(name, Client);
                         }
                         catch(Exception ex)

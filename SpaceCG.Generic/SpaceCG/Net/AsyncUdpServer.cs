@@ -43,14 +43,14 @@ namespace SpaceCG.Net
         /// 异步 UDP 服务
         /// </summary>
         /// <param name="listenPort"></param>
-        public AsyncUdpServer(int listenPort) : this(IPAddress.Any, listenPort)
+        public AsyncUdpServer(ushort listenPort) : this(IPAddress.Any, listenPort)
         {
         }
         /// <summary>
         /// 异步 UDP 服务
         /// </summary>
         /// <param name="localEP"></param>
-        public AsyncUdpServer(IPEndPoint localEP) : this(localEP.Address, localEP.Port)
+        public AsyncUdpServer(IPEndPoint localEP) : this(localEP.Address, (ushort)localEP.Port)
         {
         }
         /// <summary>
@@ -58,7 +58,7 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="localIPAddress"></param>
         /// <param name="listenPort"></param>
-        public AsyncUdpServer(IPAddress localIPAddress, int listenPort)
+        public AsyncUdpServer(IPAddress localIPAddress, ushort listenPort)
         {
             this.LocalAddress = localIPAddress;
             this.LocalPort = listenPort;
@@ -72,7 +72,7 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="localIPAddress"></param>
         /// <param name="listenPort"></param>
-        public AsyncUdpServer(String localIPAddress, int listenPort) : this(IPAddress.Parse(localIPAddress), listenPort)
+        public AsyncUdpServer(String localIPAddress, ushort listenPort) : this(IPAddress.Parse(localIPAddress), listenPort)
         {
         }
 

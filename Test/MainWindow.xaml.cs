@@ -183,13 +183,13 @@ namespace Test
             Server.ClientDataReceived += Server_ClientDataReceived;
             //Server.Start();
 
-            //Client = new AsyncTcpClient();
-            Client = new AsyncUdpClient();
+            Client = new AsyncTcpClient();
+            //Client = new AsyncUdpClient();
             Client.Connected += Client_Connected;
             Client.Disconnected += Client_Disconnected;
             Client.DataReceived += Client_DataReceived;
             Client.Exception += Client_Exception;
-            //Client.Connect("192.168.40.212", 2204);
+            Client.Connect("192.168.40.212", 2204);
         }
 
         private void Client_Exception(object sender, AsyncExceptionEventArgs e)

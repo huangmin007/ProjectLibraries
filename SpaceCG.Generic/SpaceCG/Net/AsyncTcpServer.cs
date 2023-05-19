@@ -45,14 +45,14 @@ namespace SpaceCG.Net
         /// 异步 TCP 服务器
         /// </summary>
         /// <param name="listenPort">监听的端口</param>
-        public AsyncTcpServer(int listenPort) : this(IPAddress.Any, listenPort)
+        public AsyncTcpServer(ushort listenPort) : this(IPAddress.Any, listenPort)
         {
         }
         /// <summary>
         /// 异步 TCP 服务器
         /// </summary>
         /// <param name="localEP">监听的终结点</param>
-        public AsyncTcpServer(IPEndPoint localEP) : this(localEP.Address, localEP.Port)
+        public AsyncTcpServer(IPEndPoint localEP) : this(localEP.Address, (ushort)localEP.Port)
         {
         }
         /// <summary>
@@ -60,7 +60,7 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="localIPAddress">监听的IP地址</param>
         /// <param name="listenPort">监听的端口</param>
-        public AsyncTcpServer(IPAddress localIPAddress, int listenPort)
+        public AsyncTcpServer(IPAddress localIPAddress, ushort listenPort)
         {
             LocalPort = listenPort;
             LocalAddress = localIPAddress;
@@ -77,7 +77,7 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="localIPAddress">监听的IP地址</param>
         /// <param name="listenPort">监听的端口</param>
-        public AsyncTcpServer(String localIPAddress, int listenPort) : this(IPAddress.Parse(localIPAddress), listenPort)
+        public AsyncTcpServer(String localIPAddress, ushort listenPort) : this(IPAddress.Parse(localIPAddress), listenPort)
         {
         }
 

@@ -69,7 +69,7 @@ namespace SpaceCG.Generic
                 if (!String.IsNullOrWhiteSpace(address) && IPAddress.TryParse(address, out IPAddress ipAddress) && ipAddress.ToString() != "0.0.0.0")
                 {
                     IAsyncClient Client = new AsyncTcpClient();
-                    if (Client.Connect(ipAddress, port))
+                    if (Client.Connect(ipAddress, port) && !NetworkServices.ContainsKey($"{ipAddress}:{port}"))
                     {
                         NetworkServices.Add($"{ipAddress}:{port}", Client);
                         Client.DataReceived += Client_DataReceived;
@@ -80,7 +80,7 @@ namespace SpaceCG.Generic
                 else
                 {
                     IAsyncServer Server = new AsyncTcpServer(port);
-                    if (Server.Start())
+                    if (Server.Start() && !NetworkServices.ContainsKey($"0.0.0.0:{port}"))
                     {
                         NetworkServices.Add($"0.0.0.0:{port}", Server);
                         Server.ClientDataReceived += Server_ClientDataReceived;

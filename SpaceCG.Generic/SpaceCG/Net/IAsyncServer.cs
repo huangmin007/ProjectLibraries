@@ -65,7 +65,6 @@ namespace SpaceCG.Net
         /// <param name="remote">远程地址</param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
         bool SendBytes(byte[] data, EndPoint remote);
-
         /// <summary>
         /// 异步发送数据到远程客户端
         /// </summary>
@@ -77,7 +76,7 @@ namespace SpaceCG.Net
     }
 
     /// <summary>
-    /// 异步连接对象事件参数
+    /// 连接对象事件参数
     /// </summary>
     public class AsyncEventArgs : EventArgs
     {
@@ -97,7 +96,7 @@ namespace SpaceCG.Net
     }
 
     /// <summary>
-    /// 异步连接对象数据事件参数
+    /// 连接对象数据事件参数
     /// </summary>
     public class AsyncDataEventArgs : AsyncEventArgs
     {
@@ -118,7 +117,7 @@ namespace SpaceCG.Net
     }
 
     /// <summary>
-    /// 异步连接对象异常事件参数
+    /// 连接对象异常事件参数
     /// </summary>
     public class AsyncExceptionEventArgs : AsyncEventArgs
     {

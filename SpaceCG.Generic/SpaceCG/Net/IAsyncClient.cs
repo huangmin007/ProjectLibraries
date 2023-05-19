@@ -79,14 +79,14 @@ namespace SpaceCG.Net
         /// <param name="remoteAddress"></param>
         /// <param name="remotePort"></param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
-        bool Connect(IPAddress remoteAddress, int remotePort);
+        bool Connect(IPAddress remoteAddress, ushort remotePort);
         /// <summary>
         /// 连接远程主机
         /// </summary>
         /// <param name="remoteIPAddress"></param>
         /// <param name="remotePort"></param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
-        bool Connect(String remoteIPAddress, int remotePort);
+        bool Connect(String remoteIPAddress, ushort remotePort);
 
         /// <summary>
         /// 异步发送数据到远程服务端
