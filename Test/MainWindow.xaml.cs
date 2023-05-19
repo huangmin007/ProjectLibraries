@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO.Ports;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -113,24 +115,38 @@ namespace Test
             //deviceManager = new ModbusDeviceManager();
             //deviceManager.LoadDeviceConfig("ModbusDevices.Config");
 
-#if true
+#if false
+            Stopwatch sw = new Stopwatch();
+            sw.Restart();
             //object[] arr2 = StringExtension.ConvertParameters2("0x01,3,[True,True,False]");
             //object[] arr2 = StringExtensions.SplitParameters("0x03");
             //object[] arr2 = StringExtensions.SplitParameters("'hello,world','ni,hao'");
             object[] arr2 = StringExtensions.SplitParameters("'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15");
+
             Console.WriteLine(arr2.Length);
+            foreach(var o in arr2)
+            {
+                if (o.GetType().IsArray)
+                {
+                    foreach(var so in (Array)o)
+                    {
+                        Console.Write($"{so},,,");
+                    }
+                    Console.WriteLine("");
+                }
+                else
+                {
+                    Console.WriteLine(o);
+                }
+            }
 
-            List<int> list = new List<int>();
-
-            Console.WriteLine(list.GetType().IsArray);
-            Console.WriteLine(typeof(String).IsValueType);
 
             //String s = "\'aaaa,bbbb\'";
             //object[] objs = StringExtensions.SplitParameters(s);
             //foreach (var o in objs)
-            {
-                //Console.WriteLine($"=>{o}");
-            }
+
+            //Console.WriteLine($"=>{o}");
+
 
             //bool result = StringExtensions.TryParse("45", out UInt32 v);
             //Console.WriteLine($"{result},,{v}");
@@ -176,6 +192,7 @@ namespace Test
             //SerialPortExtensions.AutoReconnection(serialPort);
             //serialPort.Open();
 
+#if false
             //Server = new AsyncUdpServer(2201);
             Server = new AsyncTcpServer(2200);
             Server.ClientConnected += Server_ClientConnected;
@@ -189,7 +206,33 @@ namespace Test
             Client.Disconnected += Client_Disconnected;
             Client.DataReceived += Client_DataReceived;
             Client.Exception += Client_Exception;
-            Client.Connect("192.168.40.212", 2204);
+            //Client.Connect("192.168.40.212", 2204);
+#endif
+            test();
+        }
+
+        private void test()
+        {
+            //String parameters = "15";
+            String parameters = "'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15";
+            Console.WriteLine(parameters);
+
+            MatchCollection matchs = StringExtensions.RegexStringArguments.Matches(parameters);
+            foreach(Match match in matchs)
+            {
+                Console.WriteLine($"({match}) {match.Name} {match.Success},{match.Value} ");
+                if (!match.Success) continue;
+
+                foreach(Group group in match.Groups)
+                {
+                    Console.WriteLine($"\t-{group.Name} {group.Success}");
+                    if(match.Name != group.Name && group.Success)
+                    {
+                        Console.WriteLine($"\t\t{group.Value}");
+                    }
+                }
+            }
+
         }
 
         private void Client_Exception(object sender, AsyncExceptionEventArgs e)
@@ -247,8 +290,6 @@ namespace Test
             Console.WriteLine($"{arg2} say: {msg}");
         }
 
-
-
         private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice slaveDevice, Register register)
         {
             Console.WriteLine(register);
@@ -297,7 +338,7 @@ namespace Test
                 //ICollection<EndPoint> clients2 = Server.Clients;
                 //Console.WriteLine(clients2.IsReadOnly);
 
-                
+
             }
             else if(button == Button_Test2)
             {

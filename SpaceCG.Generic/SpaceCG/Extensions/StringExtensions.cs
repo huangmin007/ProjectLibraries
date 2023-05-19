@@ -226,12 +226,25 @@ namespace SpaceCG.Extensions
         /// <returns></returns>
         public static bool TryParseToUInt32Array(this String value, ref UInt32[] array, char separator = ',') => TryParse<UInt32>(value, ref array, separator);
 
+        /// <summary> 正则匹配 '~' | "~" </summary>
+        private static readonly String pattern_string = @"\'([^\']+)\'|" + "\"([^\"]+)\"";
+        /// <summary> 正则匹配 [~] </summary>
+        private static readonly String pattern_array = @"\[([^\[\]]+)\]";
+#pragma warning disable CS0414
+        /// <summary> 正则匹配 (~) </summary>
+        private static readonly String pattern_parent = @"\(([^\(\)]+)\)";
+#pragma warning restore CS0414
+        /// <summary> 正则匹配 ',' 分割, 或结尾部份 </summary>
+        private static readonly String pattern_split = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";
+        private static readonly String pattern_arguments = $@"{pattern_string}|{pattern_array}|{pattern_split}";
+        public static readonly Regex RegexStringArguments = new Regex(pattern_arguments, RegexOptions.Compiled | RegexOptions.Singleline);
+
         /// <summary>
-        /// 将字符串参数集，分割转换为字符串数组，注意：不支持中文字符串,不支持多级数组与字符串
+        /// 将字符串参数集，分割转换为字符串数组，注意：不支持多级数组与字符串
         /// <para>示例字符串："0x01,True,32,False"，输出数组：["0x01","True","32","False"]</para>
         /// <para>示例字符串："0x01,3,[True,True,False]"，输出数组：["0x01","3",["True","True","False"]]</para>
         /// <para>示例字符串："0x01,[0,3,4,7],[True,True,False,True]"，输出数组：["0x01",["0","3","4","7"],["True","True","False","True"]]</para>
-        /// <para>示例字符串：" 'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15"，输出数组：["hello,world","0x01","3","ni?,hao,[aa,bb]",["True","True","False","True"],['aaa,bb,c','ni,hao'],"15,"aa,aaa",15"]</para>
+        /// <para>示例字符串：" 'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15"，输出数组：["hello,world","0x01","3","ni?,hao,[aa,bb]",["True","True","False","True"],["aaa,bb,c","ni,hao"],"15","aa,aaa","15"]</para>
         /// </summary>
         /// <param name="parameters"></param>
         /// <returns></returns>
@@ -239,48 +252,53 @@ namespace SpaceCG.Extensions
         {
             if (String.IsNullOrWhiteSpace(parameters)) return new object[] { }; // null
 
-            //String pattern = @"\[([\w\s\#\.,]+)\]|([\w\s\#\.]+),|([\w\#\.]+)";
-            //String pattern = @"\'([\w\s\#\.,\[\]]+)\'|\[([\w\s\#\.,]+)\]|([\w\s\#\.]+),|([\w\#\.]+)";
-
+#if false
             String pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //匹配'~',"~"
             String pattern_array    = @"\[([^\[\]]+)\]";                    //匹配[~]
             String pattern_parent   = @"\(([^\(\)]+)\)";                    //匹配(~)
             String pattern_split    = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";   //匹配 ',' 分割, 或结尾部份
             String pattern = $@"{pattern_string}|{pattern_array}|{pattern_split}";
-
             MatchCollection matchs = Regex.Matches(parameters, pattern, RegexOptions.Compiled | RegexOptions.Singleline);
-            //Console.WriteLine($"Match Count: {matchs.Count}");
+#else
+            MatchCollection matchs = RegexStringArguments.Matches(parameters);
+#endif
 
             List<object> args = new List<object>();
-            
             foreach (Match match in matchs)
             {
-                //Console.WriteLine($"Match:: {match.Success}({match.Groups.Count}) {match.Captures.Count} {match.Value}");
                 if (!match.Success) continue;
+#if true
                 String trimValue = match.Value.Trim();
-
                 if((trimValue.IndexOf('\'') == 0 && trimValue.LastIndexOf('\'') == trimValue.Length - 1) ||
                    (trimValue.IndexOf('\"') == 0 && trimValue.LastIndexOf('\"') == trimValue.Length - 1))
                 {
                     args.Add(trimValue.Substring(1, trimValue.Length - 2));
-                    //Console.WriteLine(trimValue.Substring(1, trimValue.Length - 2));
                 }
                 else if(trimValue.IndexOf('[') == 0 && trimValue.LastIndexOf(']') == trimValue.Length - 1)
                 {
-                    args.Add(trimValue.Substring(1, trimValue.Length - 2).Split(','));
-                    //Console.WriteLine(trimValue.Substring(1, trimValue.Length - 2));
+                    args.Add(SplitParameters(trimValue.Substring(1, trimValue.Length - 2)));
                 }
                 else if(trimValue.LastIndexOf(',') == trimValue.Length - 1)
                 {
                     args.Add(trimValue.Substring(0, trimValue.Length - 1));
-                    //Console.WriteLine(trimValue.Substring(0, trimValue.Length - 1));
                 }
                 else
                 {
                     args.Add(match.Value);
                 }
-
-                //Console.WriteLine($"SplitValue::{args[args.Count - 1]}");
+#else
+                //.Net 4.7 或以上版本
+                foreach (Group group in match.Groups)
+                {
+                    if (group.Success && match.Name != group.Name)
+                    {
+                        if (match.Name != "3") //[~]
+                            args.Add(group.Value);
+                        else
+                            args.Add(SplitParameters(group.Value));
+                    }
+                }
+#endif
             }
 
             return args.ToArray();
