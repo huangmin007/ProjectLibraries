@@ -114,6 +114,10 @@ namespace SpaceCG.Net
                     Connected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
                     _UdpClient.BeginReceive(ReceiveCallback, _UdpClient);
                 }
+                else
+                {
+                    Disconnected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
+                }
             }
 
             return true;

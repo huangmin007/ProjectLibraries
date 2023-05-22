@@ -197,6 +197,17 @@ namespace SpaceCG.Net
                 ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs((IPEndPoint)ar.AsyncState, ex));
             }
         }
+        /// <inheritdoc/>
+        public bool SendBytes(byte[] datagram)
+        {
+            foreach(var client in _Clients)
+            {
+                SendBytes(datagram, client);
+            }
+            return true;
+        }
+        /// <inheritdoc/>
+        public bool SendMessage(String message) => SendBytes(Encoding.Default.GetBytes(message));
 
         /// <inheritdoc/>
         public void Dispose()

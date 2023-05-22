@@ -73,6 +73,19 @@ namespace SpaceCG.Net
         /// <param name="data">要发送的数据</param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
         bool SendBytes(byte[] data, String ipAddress, int port);
+
+        /// <summary>
+        /// 异步发送数据到所有远程客户端
+        /// </summary>
+        /// <param name="data">要发送的数据</param>
+        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
+        bool SendBytes(byte[] data);
+        /// <summary>
+        /// 异步发送数据到所有远程客户端
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
+        bool SendMessage(String message);
     }
 
     /// <summary>

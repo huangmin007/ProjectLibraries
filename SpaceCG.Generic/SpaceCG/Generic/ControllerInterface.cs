@@ -13,8 +13,8 @@ namespace SpaceCG.Generic
 {
     /// <summary>
     /// 控制器接口对象
-    /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-    /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
+    /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Response="False" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+    /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="True" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
     /// <para>网络接口返回(XML)：&lt;Return Result="True/False" Value="value" /&gt; 属性 Result 表示远程执行返回状态(成功/失败)，Value 表示远程执行返回值 (Method 返回值，或是 Property 值)</para>
     /// </summary>
     public sealed class ControllerInterface : IDisposable
@@ -149,6 +149,7 @@ namespace SpaceCG.Generic
         {
             String message = Encoding.Default.GetString(e.Bytes);
             bool result = this.TryParseControlMessage(message, out object returnValue);
+
             String returnMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\">";
 
             if (result)

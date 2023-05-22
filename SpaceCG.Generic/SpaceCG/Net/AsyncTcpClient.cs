@@ -156,6 +156,7 @@ namespace SpaceCG.Net
             else
             {
                 _ConnectStatus = "ConnectFailed";
+                Disconnected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
             }
         }
         private void ReadCallback(IAsyncResult ar)

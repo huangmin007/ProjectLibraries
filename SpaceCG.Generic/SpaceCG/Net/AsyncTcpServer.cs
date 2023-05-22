@@ -272,6 +272,37 @@ namespace SpaceCG.Net
         }
 
         /// <inheritdoc/>
+        public bool SendBytes(byte[] data)
+        {
+            foreach (var kv in _Clients)
+            {
+                TcpClient tcpClient = kv.Value;
+                EndPoint remote = tcpClient.Client.RemoteEndPoint;
+
+                if (!tcpClient.Connected)
+                {
+                    _Buffers.TryRemove(remote, out byte[] buffer);
+                    _Clients.TryRemove(remote, out TcpClient client);
+                    ClientDisconnected?.Invoke(this, new AsyncEventArgs(remote));
+                    continue;
+                }
+
+                try
+                {
+                    tcpClient.GetStream().BeginWrite(data, 0, data.Length, WriteCallback, tcpClient);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"客户端 {remote} 发送数据异常：{ex}");
+                    ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
+                }
+            }
+            return true;
+        }
+        /// <inheritdoc/>
+        public bool SendMessage(String message) => SendBytes(Encoding.Default.GetBytes(message));
+
+        /// <inheritdoc/>
         public void Dispose()
         {
             Stop();
