@@ -157,7 +157,8 @@ namespace SpaceCG.Generic
             else
                 Logger.Warn($"Call Failed! {returnMessage}");
 
-            if (ReturnNetworkResult)
+            String str = message.ToLower().Trim();
+            if(str.IndexOf("response=\"true\"") != -1 || str.IndexOf("response=\'true\'") != -1)
             {
                 ((IAsyncClient)sender).SendMessage(returnMessage);
             }
@@ -178,10 +179,10 @@ namespace SpaceCG.Generic
             else
                 Logger.Warn($"Call Failed! {returnMessage}");
 
-            if (ReturnNetworkResult)
+            String str = message.ToLower().Trim();
+            if (str.IndexOf("response=\"true\"") != -1 || str.IndexOf("response=\'true\'") != -1)
             {
-                byte[] bytes = Encoding.Default.GetBytes(returnMessage);
-                ((IAsyncServer)sender).SendBytes(bytes, e.EndPoint);
+                ((IAsyncServer)sender).SendMessage(returnMessage);
             }
         }
 
@@ -217,6 +218,7 @@ namespace SpaceCG.Generic
 
             return true;
         }
+
 #if false
         private IKeyboardMouseEvents KeyboardMouseHook;
         private void KeyboardMouseHook_KeyUp(object sender, KeyEventArgs e)

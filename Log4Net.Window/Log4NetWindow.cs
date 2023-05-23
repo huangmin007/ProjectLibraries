@@ -229,7 +229,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 更改日志级别
         /// </summary>
-        protected void ChangeLoggerLevel()
+        public static void ChangeLoggerLevel()
         {
             log4net.Repository.Hierarchy.Logger root = ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root;
             root.Level = (root.Level == log4net.Core.Level.Info) ? log4net.Core.Level.Debug : log4net.Core.Level.Info;

@@ -60,11 +60,15 @@ namespace SpaceCG.Net
         private IPEndPoint _RemoteEP;
         private String _ConnectStatus = "Ready";
 
+        private int _ReconnectCount = 0;
+        private Boolean _AutoReconnect = true;
+
         /// <summary>
         /// 异步 TCP 客户端对象
         /// </summary>
-        public AsyncTcpClient() 
+        public AsyncTcpClient(bool autoReconnect = true) 
         {
+            this._AutoReconnect = autoReconnect;
         }
 
         /// <inheritdoc/>
@@ -142,6 +146,7 @@ namespace SpaceCG.Net
 
             if (_TcpClient.Connected)
             {
+                _ReconnectCount = 0;
                 _ConnectStatus = "ConnectSuccess";
 
                 RemotePort = _RemoteEP.Port;
@@ -155,8 +160,16 @@ namespace SpaceCG.Net
             }
             else
             {
+                _ReconnectCount++;
                 _ConnectStatus = "ConnectFailed";
                 Disconnected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
+
+                if (_AutoReconnect)
+                {
+                    if (_ReconnectCount == 1) Logger.Warn($"连接远程地址 {_RemoteEP} 失败，准备重新连接 ...... ");
+                    
+                    Connect(_RemoteEP);
+                }
             }
         }
         private void ReadCallback(IAsyncResult ar)
