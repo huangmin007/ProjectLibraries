@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace SpaceCG.Extensions
 {
-#if HPSocket
+
     public static class HPSocketExtensions
     {
         static HPSocketExtensions()
@@ -21,7 +21,7 @@ namespace SpaceCG.Extensions
         /// log4net.Logger 对象
         /// </summary>
         private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(HPSocketExtensions));
-
+#if HPSocket
         #region 扩展的配置动态调用函数
         /// <summary>
         /// 扩展的配置调用，HPSocket.IServer.Send
@@ -389,6 +389,6 @@ namespace SpaceCG.Extensions
             TClient.Dispose();
             TClient = null;
         }
-    }
 #endif
+    }
 }
