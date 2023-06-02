@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using SpaceCG.Generic;
 
 namespace SpaceCG.Net
 {
@@ -10,7 +11,7 @@ namespace SpaceCG.Net
     /// </summary>
     public class AsyncUdpClient : IAsyncClient
     {
-        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(AsyncUdpClient));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(AsyncUdpClient));
 
         /// <inheritdoc/>
         public bool IsConnected => _UdpClient?.Client != null && _UdpClient.Client.Connected;
@@ -103,7 +104,7 @@ namespace SpaceCG.Net
                     _UdpClient?.Close();
                     _UdpClient = null;
 
-                    if (Logger.IsDebugEnabled) Logger.Debug($"{ex}");
+                    Logger.Error($"{ex}");
                     Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                     return false;
                 }
@@ -135,7 +136,7 @@ namespace SpaceCG.Net
             }
             catch (Exception ex)
             {
-                if (Logger.IsDebugEnabled) Logger.Debug($"{ex}");
+                Logger.Error($"{ex}");
                 Disconnected?.Invoke(this, new AsyncEventArgs(remoteEP));
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(remoteEP, ex));
                 return;
@@ -163,7 +164,7 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                if (Logger.IsDebugEnabled) Logger.Debug($"{ex}");
+                Logger.Error($"{ex}");
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return false;
             }
@@ -181,7 +182,7 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 count = 0;
-                if (Logger.IsDebugEnabled) Logger.Debug($"{ex}");
+                Logger.Error($"{ex}");
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
             }
 

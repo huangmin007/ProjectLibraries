@@ -16,7 +16,6 @@ using SpaceCG.Extensions;
 using SpaceCG.Generic;
 using SpaceCG.Module.Modbus;
 using SpaceCG.Net;
-using SpaceCG.WindowsAPI.User32;
 
 namespace Test
 {

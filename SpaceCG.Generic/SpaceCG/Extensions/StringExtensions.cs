@@ -1,18 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using SpaceCG.Generic;
 
 namespace SpaceCG.Extensions
 {
     public static partial class StringExtensions
     {
-        /// <summary>
-        /// log4net.Logger 对象
-        /// </summary>
-        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(StringExtensions));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(StringExtensions));
 
         /// <summary>
         /// 获取数值型的字符串进位基数
@@ -56,6 +54,7 @@ namespace SpaceCG.Extensions
 
             return parameters;
         }
+
         /// <summary>
         /// 将数字字符类型转为数值类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)、Double、Float 字符串的转换。
         /// </summary>
@@ -102,12 +101,13 @@ namespace SpaceCG.Extensions
             }
             catch (Exception ex)
             {
-                Logger.Warn($"{ex.Message} {numberString}/{typeof(NumberType)}");
+                Logger.Error($"{ex.Message} {numberString}/{typeof(NumberType)}");
                 return false;
             }
 
             return true;
         }
+
         /// <summary>
         /// 将多个数值字符类型(默认以 ',' 分割)型转为数值数组类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)、double、float 字符串的转换。
         /// </summary>
@@ -165,7 +165,7 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn($"{ex.Message} {stringArray[i]}/{typeof(NumberType)}");
+                    Logger.Error($"{ex.Message} {stringArray[i]}/{typeof(NumberType)}");
                     continue;
                 }
 
@@ -385,7 +385,7 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn(ex);
+                    Logger.Error(ex.ToString());
                     return (ValueType)paramValue;
                 }
             }
@@ -410,14 +410,14 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn(ex);
+                    Logger.Error(ex.ToString());
                     return (ValueType)paramValue;
                 }
             }
             //Other
             else
             {
-                //Logger.Warn($"暂未处理的类型转换 {paramType},{paramValue}");
+                Logger.Warn($"暂未处理的类型转换 {paramType},{paramValue}");
                 return (ValueType)Convert.ChangeType(paramValue, paramType);
             }
         }

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
@@ -17,9 +16,9 @@ namespace SpaceCG.Generic
     /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="True" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
     /// <para>网络接口返回(XML)：&lt;Return Result="True/False" Value="value" /&gt; 属性 Result 表示远程执行返回状态(成功/失败)，Value 表示远程执行返回值 (Method 返回值，或是 Property 值)</para>
     /// </summary>
-    public sealed class ControllerInterface : IDisposable
+    public sealed class ControlInterface : IDisposable
     {
-        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(ControllerInterface));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ControlInterface));
 
         /// <summary>
         /// 网络控制接口服务参数，是否返回网络执行结果信息，默认为 true
@@ -34,13 +33,15 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 组合控制消息的集合
         /// </summary>
-        private ConcurrentDictionary<int, String[]> MessageGroups = new ConcurrentDictionary<int, String[]>(2, 8);
+        private Dictionary<int, String[]> MessageGroups = new Dictionary<int, String[]>(8);
+        //private ConcurrentDictionary<int, String[]> MessageGroups = new ConcurrentDictionary<int, String[]>(2, 8);
 
         /// <summary>
         /// 可访问或可控制对象的集合，可以通过反射技术访问的对象集合
         /// <para>值键对 &lt;name, object&gt; </para>
         /// </summary>
-        private ConcurrentDictionary<String, Object> ControlObjects = new ConcurrentDictionary<String, Object>(2, 8);
+        private Dictionary<String, Object> ControlObjects = new Dictionary<String, Object>(8);
+        //private ConcurrentDictionary<String, Object> ControlObjects = new ConcurrentDictionary<String, Object>(2, 8);
 
         /// <summary>
         /// 反射控制接口对象
@@ -48,7 +49,7 @@ namespace SpaceCG.Generic
         /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
         /// </summary>
         /// <param name="localPort">服务端口，小于 1024 则不启动服务接口</param>
-        public ControllerInterface(ushort localPort = 2023)
+        public ControlInterface(ushort localPort = 2023)
         {
             InstallNetworkService(localPort);
         }
@@ -91,7 +92,7 @@ namespace SpaceCG.Generic
             }
             catch (Exception ex)
             {
-                Logger.Error(ex);
+                Logger.Error(ex.ToString());
             }
             return false;
         }
@@ -155,7 +156,7 @@ namespace SpaceCG.Generic
             if (result)
                 Logger.Info($"Call Success! {returnMessage}");
             else
-                Logger.Warn($"Call Failed! {returnMessage}");
+                Logger.Info($"Call Failed! {returnMessage}");
 
             String str = message.ToLower().Trim();
             if(str.IndexOf("response=\"true\"") != -1 || str.IndexOf("response=\'true\'") != -1)
@@ -177,7 +178,7 @@ namespace SpaceCG.Generic
             if (result)
                 Logger.Info($"Call Success! {returnMessage}");
             else
-                Logger.Warn($"Call Failed! {returnMessage}");
+                Logger.Info($"Call Failed! {returnMessage}");
 
             String str = message.ToLower().Trim();
             if (str.IndexOf("response=\"true\"") != -1 || str.IndexOf("response=\'true\'") != -1)
@@ -219,26 +220,6 @@ namespace SpaceCG.Generic
             return true;
         }
 
-#if false
-        private IKeyboardMouseEvents KeyboardMouseHook;
-        private void KeyboardMouseHook_KeyUp(object sender, KeyEventArgs e)
-        {
-            Console.WriteLine($"KeyDown: KeyValue:{e.KeyValue}  Code:{e.KeyCode} KeyData:{e.KeyData}  {(int)e.KeyData}");
-
-            int key = (int)e.KeyData;
-            CallGroupMessages((int)e.KeyData);
-        }
-        private void KeyboardMouseHook_KeyDown(object sender, System.Windows.Forms.KeyEventArgs e)
-        {
-            Keys key = Keys.A | Keys.Control;
-            Console.WriteLine($"KeyDown: KeyValue:{e.KeyValue}  Code:{e.KeyCode} KeyData:{e.KeyData == key}  {(int)e.KeyData}");
-        }
-        private void KeyboardMouseHook_KeyPress(object sender, System.Windows.Forms.KeyPressEventArgs e)
-        {
-            Console.WriteLine("KeyPress: \t{0} {1}", (int)e.KeyChar, e.KeyChar);
-        }
-#endif
-
         /// <summary>
         /// 添加组合消息配置。keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息
         /// <para>如果该键已存在，则返回 false</para>
@@ -246,13 +227,25 @@ namespace SpaceCG.Generic
         /// <param name="keyValue">可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息</param>
         /// <param name="xmlControlMessages">控制消息或控制消息的集合</param>
         /// <returns>如果添加成功，返回 true, 反之 false </returns>
-        public bool AddMessageGroup(int keyValue, params String[] xmlControlMessages) => MessageGroups.TryAdd(keyValue, xmlControlMessages);
+        public bool AddMessageGroup(int keyValue, params String[] xmlControlMessages)
+        {
+            if (MessageGroups.ContainsKey(keyValue)) return false;
+            try
+            {
+                MessageGroups.Add(keyValue, xmlControlMessages);
+                return true;
+            }
+            catch(Exception)
+            {
+                return false;
+            }
+        }
         /// <summary>
         /// 移除指定的组合消息。keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息
         /// </summary>
         /// <param name="keyValue">keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息</param>
         /// <returns>如果成功地移除，则为 true；否则为 false。</returns>
-        public bool RemoveMessageGroup(int keyValue) => MessageGroups.TryRemove(keyValue, out String[] messages);
+        public bool RemoveMessageGroup(int keyValue) => MessageGroups.Remove(keyValue);
         /// <summary>
         /// 称除所有的组合消息
         /// </summary>
@@ -298,7 +291,17 @@ namespace SpaceCG.Generic
                 return false;
             }
 
-            bool result = ControlObjects.TryAdd(name, obj);
+            bool result = true;
+            try
+            {
+                ControlObjects.Add(name, obj);
+                result = true;
+            }
+            catch(Exception)
+            {
+                result = false;
+            }
+
             Logger.Info($"添加可访问控制对象 {name}/{obj}/{obj.GetType()} 状态：{result}");
             return result;           
         }
@@ -317,7 +320,9 @@ namespace SpaceCG.Generic
                 return false;
             }
 
-            bool result = ControlObjects.TryRemove(name, out Object obj);
+            Object obj = ControlObjects[name];
+            bool result = ControlObjects.Remove(name);
+
             Logger.Info($"移除可访问控制对象 {name}/{obj}/{obj?.GetType()} 状态：{result}");
             return result;
         }
@@ -341,7 +346,7 @@ namespace SpaceCG.Generic
         /// <returns></returns>
         public bool TryParseControlMessage(String xmlMessage, out object returnResult)
         {
-            return ControllerInterface.TryParseControlMessage(xmlMessage, ControlObjects, out returnResult);
+            return ControlInterface.TryParseControlMessage(xmlMessage, ControlObjects, out returnResult);
         }
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并调用实例对象的方法
@@ -352,7 +357,7 @@ namespace SpaceCG.Generic
         /// <returns></returns>
         public bool TryParseCallMethod(XElement actionElement, out object returnResult)
         {
-            return ControllerInterface.TryParseCallMethod(actionElement, ControlObjects, out returnResult);
+            return ControlInterface.TryParseCallMethod(actionElement, ControlObjects, out returnResult);
         }
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并设置/获取实例对象属性的值
@@ -363,7 +368,7 @@ namespace SpaceCG.Generic
         /// <returns></returns>
         public bool TryParseChangeValue(XElement actionElement, out object returnResult)
         {
-            return ControllerInterface.TryParseChangeValue(actionElement, ControlObjects, out returnResult);
+            return ControlInterface.TryParseChangeValue(actionElement, ControlObjects, out returnResult);
         }
 
         /// <inheritdoc/>
@@ -403,18 +408,18 @@ namespace SpaceCG.Generic
             }
             catch (Exception ex)
             {
-                Logger.Warn($"XML 格式数据 {xmlMessage} 解析错误：{ex}");
+                Logger.Error($"XML 格式数据 {xmlMessage} 解析错误：{ex}");
                 return false;
             }
 
             if (actionElement.Name?.LocalName != "Action")
             {
-                Logger.Warn($"XML 格式数据 {xmlMessage} 错误，节点名称应为 Action");
+                Logger.Error($"XML 格式数据 {xmlMessage} 错误，节点名称应为 Action");
                 return false;
             }
             if(String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value))
             {
-                Logger.Warn($"XML 格式数据 {xmlMessage} 错误，节点属性 Target 不能为空");
+                Logger.Error($"XML 格式数据 {xmlMessage} 错误，节点属性 Target 不能为空");
                 return false;
             }
 
@@ -428,7 +433,7 @@ namespace SpaceCG.Generic
             }
             else
             {
-                Logger.Warn($"XML 格式数数据错误 {actionElement} 不支持的格式");
+                Logger.Error($"XML 格式数数据错误 {actionElement} 不支持的格式");
             }
 
             return false;
@@ -450,7 +455,7 @@ namespace SpaceCG.Generic
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Method")?.Value))
             {
-                Logger.Warn($"XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Method 不能为空");
+                Logger.Error($"XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Method 不能为空");
                 return false;
             }
 
@@ -461,7 +466,7 @@ namespace SpaceCG.Generic
 
                 if (!accessObjects.TryGetValue(objectName, out Object targetObject))
                 {
-                    Logger.Warn($"未找到目标实例对象 {objectName} ");
+                    Logger.Error($"未找到目标实例对象 {objectName} ");
                     return false;
                 }
 
@@ -474,8 +479,8 @@ namespace SpaceCG.Generic
             }
             catch (Exception ex)
             {
-                Logger.Warn($"执行 XML 数据指令错误：{actionElement}");
-                Logger.Error(ex);
+                Logger.Error($"执行 XML 数据指令错误：{actionElement}");
+                Logger.Error(ex.ToString());
             }
 
             return false;
@@ -497,7 +502,7 @@ namespace SpaceCG.Generic
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Property")?.Value))
             {
-                Logger.Warn($"XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Property 不能为空");
+                Logger.Error($"XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Property 不能为空");
                 return false;
             }
 
@@ -506,7 +511,7 @@ namespace SpaceCG.Generic
 
             if (!accessObjects.TryGetValue(objectName, out Object targetObject))
             {
-                Logger.Warn($"未找到目标实例对象 {objectName} ");
+                Logger.Error($"未找到目标实例对象 {objectName} ");
                 return false;
             }
 
@@ -525,8 +530,8 @@ namespace SpaceCG.Generic
             {
                 changeResult = false;
 
-                Logger.Warn($"执行 XML 数据指令错误：{actionElement}");
-                Logger.Error(ex);
+                Logger.Error($"执行 XML 数据指令错误：{actionElement}");
+                Logger.Error(ex.ToString());
             }
 
             return changeResult;

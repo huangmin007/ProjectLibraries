@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Xml.Linq;
-using SpaceCG.Extensions;
 using Modbus.Device;
+using SpaceCG.Generic;
 
-namespace SpaceCG.Module.Modbus
+namespace SpaceCG.Extensions.Modbus
 {
 
     /// <summary>
@@ -15,7 +15,7 @@ namespace SpaceCG.Module.Modbus
     /// </summary>
     public partial class ModbusTransportDevice : IDisposable
     {
-        protected static readonly log4net.ILog Log = log4net.LogManager.GetLogger(nameof(ModbusTransportDevice));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusTransportDevice));
 
         /// <summary>
         /// 传输对象名称
@@ -80,12 +80,12 @@ namespace SpaceCG.Module.Modbus
 
             if (ModbusDevices.ContainsKey(device.Address))
             {
-                Log.Warn($"传输总线 ({Name})，已经存在相同的 IO 设备地址 0x{device.Address:X2}");
+                Logger.Warn($"传输总线 ({Name})，已经存在相同的 IO 设备地址 0x{device.Address:X2}");
                 return false;
             }
 
             bool result = ModbusDevices.TryAdd(device.Address, device);
-            Log.Info($"传输总线 ({Name})，添加 IO 设备 0x{device.Address:X2} 状态 {result}");
+            Logger.Info($"传输总线 ({Name})，添加 IO 设备 0x{device.Address:X2} 状态 {result}");
 
             if(result && Master != null)
             {
@@ -107,17 +107,17 @@ namespace SpaceCG.Module.Modbus
             {
                 if (ModbusDevices.TryRemove(slaveAddress, out ModbusIODevice device))
                 {
-                    Log.Info($"传输总线 ({Name}) 成功移除 IO 设备 0x{slaveAddress:X2}");
+                    Logger.Info($"传输总线 ({Name}) 成功移除 IO 设备 0x{slaveAddress:X2}");
                 }
                 else
                 {
-                    Log.Warn($"传输总线 ({Name}) 移除 IO 设备 0x{slaveAddress:X2} 失败");
+                    Logger.Warn($"传输总线 ({Name}) 移除 IO 设备 0x{slaveAddress:X2} 失败");
                     return false;
                 }
             }
             else
             {
-                Log.Warn($"传输总线 {Name} 不存在 IO 设备 0x{slaveAddress:X2}");
+                Logger.Warn($"传输总线 {Name} 不存在 IO 设备 0x{slaveAddress:X2}");
             }
 
             return true;
@@ -173,7 +173,7 @@ namespace SpaceCG.Module.Modbus
             var sc_result = EventTimer.Change(100, 5);
             //var tp_result = ThreadPool.QueueUserWorkItem(new WaitCallback(SyncModbusDevicesStatus), this);
             var tp_result = ThreadPool.QueueUserWorkItem(o => SyncModbusDevicesStatus(CancelToken.Token));
-            Log.Info($"传输总线 ({this}) 同步数据线程入池状态： {tp_result}, 事件线程状态：{sc_result}");
+            Logger.Info($"传输总线 ({this}) 同步数据线程入池状态： {tp_result}, 事件线程状态：{sc_result}");
 
         }
 
@@ -195,7 +195,7 @@ namespace SpaceCG.Module.Modbus
             }
 
             Thread.Sleep(32);
-            Log.Info($"传输总线 ({this}) 停止同步传输");
+            Logger.Info($"传输总线 ({this}) 停止同步传输");
         }
 
         /// <summary>
@@ -226,7 +226,7 @@ namespace SpaceCG.Module.Modbus
             {
                 if (token.IsCancellationRequested)
                 {
-                    Log.Info($"Cancellation Requested ... {Thread.CurrentThread.ManagedThreadId}");
+                    Logger.Info($"Cancellation Requested ... {Thread.CurrentThread.ManagedThreadId}");
                     return;
                 }
 
@@ -261,7 +261,7 @@ namespace SpaceCG.Module.Modbus
                 String.IsNullOrWhiteSpace(element.Attribute("Name").Value) ||
                 String.IsNullOrWhiteSpace(element.Attribute("Parameters")?.Value))
             {
-                Log.Warn($"({nameof(ModbusTransportDevice)}) 配置格式存在错误, {element}");
+                Logger.Warn($"({nameof(ModbusTransportDevice)}) 配置格式存在错误, {element}");
                 return false;
             }
 
@@ -275,7 +275,7 @@ namespace SpaceCG.Module.Modbus
             }
             else
             {
-                Log.Warn($"({nameof(ModbusTransportDevice)}) 配置格式存在错误, {element} 节点属性 Parameters 值错误");
+                Logger.Warn($"({nameof(ModbusTransportDevice)}) 配置格式存在错误, {element} 节点属性 Parameters 值错误");
                 return false;
             }
 
@@ -294,7 +294,7 @@ namespace SpaceCG.Module.Modbus
             {
                 if(!(ModbusIODevice.TryParse(deviceElement, out ModbusIODevice device) && transport.AddIODevice(device)))
                 {
-                    Log.Warn($"{transport} 解析/添加 IO 设备失败");
+                    Logger.Warn($"{transport} 解析/添加 IO 设备失败");
                 }
             }
 

@@ -1,11 +1,9 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
+using SpaceCG.Generic;
 
 namespace SpaceCG.Net
 {
@@ -14,7 +12,8 @@ namespace SpaceCG.Net
     /// </summary>
     public class AsyncUdpServer : IAsyncServer
     {
-        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(AsyncUdpServer));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(AsyncUdpServer));
+        
 
         /// <inheritdoc/>
         public int ClientCount => _Clients != null ? _Clients.Count : 0;
@@ -140,7 +139,7 @@ namespace SpaceCG.Net
                     _Clients.Remove(remote);
                     ClientDisconnected?.Invoke(this, new AsyncEventArgs(remote));
                 }
-                Logger.Warn(ex);
+                Logger.Error(ex.ToString());
                 ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
             }
             finally
@@ -160,7 +159,7 @@ namespace SpaceCG.Net
             }
             catch (Exception ex)
             {
-                Logger.Warn($"数据报异步发送到目标 {remote} 异常：{ex}");
+                Logger.Error($"数据报异步发送到目标 {remote} 异常：{ex}");
                 ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
                 return false;
             }
@@ -176,7 +175,7 @@ namespace SpaceCG.Net
             }
             catch (Exception ex)
             {
-                Logger.Warn($"数据报异步发送到目标 {ipAddress}:{port} 异常：{ex}");
+                Logger.Error($"数据报异步发送到目标 {ipAddress}:{port} 异常：{ex}");
                 ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
                 return false;
             }

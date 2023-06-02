@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Xml.Linq;
-using SpaceCG.Extensions;
 using Modbus.Device;
+using SpaceCG.Generic;
 
-namespace SpaceCG.Module.Modbus
+namespace SpaceCG.Extensions.Modbus
 {
     /// <summary>
     /// 寄存器类型
@@ -46,7 +46,7 @@ namespace SpaceCG.Module.Modbus
     /// </summary>
     public class Register
     {
-        private static readonly log4net.ILog Log = log4net.LogManager.GetLogger(nameof(Register));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(Register));
 
         private string _name;
         private byte _count = 1;
@@ -176,7 +176,7 @@ namespace SpaceCG.Module.Modbus
             if (element == null) return false;
             if (element.Name != nameof(Register) || !element.HasAttributes)
             {
-                Log.Warn($"({nameof(Register)}) 配置格式存在错误, {element}");
+                Logger.Warn($"({nameof(Register)}) 配置格式存在错误, {element}");
                 return false;
             }
 
@@ -188,7 +188,7 @@ namespace SpaceCG.Module.Modbus
             }
             else
             {
-                Log.Warn($"({nameof(Register)}) 配置格式存在错误, {element} 节点属性 Address, Type 值错误");
+                Logger.Warn($"({nameof(Register)}) 配置格式存在错误, {element} 节点属性 Address, Type 值错误");
                 return false;
             }
 
@@ -208,12 +208,12 @@ namespace SpaceCG.Module.Modbus
     /// </summary>
     public class ModbusIODevice:IDisposable
     {
-        private static readonly log4net.ILog Log = log4net.LogManager.GetLogger(nameof(ModbusIODevice));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusIODevice));
 
         /// <summary>
         /// 读取线圈状态的代理函数
         /// <para>(byte slaveAddress, ushort startAddress, ushort numberOfPoints)</para>
-        /// </summary>
+        /// </summary> 
         internal Func<byte, ushort, ushort, bool[]> ReadCoilsStatus;
         /// <summary>
         /// 读取保持寄存器的代理函数
@@ -649,7 +649,7 @@ namespace SpaceCG.Module.Modbus
             SyncOutputRegisters();
             InitializeIORegisters();
 
-            Log.Info($"{this} Initialize Device.");
+            Logger.Info($"{this} Initialize Device.");
         }
 
         /// <summary>
@@ -670,8 +670,8 @@ namespace SpaceCG.Module.Modbus
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"{this}");
-                    Log.Error(ex);
+                    Logger.Error($"{this}");
+                    Logger.Error(ex);
                     Thread.Sleep(300);
                 }
             }
@@ -687,8 +687,8 @@ namespace SpaceCG.Module.Modbus
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"{this}");
-                    Log.Error(ex);
+                    Logger.Error($"{this}");
+                    Logger.Error(ex);
                     Thread.Sleep(300);
                 }
             }
@@ -712,8 +712,8 @@ namespace SpaceCG.Module.Modbus
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"{this}");
-                    Log.Error(ex);
+                    Logger.Error($"{this}");
+                    Logger.Error(ex);
                     Thread.Sleep(300);
                 }
             }
@@ -729,8 +729,8 @@ namespace SpaceCG.Module.Modbus
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"{this}");
-                    Log.Error(ex);
+                    Logger.Error($"{this}");
+                    Logger.Error(ex);
                     Thread.Sleep(300);
                 }
             }
@@ -896,12 +896,12 @@ namespace SpaceCG.Module.Modbus
             if (element == null) return false;
             if (element.Name != "Device" || String.IsNullOrWhiteSpace(element.Attribute("Address").Value))
             {
-                Log.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element}");
+                Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element}");
                 return false;
             }
             if (!StringExtensions.TryParse<byte>(element.Attribute("Address").Value, out byte address))
             {
-                Log.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element} 节点属性 Address 值错误");
+                Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element} 节点属性 Address 值错误");
                 return false;
             }
 
@@ -930,14 +930,14 @@ namespace SpaceCG.Module.Modbus
                 }
                 else
                 {
-                    Log.Warn($"解析寄存器错误, {element} 节点属性 {attributes[i]} 值格式错误");
+                    Logger.Warn($"解析寄存器错误, {element} 节点属性 {attributes[i]} 值格式错误");
                     continue;
                 }
 
                 for (ushort j = 0; j < count; j++, startAddress++)
                 {
                     if (!device.AddRegister(startAddress, (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true)))
-                        Log.Warn($"{device} 添加寄存器失败, {element} 节点属性 {attributes[i]} 值格式错误");
+                        Logger.Warn($"{device} 添加寄存器失败, {element} 节点属性 {attributes[i]} 值格式错误");
                 }
             }
 
@@ -948,7 +948,7 @@ namespace SpaceCG.Module.Modbus
             foreach(var regElement in regElements)
             {
                 if (!(Register.TryParse(regElement, out Register register) && device.AddRegister(register)))
-                    Log.Warn($"{device} 解析/添加寄存器失败");
+                    Logger.Warn($"{device} 解析/添加寄存器失败");
             }
 
             return true;

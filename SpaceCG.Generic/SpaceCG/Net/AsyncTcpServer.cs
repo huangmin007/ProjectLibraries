@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using SpaceCG.Generic;
 
 namespace SpaceCG.Net
 {
@@ -12,7 +13,7 @@ namespace SpaceCG.Net
     /// </summary>
     public class AsyncTcpServer : IAsyncServer
     {
-        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(AsyncTcpServer));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(AsyncTcpServer));
 
         /// <inheritdoc/>
         public int ClientCount => _Clients != null ? _Clients.Count : 0;
@@ -153,7 +154,7 @@ namespace SpaceCG.Net
 
             if (_Clients.TryAdd(endPoint, tcpClient) && _Buffers.TryAdd(endPoint, new byte[Math.Max(Math.Min(tcpClient.ReceiveBufferSize, 8192), 2048)]))
             {
-                if (Logger.IsDebugEnabled) Logger.Debug($"客户端 {endPoint} 连接成功");
+                Logger.Info($"客户端 {endPoint} 连接成功");
 
                 tcpClient.NoDelay = true;
                 ClientConnected?.Invoke(this, new AsyncEventArgs(endPoint));
@@ -165,7 +166,7 @@ namespace SpaceCG.Net
                 _Clients.TryRemove(endPoint, out TcpClient client);
 
                 tcpClient?.Dispose();
-                Logger.Error($"客户端 {endPoint} 连接失败, 已移除");
+                Logger.Info($"客户端 {endPoint} 连接失败, 已移除");
             }
 
             _Listener.BeginAcceptTcpClient(AcceptCallback, _Listener);
@@ -187,19 +188,19 @@ namespace SpaceCG.Net
             try
             {
                 count = tcpClient.GetStream().EndRead(ar);
-                if (Logger.IsDebugEnabled && count > 0) Logger.Debug($"接收客户端 {endPoint} 数据 {count} Bytes");
+                if (count > 0) Logger.Info($"接收客户端 {endPoint} 数据 {count} Bytes");
             }
             catch (Exception ex)
             {
                 count = 0;
-                if (Logger.IsDebugEnabled) Logger.Debug($"客户端 {endPoint} 处理异步读取异常：{ex}");
+                Logger.Error($"客户端 {endPoint} 处理异步读取异常：{ex}");
                 ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(endPoint, ex));
             }
 
             if (count == 0)
             {
                 tcpClient?.Close();
-                if (Logger.IsDebugEnabled) Logger.Debug($"客户端 {endPoint} 断开连接");
+                Logger.Info($"客户端 {endPoint} 断开连接");
 
                 _Buffers.TryRemove(endPoint, out byte[] buffer);
                 _Clients.TryRemove(endPoint, out TcpClient client);
@@ -238,7 +239,7 @@ namespace SpaceCG.Net
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"客户端 {remote} 发送数据异常：{ex}");
+                    Logger.Warn($"客户端 {remote} 发送数据异常：{ex}");
                     ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
                     return false;
                 }
@@ -266,7 +267,7 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Logger.Error($"客户端 {endPoint} 发送数据异常：{ex}");
+                Logger.Warn($"客户端 {endPoint} 发送数据异常：{ex}");
                 ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(endPoint, ex));
             }
         }
@@ -293,7 +294,7 @@ namespace SpaceCG.Net
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"客户端 {remote} 发送数据异常：{ex}");
+                    Logger.Warn($"客户端 {remote} 发送数据异常：{ex}");
                     ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
                 }
             }

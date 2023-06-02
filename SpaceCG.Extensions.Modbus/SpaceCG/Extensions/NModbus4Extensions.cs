@@ -1,32 +1,30 @@
-﻿//#define NModbus
-//#define NModbus_Serial
+﻿#define NModbus4
 
 using System;
-using System.Configuration;
 using System.IO.Ports;
 using System.Net.Sockets;
+using SpaceCG.Generic;
+using Modbus.Device;
 
 namespace SpaceCG.Extensions
 {
-    public static partial class NModbusExtensions
+    public static partial class NModbus4Extensions
     {
-        /// <summary>
-        /// log4net.Logger 对象
-        /// </summary>
-        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(NModbusExtensions));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(NModbus4Extensions));
 
-#if NModbus
-        public static void Sleep(this NModbus.IModbusMaster master, int millisecondsTimeout)
+#if NModbus4
+        public static void Sleep(this IModbusMaster master, int millisecondsTimeout)
         {
             if (millisecondsTimeout > 0) System.Threading.Thread.Sleep(millisecondsTimeout);
         }
+
         /// <summary>
         /// 翻转单线圈
         /// </summary>
         /// <param name="master"></param>
         /// <param name="slaveAddress"></param>
         /// <param name="startAddress"></param>
-        public static async void TurnSingleCoilAsync(this NModbus.IModbusMaster master, byte slaveAddress, ushort startAddress)
+        public static async void TurnSingleCoilAsync(this IModbusMaster master, byte slaveAddress, ushort startAddress)
         {
             if (master?.Transport == null) return;
 
@@ -42,7 +40,7 @@ namespace SpaceCG.Extensions
         /// <param name="slaveAddress"></param>
         /// <param name="startAddress"></param>
         /// <param name="numberOfPoints"></param>
-        public static async void TurnMultipleCoilisAsync(this NModbus.IModbusMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints)
+        public static async void TurnMultipleCoilisAsync(this IModbusMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints)
         {
             if (master?.Transport == null) return;
 
@@ -60,7 +58,7 @@ namespace SpaceCG.Extensions
         /// <param name="master"></param>
         /// <param name="slaveAddress"></param>
         /// <param name="startAddress"></param>
-        public static void TurnSingleCoil(this NModbus.IModbusMaster master, byte slaveAddress, ushort startAddress)
+        public static void TurnSingleCoil(this IModbusMaster master, byte slaveAddress, ushort startAddress)
         {
             if (master?.Transport == null) return;
 
@@ -76,7 +74,7 @@ namespace SpaceCG.Extensions
         /// <param name="slaveAddress"></param>
         /// <param name="startAddress"></param>
         /// <param name="numberOfPoints"></param>
-        public static void TurnMultipleCoilis(this NModbus.IModbusMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints)
+        public static void TurnMultipleCoilis(this IModbusMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints)
         {
             if (master?.Transport == null) return;
 
@@ -89,14 +87,24 @@ namespace SpaceCG.Extensions
             master.WriteMultipleCoils(slaveAddress, startAddress, value);
         }
 
+        public static void TurnSingleCoilAsync(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoilAsync((IModbusMaster)master, slaveAddress, startAddress);
+        public static void TurnMultipleCoilisAsync(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilisAsync((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        public static void TurnSingleCoilAsync(this ModbusIpMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoilAsync((IModbusMaster)master, slaveAddress, startAddress);
+        public static void TurnMultipleCoilisAsync(this ModbusIpMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilisAsync((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        
+        public static void TurnSingleCoil(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoil((IModbusMaster)master, slaveAddress, startAddress);
+        public static void TurnMultipleCoilis(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilis((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        public static void TurnSingleCoil(this ModbusIpMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoil((IModbusMaster)master, slaveAddress, startAddress);
+        public static void TurnMultipleCoilis(this ModbusIpMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilis((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+#if false
         /// <summary>
-        /// 创建 NModbus 主机对象
+        /// 创建 NModbus4 主机对象
         /// <para>配置的键值格式：Type,RemoteHostORcomm,RemotePortORbaudRate</para>
         /// <para>Type支持：TCP/TCP-RTU/UDP/UDP-RTU/SERIAL </para>
         /// </summary>
         /// <param name="cfgKey">Config Key Format:(type,hostORcom,portORbaudRate)</param>
         /// <returns></returns>
-        public static NModbus.IModbusMaster CreateNModbusMaster(string cfgKey)
+        public static IModbusMaster CreateNModbus4Master(string cfgKey)
         {
             if (String.IsNullOrWhiteSpace(ConfigurationManager.AppSettings[cfgKey])) return null;
 
@@ -105,24 +113,24 @@ namespace SpaceCG.Extensions
 
             if (!int.TryParse(args[2], out int portOrbaudRate)) return null;
 
-            return CreateNModbusMaster(args[0], args[1], portOrbaudRate);
+            return CreateNModbus4Master(args[0], args[1], portOrbaudRate);
         }
+#endif
         /// <summary>
-        /// 创建 NModbus 主机对象
+        /// 创建 NModbus4 主机对象
         /// </summary>
         /// <param name="type"></param>
         /// <param name="hostORcom"></param>
         /// <param name="portORbaudRate"></param>
         /// <returns></returns>
-        public static NModbus.IModbusMaster CreateNModbusMaster(string type, string hostORcom, int portORbaudRate)
+        public static IModbusMaster CreateNModbus4Master(string type, string hostORcom, int portORbaudRate)
         {
             if (portORbaudRate <= 0) return null;
             if (String.IsNullOrWhiteSpace(type) || String.IsNullOrWhiteSpace(hostORcom))
                 throw new ArgumentNullException("参数不能为空");
 
+            IModbusMaster master;
             type = type.ToUpper().Trim();
-            NModbus.IModbusMaster master = null;
-            NModbus.IModbusFactory factory = new NModbus.ModbusFactory();
 
             try
             {
@@ -132,9 +140,9 @@ namespace SpaceCG.Extensions
                     tcpClient.Connect(hostORcom, portORbaudRate);
 
                     if (type.IndexOf("RTU") == -1)
-                        master = factory.CreateMaster(tcpClient);
+                        master = ModbusIpMaster.CreateIp(tcpClient);
                     else
-                        master = factory.CreateMaster(factory.CreateRtuTransport(new NModbus.IO.TcpClientAdapter(tcpClient)));
+                        master = ModbusSerialMaster.CreateRtu(tcpClient);
                 }
                 else if (type.IndexOf("UDP") >= 0)
                 {
@@ -142,17 +150,16 @@ namespace SpaceCG.Extensions
                     udpClient.Connect(hostORcom, portORbaudRate);
 
                     if (type.IndexOf("RTU") == -1)
-                        master = factory.CreateMaster(udpClient);
+                        master = ModbusIpMaster.CreateIp(udpClient);
                     else
-                        master = factory.CreateMaster(factory.CreateRtuTransport(new NModbus.IO.UdpClientAdapter(udpClient)));
+                        master = ModbusSerialMaster.CreateRtu(udpClient);
                 }
                 else if (type.IndexOf("SERIAL") >= 0)
                 {
-#if NModbus_Serial
                     SerialPort serialPort = new SerialPort(hostORcom, portORbaudRate);
                     serialPort.Open();
-                    master = NModbus.Serial.ModbusFactoryExtensions.CreateRtuMaster(factory, serialPort);
-#endif
+
+                    master = ModbusSerialMaster.CreateRtu(serialPort);
                 }
                 else
                 {
@@ -171,22 +178,22 @@ namespace SpaceCG.Extensions
             AppDomain.CurrentDomain.ProcessExit += (s, e) =>
             {
                 Logger.Info($"exit modbus ...");
-                DisposeNModbusMaster(ref master);
+                DisposeNModbus4Master(ref master);
             };
 
             return master;
         }
         /// <summary>
-        /// 关闭并清理 NModbusMaster 对象
+        /// 关闭并清理 NModbus4Master 对象
         /// </summary>
         /// <param name="master"></param>
-        public static void DisposeNModbusMaster(ref NModbus.IModbusMaster master)
+        public static void DisposeNModbus4Master(ref IModbusMaster master)
         {
             if (master == null) return;
 
             try
             {
-                Logger.DebugFormat("Dispose ModbusMaster: {0} {1}", master.Transport != null ? master.Transport.ToString() : "", master.ToString());
+                Logger.Debug($"Dispose ModbusMaster: {master.Transport?.ToString()} {master.ToString()}");
                 master.Transport?.Dispose();
                 master.Dispose();
             }
@@ -200,5 +207,5 @@ namespace SpaceCG.Extensions
             }
         }
 #endif
-                }
+    }
 }

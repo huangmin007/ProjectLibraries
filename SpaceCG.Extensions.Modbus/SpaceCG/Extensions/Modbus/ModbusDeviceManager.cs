@@ -5,11 +5,10 @@ using System.IO.Ports;
 using System.Linq;
 using System.Threading;
 using System.Xml.Linq;
-using SpaceCG.Extensions;
 using SpaceCG.Generic;
 using SpaceCG.Net;
 
-namespace SpaceCG.Module.Modbus
+namespace SpaceCG.Extensions.Modbus
 {
     /// <summary>
     /// Modbus Device Manager 
@@ -17,7 +16,7 @@ namespace SpaceCG.Module.Modbus
     /// </summary>
     public class ModbusDeviceManager : IDisposable
     {
-        protected static readonly log4net.ILog Log = log4net.LogManager.GetLogger(nameof(ModbusDeviceManager));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusDeviceManager));
 
         /// <summary>
         /// Name
@@ -33,7 +32,7 @@ namespace SpaceCG.Module.Modbus
         /// <summary>
         /// 控制接口对象
         /// </summary>
-        public ControllerInterface ControlInterface { get; private set; } = new ControllerInterface(0);
+        public ControlInterface ControlInterface { get; private set; } = new ControlInterface(0);
 
         /// <summary>
         /// Transport Devices 列表
@@ -81,7 +80,7 @@ namespace SpaceCG.Module.Modbus
         {
             if (!File.Exists(configFile))
             {
-                Log.Error($"指定的配置文件不存在 {configFile}, 禁用 Modbus Device Manager 模块.");
+                Logger.Error($"指定的配置文件不存在 {configFile}, 禁用 Modbus Device Manager 模块.");
                 return;
             }
 
@@ -157,14 +156,14 @@ namespace SpaceCG.Module.Modbus
                             else if (args[0].ToUpper() == "UDP")
                                 Server = new AsyncUdpServer((ushort)port);
                             else
-                                Log.Warn($"连接参数错误：{name},{type},{parameters}");
+                                Logger.Warn($"连接参数错误：{name},{type},{parameters}");
 
                             if (Server != null && Server.Start())
                                 ControlInterface.AddControlObject(name, Server);
                         }
                         catch(Exception ex)
                         {
-                            Log.Error($"创建服务端 {args} 错误：{ex}");
+                            Logger.Error($"创建服务端 {args} 错误：{ex}");
                         }
                         break;
 
@@ -177,14 +176,14 @@ namespace SpaceCG.Module.Modbus
                             else if (args[0].ToUpper() == "UDP")
                                 Client = new AsyncUdpClient();
                             else
-                                Log.Warn($"连接参数错误：{name},{type},{parameters}");
+                                Logger.Warn($"连接参数错误：{name},{type},{parameters}");
 
                             if (Client != null && Client.Connect(args[1], (ushort)port))
                                 ControlInterface.AddControlObject(name, Client);
                         }
                         catch(Exception ex)
                         {
-                            Log.Error($"创建客户端 {args} 错误：{ex}");
+                            Logger.Error($"创建客户端 {args} 错误：{ex}");
                         }
                         break;
                 }
@@ -210,7 +209,7 @@ namespace SpaceCG.Module.Modbus
                 }
                 else
                 {
-                    Log.Warn($"解析/添加 传输总线 设备失败");
+                    Logger.Warn($"解析/添加 传输总线 设备失败");
                 }
             }
         }
@@ -247,8 +246,8 @@ namespace SpaceCG.Module.Modbus
         {
             if (ModbusElements?.Count() <= 0) return;
 
-            if(Log.IsDebugEnabled)
-                Log.Debug($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+            if(Logger.IsDebugEnabled)
+                Logger.Debug($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
             foreach (XElement modbus in ModbusElements)
             {
@@ -267,8 +266,8 @@ namespace SpaceCG.Module.Modbus
 
                     if (StringExtensions.TryParse(evt.Attribute("Value")?.Value, out ulong regValue) && regValue == register.Value)
                     {
-                        if (Log.IsInfoEnabled)
-                            Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+                        if (Logger.IsInfoEnabled)
+                            Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
                         IEnumerable<XElement> actions = evt.Elements("Action");
                         foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
@@ -278,8 +277,8 @@ namespace SpaceCG.Module.Modbus
                     {
                         if (maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && (register.LastValue < minValue || register.LastValue > maxValue))
                         {
-                            if (Log.IsInfoEnabled)
-                                Log.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+                            if (Logger.IsInfoEnabled)
+                                Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
                             IEnumerable<XElement> actions = evt.Elements("Action");
                             foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
@@ -339,7 +338,7 @@ namespace SpaceCG.Module.Modbus
                 }
                 catch (Exception ex)
                 {
-                    Log.Warn(ex);
+                    Logger.Warn(ex);
                     continue;
                 }
             }

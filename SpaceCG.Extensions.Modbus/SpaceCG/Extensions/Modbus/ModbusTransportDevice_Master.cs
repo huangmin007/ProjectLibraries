@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Modbus.Device;
 
-namespace SpaceCG.Module.Modbus
+namespace SpaceCG.Extensions.Modbus
 {
     /// <summary>
     /// Modbus Write Function Info
@@ -334,8 +334,8 @@ namespace SpaceCG.Module.Modbus
             }
             catch(Exception ex)
             {
-                Log.Error(this);
-                Log.Error(ex);
+                Logger.Error(this);
+                Logger.Error(ex);
                 Thread.Sleep(300);
             }
 
@@ -345,12 +345,12 @@ namespace SpaceCG.Module.Modbus
         {
             if (String.IsNullOrWhiteSpace(message))
             {
-                Log.Info("Test...Echo....");
+                Logger.Info("Test...Echo....");
                 return false;
             }
             else
             {
-                Log.Info($"Test...Echo...{message}");
+                Logger.Info($"Test...Echo...{message}");
                 return true;
             }
         }

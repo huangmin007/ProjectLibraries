@@ -2,15 +2,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Configuration;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Linq;
+using SpaceCG.Generic;
 
 namespace SpaceCG.Extensions
 {
@@ -19,14 +15,11 @@ namespace SpaceCG.Extensions
     /// </summary>
     public static partial class InstanceExtensions
     {
-        /// <summary>
-        /// log4net.Logger 对象
-        /// </summary>
-        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(InstanceExtensions));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(InstanceExtensions));
 
         static InstanceExtensions()
         {
-            //嵌入 log4net.dll
+            //嵌入 dll
         }
 
         /// <summary>
@@ -60,7 +53,7 @@ namespace SpaceCG.Extensions
             }
             catch (Exception ex)
             {
-                Logger.Error(ex);
+                Logger.Error(ex.ToString());
             }
             return null;
         }
@@ -146,38 +139,7 @@ namespace SpaceCG.Extensions
                 SetInstancePropertyValue(instanceObj, attribute.Name.LocalName, attribute.Value);
             }
         }
-        /// <summary>
-        /// 动态的设置实例对象的多个属性值，跟据 配置文件 中读取对应实例的 key 属性值
-        /// <para>nameSpace 格式指：[Object.]Property , Object 可为空</para>
-        /// </summary>
-        /// <param name="instanceObj"></param>
-        /// <param name="nameSpace"></param>
-        public static void SetInstancePropertyValues(Object instanceObj, String nameSpace)
-        {
-            if (instanceObj == null)
-            {
-#if RETURN
-                return;
-#else
-                throw new ArgumentNullException(nameof(instanceObj), "参数不能为空");
-#endif
-            }
-
-            if (String.IsNullOrWhiteSpace(nameSpace)) nameSpace = "";
-            PropertyInfo[] properties = instanceObj.GetType().GetProperties();
-
-            foreach (PropertyInfo property in properties)
-            {
-                if (!property.CanWrite || !property.CanRead) continue;
-
-                String value = ConfigurationManager.AppSettings[$"{nameSpace}{property.Name}"];
-                if (String.IsNullOrWhiteSpace(value)) continue;
-
-                SetInstancePropertyValue(instanceObj, property.Name, value);
-            }
-        }
-
-
+        
         /// <summary>
         /// 动态的设置实例对象的属性值, Only Support ValueType And ArrayType
         /// <para>属性是指实现了 get,set 方法的对象</para>
@@ -291,13 +253,12 @@ namespace SpaceCG.Extensions
                     if (instanceObj.GetType().GetEvent(eventName) == null) continue;
 
                     instanceObj.GetType().GetEvent(eventName).RemoveEventHandler(instanceObj, handler);
-                    if (Logger.IsDebugEnabled)
-                        Logger.Debug($"Object({instanceObj.GetType()}) Remove Event: {eventName}({handler.Method.Name})");
+                    Logger.Debug($"Object({instanceObj.GetType()}) Remove Event: {eventName}({handler.Method.Name})");
                 }
             }
             catch (Exception ex)
             {
-                Logger.ErrorFormat("Remove Anonymous Events Error:{0}", ex);
+                Logger.Error($"Remove Anonymous Events Error:{ex}");
             }
         }
         /// <summary>
@@ -394,8 +355,7 @@ namespace SpaceCG.Extensions
                 if (!methodInfo.IsStatic)
                 {
                     _parameters = parameters;
-                    if(Logger.IsDebugEnabled)
-                        Logger.Debug($"实例对象 {instanceObj}, 准备执行匹配的函数(实例函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{paramsLength} 个");
+                    Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的函数(实例函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{paramsLength} 个");
                 }
                 //扩展方法
                 else
@@ -403,9 +363,7 @@ namespace SpaceCG.Extensions
                     _parameters = new object[paramsLength + 1];
                     _parameters[0] = instanceObj;
                     for (int i = 0; i < paramsLength; i++) _parameters[i + 1] = parameters[i];
-
-                    if (Logger.IsDebugEnabled)
-                        Logger.Debug($"实例对象 {instanceObj}, 准备执行匹配的函数(扩展函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
+                    Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的函数(扩展函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
                 }
             }
             //静态方法
@@ -414,8 +372,7 @@ namespace SpaceCG.Extensions
                 if (methodInfo.IsStatic)
                 {
                     _parameters = parameters;
-                    if (Logger.IsDebugEnabled)
-                        Logger.Debug($"准备执行匹配的函数(静态函数) {methodInfo.Name}({paramDebugInfo}) 参数 {parameterInfos.Length}/{paramsLength} 个");
+                    Logger.Info($"准备执行匹配的函数(静态函数) {methodInfo.Name}({paramDebugInfo}) 参数 {parameterInfos.Length}/{paramsLength} 个");
                 }
                 else
                 {
@@ -458,14 +415,14 @@ namespace SpaceCG.Extensions
                 if (Logger.IsDebugEnabled)
                 {
                     foreach (object arg in arguments)
-                        Logger.Debug($"{arg.GetType()} : {arg}");
+                        Console.WriteLine($"{arg.GetType()} : {arg}");
                 }
 #endif
                 return methodInfo.Invoke(instanceObj, arguments);
             }
             catch (Exception ex)
             {
-                Logger.Warn($"函数 {methodInfo.Name} 执行失败: {ex}");
+                Logger.Error($"函数 {methodInfo.Name} 执行失败: {ex}");
             }
 
             return null;
@@ -501,7 +458,7 @@ namespace SpaceCG.Extensions
 
             if (methodCount != 1)
             {
-                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName}/{paramLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
+                Logger.Info($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName}/{paramLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
                 return CallInstanceExtensionMethod(instanceObj, methodName, parameters);
             }
             

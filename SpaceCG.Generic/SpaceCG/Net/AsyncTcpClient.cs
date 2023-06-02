@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
+using SpaceCG.Generic;
 
 namespace SpaceCG.Net
 {
@@ -13,7 +11,7 @@ namespace SpaceCG.Net
     /// </summary>
     public class AsyncTcpClient : IAsyncClient
     {
-        private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(AsyncTcpClient));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(AsyncTcpClient));
 
         /// <inheritdoc/>
         public bool IsConnected => _TcpClient != null && _TcpClient.Connected;
@@ -91,7 +89,7 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                if (Logger.IsDebugEnabled) Logger.Debug(ex);
+                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return false;
             }
@@ -125,7 +123,7 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 _ConnectStatus = "ConnectException";
-                if (Logger.IsDebugEnabled) Logger.Debug(ex);
+                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return false;
             }
@@ -139,7 +137,7 @@ namespace SpaceCG.Net
             catch(Exception ex)
             {
                 _ConnectStatus = "ConnectException";
-                if (Logger.IsDebugEnabled) Logger.Debug(ex);
+                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return;
             }
@@ -184,7 +182,7 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 count = 0;
-                Logger.Warn(ex);
+                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
             }
 
@@ -216,7 +214,7 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Logger.Warn(ex);
+                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return false;
             }
@@ -229,7 +227,7 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Logger.Warn(ex);
+                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return;
             }

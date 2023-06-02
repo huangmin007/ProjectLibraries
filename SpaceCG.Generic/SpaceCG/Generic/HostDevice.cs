@@ -12,7 +12,7 @@ namespace SpaceCG.Generic
 {
     public class HostDevice
     {
-        public static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(HostDevice));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(HostDevice));
 
         /// <summary>
         /// 关机或重启主机函数
@@ -33,7 +33,7 @@ namespace SpaceCG.Generic
             }
             catch(Exception ex)
             {
-                Logger.Error(ex);
+                Logger.Error(ex.ToString());
             }
         }
 
@@ -80,7 +80,7 @@ namespace SpaceCG.Generic
             }
             catch(Exception ex)
             {
-                Logger.Error(ex);
+                Logger.Error(ex.ToString());
                 return false;
             }
 
