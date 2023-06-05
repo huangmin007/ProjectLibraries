@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO.Ports;
 using System.Threading;
 using SpaceCG.Extensions.Modbus;
 using SpaceCG.Generic;
@@ -16,7 +17,16 @@ namespace ModbusDevicesManagerServices
 
         static void Main(string[] args)
         {
+            string title = "Modbus Device Manager Server v2.1.230602";
             Console.Title = "Modbus Device Manager Server v2.1.230602";
+            Console.WriteLine($"Echo: {title}");
+
+            string[] names = SerialPort.GetPortNames();
+            if(names.Length > 0 ) 
+            {
+                foreach (string name in names) { Console.WriteLine(name); }
+            }
+
             Console.CancelKeyPress += Console_CancelKeyPress;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 

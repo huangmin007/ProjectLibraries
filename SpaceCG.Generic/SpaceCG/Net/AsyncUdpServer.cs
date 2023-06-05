@@ -82,7 +82,10 @@ namespace SpaceCG.Net
             {
                 IsRunning = true;
                 _Server.EnableBroadcast = true;
-                _Server.AllowNatTraversal(true);
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                {
+                    _Server.AllowNatTraversal(true);
+                }
                 _Server.BeginReceive(ReceiveCallback, null);
             }
 

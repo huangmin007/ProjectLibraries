@@ -279,6 +279,12 @@ namespace SpaceCG.Extensions.Modbus
                 return false;
             }
 
+            if (master == null)
+            {
+                Logger.Warn($"({nameof(ModbusTransportDevice)}) 创建 Modbus 对象失败");
+                return false;
+            }
+
             if (int.TryParse(element.Attribute("ReadTimeout")?.Value, out int readTimeout))
                 master.Transport.ReadTimeout = readTimeout;
             if (int.TryParse(element.Attribute("WriteTimeout")?.Value, out int writeTimeout))

@@ -70,8 +70,18 @@ namespace SpaceCG.Net
             _Buffers = new ConcurrentDictionary<EndPoint, byte[]>();
             _Clients = new ConcurrentDictionary<EndPoint, TcpClient>();
 
-            _Listener = new TcpListener(LocalAddress, LocalPort);
-            _Listener.AllowNatTraversal(true);
+            try
+            {
+                _Listener = new TcpListener(LocalAddress, LocalPort);
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                {
+                    _Listener.AllowNatTraversal(true);
+                }
+            }
+            catch(Exception ex)
+            {
+                Logger.Error($"{ex}");
+            }
         }
         /// <summary>
         /// 异步 TCP 服务器
