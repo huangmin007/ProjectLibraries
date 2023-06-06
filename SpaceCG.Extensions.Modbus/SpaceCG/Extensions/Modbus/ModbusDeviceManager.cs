@@ -172,7 +172,10 @@ namespace SpaceCG.Extensions.Modbus
                         {
                             IAsyncClient Client = null;
                             if (args[0].ToUpper() == "TCP")
+                            {
                                 Client = new AsyncTcpClient();
+                                Client.Disconnected += (s, e) => Client.Connect(args[1], (ushort)port);
+                            }
                             else if (args[0].ToUpper() == "UDP")
                                 Client = new AsyncUdpClient();
                             else

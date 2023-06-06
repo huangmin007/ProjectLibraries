@@ -93,7 +93,7 @@ namespace SpaceCG.Net
                     _UdpClient = new UdpClient();
                     _UdpClient.EnableBroadcast = true;
                     _UdpClient.ExclusiveAddressUse = true;
-                    _UdpClient.AllowNatTraversal(true);
+                    if(Environment.OSVersion.Platform == PlatformID.Win32NT) _UdpClient.AllowNatTraversal(true);
                     _UdpClient.Connect(remoteAddress, remotePort);
                     
                     LocalPort = ((IPEndPoint)(_UdpClient.Client.LocalEndPoint)).Port;
@@ -103,10 +103,7 @@ namespace SpaceCG.Net
                 {
                     _UdpClient?.Close();
                     _UdpClient = null;
-
-                    Logger.Error($"{ex}");
                     Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
-                    return false;
                 }
 
                 if(_UdpClient.Client.Connected)
@@ -136,7 +133,6 @@ namespace SpaceCG.Net
             }
             catch (Exception ex)
             {
-                Logger.Error($"{ex}");
                 Disconnected?.Invoke(this, new AsyncEventArgs(remoteEP));
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(remoteEP, ex));
                 return;
@@ -164,7 +160,6 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Logger.Error($"{ex}");
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return false;
             }
@@ -182,7 +177,6 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 count = 0;
-                Logger.Error($"{ex}");
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
             }
 
@@ -212,6 +206,11 @@ namespace SpaceCG.Net
 
             RemotePort = -1;
             RemoteAddress = null;
+        }
+
+        public override string ToString()
+        {
+            return $"[{nameof(AsyncUdpClient)}] {LocalAddress}:{LocalPort} => {RemoteAddress}:{RemotePort}";
         }
     }
 }

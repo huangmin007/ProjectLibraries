@@ -7,23 +7,19 @@ using System.Threading.Tasks;
 using SpaceCG.Extensions;
 using SpaceCG.Net;
 using System.Net;
+using System.Runtime.CompilerServices;
 
 namespace SpaceCG.Generic
 {
     /// <summary>
     /// 控制器接口对象
-    /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Response="False" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-    /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="True" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
+    /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Response="False" Async="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+    /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="True" Async="False"/&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
     /// <para>网络接口返回(XML)：&lt;Return Result="True/False" Value="value" /&gt; 属性 Result 表示远程执行返回状态(成功/失败)，Value 表示远程执行返回值 (Method 返回值，或是 Property 值)</para>
     /// </summary>
     public sealed class ControlInterface : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ControlInterface));
-
-        /// <summary>
-        /// 网络控制接口服务参数，是否返回网络执行结果信息，默认为 true
-        /// </summary>
-        public bool ReturnNetworkResult { get; set; } = true;
 
         /// <summary>
         /// 网络控制接口服务对象
@@ -34,19 +30,17 @@ namespace SpaceCG.Generic
         /// 组合控制消息的集合
         /// </summary>
         private Dictionary<int, String[]> MessageGroups = new Dictionary<int, String[]>(8);
-        //private ConcurrentDictionary<int, String[]> MessageGroups = new ConcurrentDictionary<int, String[]>(2, 8);
 
         /// <summary>
         /// 可访问或可控制对象的集合，可以通过反射技术访问的对象集合
         /// <para>值键对 &lt;name, object&gt; </para>
         /// </summary>
         private Dictionary<String, Object> ControlObjects = new Dictionary<String, Object>(8);
-        //private ConcurrentDictionary<String, Object> ControlObjects = new ConcurrentDictionary<String, Object>(2, 8);
 
         /// <summary>
         /// 反射控制接口对象
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
+        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Response="False" Async="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="False" Async="True" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
         /// </summary>
         /// <param name="localPort">服务端口，小于 1024 则不启动服务接口</param>
         public ControlInterface(ushort localPort = 2023)
@@ -74,6 +68,7 @@ namespace SpaceCG.Generic
                     {
                         NetworkServices.Add($"{ipAddress}:{port}", Client);
                         Client.DataReceived += Client_DataReceived;
+                        Client.Disconnected += Client_Disconnected;
                         return true;
                     }
                     Client?.Dispose();
@@ -96,6 +91,7 @@ namespace SpaceCG.Generic
             }
             return false;
         }
+
         /// <summary>
         /// 卸载指定的网络服务接口
         /// <para>IPEndPoint == $"{address}:{port}"</para>
@@ -141,6 +137,18 @@ namespace SpaceCG.Generic
             NetworkServices?.Clear();
         }
 
+        /// <summary>
+        /// On Client Disconnected Event Handler
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void Client_Disconnected(object sender, AsyncEventArgs e)
+        {
+            IAsyncClient client = (IAsyncClient)sender;
+            client.Connect((IPEndPoint)e.EndPoint);
+
+            if (Logger.IsDebugEnabled) Logger.Debug($"客户 {client} 端准备重新连接 {e.EndPoint}");
+        }
         /// <summary>
         /// On Client Receive Event Handler
         /// </summary>
@@ -190,17 +198,10 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 安装键盘控制接口服务
         /// </summary>
-        /// <param name="global"></param>
+        /// <param name="enabled"></param>
         /// <returns></returns>
-        public bool InstallKeyboardService(bool global)
+        public bool InstallKeyboardService(bool enabled)
         {
-            //if (KeyboardMouseHook != null) return true;
-
-            //KeyboardMouseHook = global?  Hook.GlobalEvents() : Hook.AppEvents();
-            //KeyboardMouseHook.KeyUp += KeyboardMouseHook_KeyUp;
-            //-KeyboardMouseHook.KeyDown += KeyboardMouseHook_KeyDown;
-            //-KeyboardMouseHook.KeyPress += KeyboardMouseHook_KeyPress;
-
             return false;
         }
         /// <summary>
@@ -209,15 +210,7 @@ namespace SpaceCG.Generic
         /// <returns></returns>
         public bool UnistallKeyboardServices()
         {
-            //if (KeyboardMouseHook == null) return true;
-
-            //KeyboardMouseHook.KeyUp -= KeyboardMouseHook_KeyUp;
-            //-KeyboardMouseHook.KeyDown -= KeyboardMouseHook_KeyDown;
-            //-KeyboardMouseHook.KeyPress -= KeyboardMouseHook_KeyPress;
-            //KeyboardMouseHook.Dispose();
-            //KeyboardMouseHook = null;
-
-            return true;
+            return false;
         }
 
         /// <summary>
@@ -302,7 +295,7 @@ namespace SpaceCG.Generic
                 result = false;
             }
 
-            Logger.Info($"添加可访问控制对象 {name}/{obj}/{obj.GetType()} 状态：{result}");
+            Logger.Info($"添加可访问控制对象(name/object/type) {name}/{obj}/{obj.GetType()} 状态：{result}");
             return result;           
         }
         /// <summary>
@@ -323,7 +316,7 @@ namespace SpaceCG.Generic
             Object obj = ControlObjects[name];
             bool result = ControlObjects.Remove(name);
 
-            Logger.Info($"移除可访问控制对象 {name}/{obj}/{obj?.GetType()} 状态：{result}");
+            Logger.Info($"移除可访问控制对象(name/object/type) {name}/{obj}/{obj?.GetType()} 状态：{result}");
             return result;
         }
         /// <summary>
@@ -344,10 +337,8 @@ namespace SpaceCG.Generic
         /// <param name="xmlMessage"></param>
         /// <param name="returnResult"></param>
         /// <returns></returns>
-        public bool TryParseControlMessage(String xmlMessage, out object returnResult)
-        {
-            return ControlInterface.TryParseControlMessage(xmlMessage, ControlObjects, out returnResult);
-        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryParseControlMessage(String xmlMessage, out object returnResult) => TryParseControlMessage(xmlMessage, ControlObjects, out returnResult);
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并调用实例对象的方法
         /// <para>XML 格式：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
@@ -355,10 +346,8 @@ namespace SpaceCG.Generic
         /// <param name="actionElement"></param>
         /// <param name="returnResult"></param>
         /// <returns></returns>
-        public bool TryParseCallMethod(XElement actionElement, out object returnResult)
-        {
-            return ControlInterface.TryParseCallMethod(actionElement, ControlObjects, out returnResult);
-        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryParseCallMethod(XElement actionElement, out object returnResult) => TryParseCallMethod(actionElement, ControlObjects, out returnResult);
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并设置/获取实例对象属性的值
         /// <para>XML 格式：&lt;Action Target="object key name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
@@ -366,10 +355,8 @@ namespace SpaceCG.Generic
         /// <param name="actionElement"></param>
         /// <param name="returnResult"></param>
         /// <returns></returns>
-        public bool TryParseChangeValue(XElement actionElement, out object returnResult)
-        {
-            return ControlInterface.TryParseChangeValue(actionElement, ControlObjects, out returnResult);
-        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryParseChangeValue(XElement actionElement, out object returnResult) => TryParseChangeValue(actionElement, ControlObjects, out returnResult);
 
         /// <inheritdoc/>
         public void Dispose()
@@ -440,7 +427,7 @@ namespace SpaceCG.Generic
         }
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并调用实例对象的方法
-        /// <para>XML 格式：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// <para>XML 格式：&lt;Action Target="object key name" Method="method name" Params="method params" Async="True"/&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
         /// </summary>
         /// <param name="actionElement"></param>
         /// <param name="accessObjects">可访问对象的集合</param>
@@ -459,21 +446,35 @@ namespace SpaceCG.Generic
                 return false;
             }
 
+            String asyncValue = actionElement.Attribute("Async")?.Value;
+            String objectName = actionElement.Attribute("Target").Value;
+            String methodName = actionElement.Attribute("Method").Value;            
+
+            if (!accessObjects.TryGetValue(objectName, out Object targetObject))
+            {
+                Logger.Error($"未找到目标实例对象 {objectName} ");
+                return false;
+            }
+
+            bool Async = true;  //使用异步执行函数(非阻塞执行)
+            if (!String.IsNullOrWhiteSpace(asyncValue))
+                Async = asyncValue.ToLower() == "true";
+
             try
             {
-                String objectName = actionElement.Attribute("Target").Value;
-                String methodName = actionElement.Attribute("Method").Value;
-
-                if (!accessObjects.TryGetValue(objectName, out Object targetObject))
+                if (Async)
                 {
-                    Logger.Error($"未找到目标实例对象 {objectName} ");
-                    return false;
+                    returnResult = Task.Run<Object>(() =>
+                    {
+                        object[] parameters = StringExtensions.SplitParameters(actionElement.Attribute("Params")?.Value);
+                        return InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object returnValue) ? returnValue : null;
+                    }).Result;
                 }
-
-                returnResult = Task.Run<Object>(() =>
+                else
                 {
-                    return InstanceExtensions.CallInstanceMethod(targetObject, methodName, StringExtensions.SplitParameters(actionElement.Attribute("Params")?.Value));
-                }).Result;
+                    object[] parameters = StringExtensions.SplitParameters(actionElement.Attribute("Params")?.Value);
+                    returnResult = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object returnValue) ? returnValue : null;
+                }
 
                 return true;
             }
@@ -487,7 +488,7 @@ namespace SpaceCG.Generic
         }
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并设置/获取实例对象属性的值
-        /// <para>XML 格式：&lt;Action Target="object key name" Property="property name" Value="newValue" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
+        /// <para>XML 格式：&lt;Action Target="object key name" Property="property name" Value="newValue" Async="True"/&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
         /// </summary>
         /// <param name="actionElement"></param>
         /// <param name="accessObjects"></param>
@@ -506,6 +507,7 @@ namespace SpaceCG.Generic
                 return false;
             }
 
+            String asyncValue = actionElement.Attribute("Async")?.Value;
             String objectName = actionElement.Attribute("Target").Value;
             String propertyName = actionElement.Attribute("Property").Value;
 
@@ -515,26 +517,77 @@ namespace SpaceCG.Generic
                 return false;
             }
 
-            bool changeResult = true;
+            bool Async = true;
+            bool changeSuccess = true;
+            if (!String.IsNullOrWhiteSpace(asyncValue))
+                Async = asyncValue.ToLower() == "true";
+
             try
             {
-                returnResult = Task.Run<Object>(() =>
+                if (Async)
                 {
-                    if(actionElement.Attribute("Value") != null)
-                        changeResult = InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
-
-                    return InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName);
-                }).Result;
+                    returnResult = Task.Run<Object>(() =>
+                    {
+                        if (actionElement.Attribute("Value") != null)
+                            changeSuccess = InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
+                        return InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value) ? value : null;
+                    }).Result;
+                }
+                else
+                {
+                    if (actionElement.Attribute("Value") != null)
+                        changeSuccess = InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
+                    returnResult = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value) ? value : null;
+                }                
             }
             catch(Exception ex)
             {
-                changeResult = false;
-
+                changeSuccess = false;
                 Logger.Error($"执行 XML 数据指令错误：{actionElement}");
                 Logger.Error(ex.ToString());
             }
 
-            return changeResult;
+            return changeSuccess;
+        }
+
+        /// <summary>
+        /// 创建控制消息
+        /// </summary>
+        /// <param name="targetName"></param>
+        /// <param name="methodName"></param>
+        /// <param name="methodParams"></param>
+        /// <param name="async"></param>
+        /// <param name="response"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static string CreateMessage4Method(string targetName, string methodName, string methodParams, bool async = true, bool response = true)
+        {
+            if (String.IsNullOrWhiteSpace(targetName) || String.IsNullOrWhiteSpace(methodName))
+                throw new ArgumentNullException($"{nameof(targetName)},{nameof(methodName)}", "关键参数不能为空");
+
+            if(methodParams == null)
+                return $"<Action Target=\"{targetName}\" Method=\"{methodName}\" Async=\"{async}\" Response=\"{response}\" />";
+            else
+                return $"<Action Target=\"{targetName}\" Method=\"{methodName}\" Params=\"{methodParams}\" Async=\"{async}\" Response=\"{response}\" />";
+        }
+        /// <summary>
+        /// 创建控制消息
+        /// </summary>
+        /// <param name="targetName"></param>
+        /// <param name="propertyName"></param>
+        /// <param name="propertyValue"></param>
+        /// <param name="async"></param>
+        /// <param name="response"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static string CreateMessage4Property(string targetName, string propertyName, string propertyValue, bool async = true, bool response = true)
+        {
+            if (String.IsNullOrWhiteSpace(targetName) || String.IsNullOrWhiteSpace(propertyName))
+                throw new ArgumentNullException($"{nameof(targetName)},{nameof(propertyName)}", "关键参数不能为空");
+
+            return $"<Action Target=\"{targetName}\" Property=\"{propertyName}\" Value=\"{(propertyValue == null ? "null" : propertyValue)}\" Async=\"{async}\" Response=\"{response}\" />";
         }
     }
 }

@@ -223,5 +223,10 @@ namespace SpaceCG.Net
             _Server = null;
         }
 
+        public override string ToString()
+        {
+            return $"[{nameof(AsyncUdpServer)}] {LocalAddress}:{LocalPort}";
+        }
+
     }
 }

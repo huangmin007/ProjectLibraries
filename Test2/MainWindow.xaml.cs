@@ -45,6 +45,7 @@ namespace Test2
 
         }
 
+        ControlInterface controlInterface;
         private static LoggerTrace Logger = new LoggerTrace(nameof(MainWindow));
         private static LoggerTrace Logger2 = new LoggerTrace("aadafd", SourceLevels.Information);
 
@@ -60,6 +61,12 @@ namespace Test2
             Logger2.Fatal("Logger Fatal");
 
             Console.WriteLine("Window.Loaded");
+
+            Console.WriteLine(  ControlInterface.CreateMessage4Method("aaa", "bbb", ""));
+            Console.WriteLine(  ControlInterface.CreateMessage4Property("aaa", "bbb", null));
+
+            controlInterface = new ControlInterface(0);
+            controlInterface.InstallNetworkService(2023, "127.0.0.1");
 
             //throw new Exception("aaaaaa");
         }

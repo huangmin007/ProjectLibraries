@@ -58,15 +58,11 @@ namespace SpaceCG.Net
         private IPEndPoint _RemoteEP;
         private String _ConnectStatus = "Ready";
 
-        private int _ReconnectCount = 0;
-        private Boolean _AutoReconnect = true;
-
         /// <summary>
         /// 异步 TCP 客户端对象
         /// </summary>
-        public AsyncTcpClient(bool autoReconnect = true) 
+        public AsyncTcpClient() 
         {
-            this._AutoReconnect = autoReconnect;
         }
 
         /// <inheritdoc/>
@@ -89,7 +85,6 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return false;
             }
@@ -123,7 +118,6 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 _ConnectStatus = "ConnectException";
-                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return false;
             }
@@ -137,14 +131,12 @@ namespace SpaceCG.Net
             catch(Exception ex)
             {
                 _ConnectStatus = "ConnectException";
-                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
-                return;
             }
 
             if (_TcpClient.Connected)
             {
-                _ReconnectCount = 0;
+                //_ReconnectCount = 0;
                 _ConnectStatus = "ConnectSuccess";
 
                 RemotePort = _RemoteEP.Port;
@@ -158,16 +150,8 @@ namespace SpaceCG.Net
             }
             else
             {
-                _ReconnectCount++;
                 _ConnectStatus = "ConnectFailed";
                 Disconnected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
-
-                if (_AutoReconnect)
-                {
-                    if (_ReconnectCount == 1) Logger.Warn($"连接远程地址 {_RemoteEP} 失败，准备重新连接 ...... ");
-                    
-                    Connect(_RemoteEP);
-                }
             }
         }
         private void ReadCallback(IAsyncResult ar)
@@ -182,7 +166,6 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 count = 0;
-                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
             }
 
@@ -214,7 +197,6 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return false;
             }
@@ -227,7 +209,6 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Logger.Error(ex.ToString());
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
                 return;
             }
@@ -248,6 +229,11 @@ namespace SpaceCG.Net
 
             RemotePort = -1;
             RemoteAddress = null;
+        }
+
+        public override string ToString()
+        {
+            return $"[{nameof(AsyncTcpClient)}] {LocalAddress}:{LocalPort} => {RemoteAddress}:{RemotePort}";
         }
     }
 }

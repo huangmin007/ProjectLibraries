@@ -17,10 +17,9 @@ namespace SpaceCG.Generic
         private static readonly TextWriterTraceListener consoleListener;
         private static readonly TextWriterTraceListener textFileListener;
 
-        public bool IsDebugEnabled => traceSource?.Switch.Level <= SourceLevels.Verbose;
-        public bool IsInfoEnabled => traceSource?.Switch.Level <= SourceLevels.Information;
+        public bool IsDebugEnabled => traceSource?.Switch.Level != SourceLevels.Off && traceSource?.Switch.Level <= SourceLevels.Verbose;
+        public bool IsInfoEnabled => traceSource?.Switch.Level != SourceLevels.Off && traceSource?.Switch.Level <= SourceLevels.Information;
         
-
         static LoggerTrace()
         {
             string path = "logs";
@@ -37,6 +36,7 @@ namespace SpaceCG.Generic
             String message = $"{Environment.NewLine}[{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}] (OS: {os.Platform} {os.Version})";
             consoleListener.WriteLine(message);
             textFileListener.WriteLine(message);
+
             consoleListener.Flush();
             textFileListener.Flush();
         }

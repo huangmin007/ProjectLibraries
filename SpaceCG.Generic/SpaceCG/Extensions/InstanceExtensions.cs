@@ -23,21 +23,16 @@ namespace SpaceCG.Extensions
         }
 
         /// <summary>
-        /// 动态的获取实例的字段对象。注意：包括私有对象
+        /// 试图动态的获取实例的字段对象。注意：包括私有对象
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="fieldName"></param>
-        /// <returns></returns>
-        public static object GetInstanceFieldValue(object instanceObj, String fieldName)
+        /// <param name="value"></param>
+        /// <returns>获取成功返回 true, 否则返回 false </returns>
+        public static bool GetInstanceFieldValue(object instanceObj, String fieldName, out object value)
         {
-            if (instanceObj == null || String.IsNullOrWhiteSpace(fieldName))
-            {
-#if RETURN
-                return null;
-#else
-                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(fieldName)}", "参数不能为空");
-#endif
-            }
+            value = null;
+            if (instanceObj == null || String.IsNullOrWhiteSpace(fieldName)) return false;
 
             try
             {
@@ -46,34 +41,28 @@ namespace SpaceCG.Extensions
                 if (fieldInfo == null)
                 {
                     Logger.Warn($"在实例对象 {instanceObj} 中，未找到指定字段 {fieldName} 对象");
-                    return null;
+                    return false;
                 }
 
-                return fieldInfo.GetValue(instanceObj);
+                value = fieldInfo.GetValue(instanceObj);
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Error(ex.ToString());
             }
-            return null;
+            return false;
         }
         /// <summary>
-        /// 动态的设置实例的字段对象。注意：包括私有对象
+        /// 试图动态的设置实例的字段对象。注意：包括私有对象
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="fieldName"></param>
         /// <param name="newValue"></param>
-        /// <returns></returns>
+        /// <returns>设置成功返回 true, 否则返回 false </returns>
         public static bool SetInstanceFieldValue(object instanceObj, String fieldName, object newValue)
         {
-            if (instanceObj == null || String.IsNullOrWhiteSpace(fieldName))
-            {
-#if RETURN
-                return false;
-#else
-                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(fieldName)}", "参数不能为空");
-#endif
-            }
+            if (instanceObj == null || String.IsNullOrWhiteSpace(fieldName)) return false;
 
             Type type = instanceObj.GetType();
             FieldInfo fieldInfo = type.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -110,7 +99,6 @@ namespace SpaceCG.Extensions
             return false;
         }
 
-
         /// <summary>
         /// 动态的设置实例对象的多个属性值，跟据 XML 配置文件节点名称(实例字段对象)及节点属性(字段对象的属性)来个修改实例属性
         /// <para>例如：&lt;Window Left="100" Width="100"/&gt; </para>
@@ -118,18 +106,13 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="instanceParentObj"></param>
         /// <param name="element"></param>
+        /// <exception cref="ArgumentNullException"></exception>
         public static void SetInstancePropertyValues(Object instanceParentObj, XElement element)
         {
             if (instanceParentObj == null || element == null)
-            {
-#if RETURN
-                return;
-#else
-                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(element)}", "参数不能为空");
-#endif
-            }
-            Object instanceObj = GetInstanceFieldValue(instanceParentObj, element.Name.LocalName);
-            if (instanceObj == null) return;
+                throw new ArgumentNullException($"{nameof(instanceParentObj)},{nameof(element)}", "参数不能为空");
+
+            if(!GetInstanceFieldValue(instanceParentObj, element.Name.LocalName, out object instanceObj)) return;
 
             IEnumerable<XAttribute> attributes = element.Attributes();
             if (attributes.Count() == 0) return;
@@ -147,17 +130,10 @@ namespace SpaceCG.Extensions
         /// <param name="instanceObj"></param>
         /// <param name="propertyName"></param>
         /// <param name="newValue"></param>
-        /// <returns>如果设置成功，则返回 true, 否则返回 false </returns>
+        /// <returns>设置成功返回 true, 否则返回 false </returns>
         public static bool SetInstancePropertyValue(Object instanceObj, String propertyName, Object newValue)
         {
-            if (instanceObj == null || String.IsNullOrWhiteSpace(propertyName))
-            {
-#if RETURN
-                return false;
-#else
-                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(propertyName)}", "参数不能为空");
-#endif
-            }
+            if (instanceObj == null || String.IsNullOrWhiteSpace(propertyName)) return false;
 
             Type type = instanceObj.GetType();
             PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
@@ -195,23 +171,28 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="propertyName"></param>
-        /// <returns></returns>
-        public static object GetInstancePropertyValue(Object instanceObj, String propertyName)
+        /// <param name="value"></param>
+        /// <returns>获取成功返回 true, 否则返回 false </returns>
+        public static bool GetInstancePropertyValue(Object instanceObj, String propertyName, out object value)
         {
-            if (instanceObj == null || String.IsNullOrWhiteSpace(propertyName))
-            {
-#if RETURN
-                return false;
-#else
-                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(propertyName)}", "参数不能为空");
-#endif
-            }
+            value = null;
+            if (instanceObj == null || String.IsNullOrWhiteSpace(propertyName)) return false;
 
             Type type = instanceObj.GetType();
             PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
-            if (property == null || !property.CanRead) return null;
+            if (property == null || !property.CanRead) return false;
 
-            return property.GetValue(instanceObj);
+            try
+            {
+                value = property.GetValue(instanceObj);
+                return true;
+            }
+            catch(Exception ex)
+            {
+                Logger.Error(ex);
+            }
+
+            return false;
         }
 
 
@@ -220,17 +201,10 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="instanceObj">对象实例</param>
         /// <param name="eventName">对象事件名称</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        public static void RemoveInstanceEvent(object instanceObj, string eventName)
+        /// <returns>移除成功返回 true, 否则返回 false </returns>
+        public static bool RemoveInstanceEvent(object instanceObj, string eventName)
         {
-            if (instanceObj == null || string.IsNullOrWhiteSpace(eventName))
-            {
-#if RETURN
-                return;
-#else
-                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(eventName)}", "参数不能为空");
-#endif
-            }
+            if (instanceObj == null || string.IsNullOrWhiteSpace(eventName)) return false;
 
             //BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
             BindingFlags bindingAttr = BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static;
@@ -241,11 +215,11 @@ namespace SpaceCG.Extensions
                 if (fields == null)
                 {
                     fields = instanceObj.GetType().BaseType.GetField(eventName, bindingAttr);   //基类类型中查找
-                    if (fields == null) return;
+                    if (fields == null) return false;
                 }
 
                 object value = fields.GetValue(instanceObj);
-                if (value == null || !(value is Delegate)) return;
+                if (value == null || !(value is Delegate)) return false;
 
                 Delegate anonymity = (Delegate)value;
                 foreach (Delegate handler in anonymity.GetInvocationList())
@@ -253,13 +227,15 @@ namespace SpaceCG.Extensions
                     if (instanceObj.GetType().GetEvent(eventName) == null) continue;
 
                     instanceObj.GetType().GetEvent(eventName).RemoveEventHandler(instanceObj, handler);
-                    Logger.Debug($"Object({instanceObj.GetType()}) Remove Event: {eventName}({handler.Method.Name})");
+                    if(Logger.IsDebugEnabled) Logger.Debug($"Object({instanceObj.GetType()}) Remove Event: {eventName}({handler.Method.Name})");
                 }
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Error($"Remove Anonymous Events Error:{ex}");
             }
+            return false;
         }
         /// <summary>
         /// 动态移除实例对象所有委托事件
@@ -268,14 +244,8 @@ namespace SpaceCG.Extensions
         /// <exception cref="ArgumentNullException"></exception>
         public static void RemoveInstanceEvents(object instanceObj)
         {
-            if (instanceObj == null)
-            {
-#if RETURN
-                return;
-#else
+            if (instanceObj == null) 
                 throw new ArgumentNullException(nameof(instanceObj), "参数不能为空");
-#endif
-            }
 
             EventInfo[] events = instanceObj.GetType().GetEvents();
             foreach (EventInfo info in events)
@@ -294,7 +264,7 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="methods"></param>
         /// <param name="parameters"></param>
-        private static void MoveOutMethodInfo(ref List<MethodInfo> methods, params object[] parameters)
+        private static void MoveOutMethodInfo(ref List<MethodInfo> methods, object[] parameters)
         {
             if (methods?.Count <= 1) return;
 
@@ -302,13 +272,15 @@ namespace SpaceCG.Extensions
             {
                 MethodInfo method = methods[i];
                 ParameterInfo[] paramsInfo = method.GetParameters();
-                if (paramsInfo.Length != parameters.Length) continue;
+                if (paramsInfo.Length != parameters?.Length) continue;
 
                 for (int k = 0; k < paramsInfo.Length; k++)
                 {
-                    Type paramType = parameters[k].GetType();
-                    if ((paramsInfo[k].ParameterType.IsArray && paramType.IsArray) ||
-                        (paramsInfo[k].ParameterType.IsValueType && (paramType.IsValueType || paramType == typeof(String))))
+                    Type inputParamType = parameters[k].GetType();
+                    Type methodParamType = paramsInfo[k].ParameterType;
+
+                    if ((methodParamType.IsArray && inputParamType.IsArray) ||
+                        (methodParamType.IsValueType && (inputParamType.IsValueType || inputParamType == typeof(String))))
                     {
                         continue;
                     }
@@ -320,22 +292,17 @@ namespace SpaceCG.Extensions
         }
         /// <summary>
         /// 动态调用对象的方法
-        /// <para>按顺序查找方法：实例方法 > 扩展方法 > 静态方法 </para>
+        /// <para>按顺序查找方法：实例方法 > (实例)扩展方法 > (类)静态方法 </para>
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="methodInfo"></param>
         /// <param name="parameters"></param>
-        /// <returns>调用 Method 的返回值</returns>
-        public static object CallInstanceMethod(object instanceObj, MethodInfo methodInfo, params object[] parameters)
+        /// <param name="returnValue">函数返回值</param>
+        /// <returns>方法调用成功返回 true, 否则返回 false </returns>
+        public static bool CallInstanceMethod(object instanceObj, MethodInfo methodInfo, object[] parameters, out object returnValue)
         {
-            if (methodInfo == null)
-            {
-#if RETURN
-                return null;
-#else
-                throw new ArgumentNullException(nameof(methodInfo), "参数不能为空");
-#endif
-            }
+            returnValue = null;
+            if (methodInfo == null) return false;
 
             String paramDebugInfo = "";
             ParameterInfo[] parameterInfos = methodInfo.GetParameters();
@@ -377,7 +344,7 @@ namespace SpaceCG.Extensions
                 else
                 {
                     Logger.Warn($"实例对象 {instanceObj}, 匹配的函数(超出处理范围的函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
-                    return null;
+                    return false;
                 }
             }
 
@@ -418,33 +385,29 @@ namespace SpaceCG.Extensions
                         Console.WriteLine($"{arg.GetType()} : {arg}");
                 }
 #endif
-                return methodInfo.Invoke(instanceObj, arguments);
+                returnValue = methodInfo.Invoke(instanceObj, arguments);
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Error($"函数 {methodInfo.Name} 执行失败: {ex}");
             }
 
-            return null;
+            return false;
         }
         /// <summary>
         /// 动态调用 实例 对象的方法
-        /// <para>按顺序查找方法：实例方法 > 实例的扩展方法</para>
+        /// <para>按顺序查找方法：实例方法 > (实例)扩展方法</para>
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <returns>调用 Method 的返回值</returns>
-        public static object CallInstanceMethod(object instanceObj, String methodName, params object[] parameters)
+        /// <param name="returnValue">函数的返回值</param>
+        /// <returns>方法调用成功返回 true, 否则返回 false</returns>
+        public static bool CallInstanceMethod(object instanceObj, String methodName, object[] parameters, out object returnValue)
         {
-            if (instanceObj == null || String.IsNullOrWhiteSpace(methodName))
-            {
-#if RETURN
-                return null;
-#else
-                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(methodName)}", "参数不能为空");
-#endif
-            }
+            returnValue = null;
+            if (instanceObj == null || String.IsNullOrWhiteSpace(methodName)) return false;
 
             Type type = instanceObj.GetType();
             int paramLength = parameters == null ? 0 : parameters.Length;
@@ -453,36 +416,31 @@ namespace SpaceCG.Extensions
                                         where method.GetParameters().Length == paramLength
                                         select method)?.ToList();
 
-            MoveOutMethodInfo(ref methods);
+            MoveOutMethodInfo(ref methods, parameters);
             int methodCount = methods == null ? 0 : methods.Count();
 
             if (methodCount != 1)
             {
                 Logger.Info($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName}/{paramLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
-                return CallInstanceExtensionMethod(instanceObj, methodName, parameters);
+                return CallInstanceExtensionMethod(instanceObj, methodName, parameters, out returnValue);
             }
             
-            return CallInstanceMethod(instanceObj, methods.First(), parameters);
+            return CallInstanceMethod(instanceObj, methods.First(), parameters, out returnValue);
         }
 
         /// <summary>
         /// 动态调用 对象扩展 的方法
-        /// <para>按顺序查找方法：实例的扩展方法 </para>
+        /// <para>按顺序查找方法：(实例)扩展方法 </para>
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <returns>调用 Method 的返回值</returns>
-        public static object CallInstanceExtensionMethod(object instanceObj, String methodName, params object[] parameters)
+        /// <param name="returnValue">函数的返回值</param>
+        /// <returns>方法调用成功返回 true, 否则返回 false</returns>
+        public static bool CallInstanceExtensionMethod(object instanceObj, String methodName, object[] parameters, out object returnValue)
         {
-            if (instanceObj == null || String.IsNullOrWhiteSpace(methodName))
-            {
-#if RETURN
-                return null;
-#else
-                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(methodName)}", "参数不能为空");
-#endif
-            }
+            returnValue = null;
+            if (instanceObj == null || String.IsNullOrWhiteSpace(methodName)) return false;
 
             List<MethodInfo> methods = (from type in typeof(InstanceExtensions).Assembly.GetTypes()
                                         where type.IsSealed && !type.IsGenericType && !type.IsNested
@@ -490,36 +448,31 @@ namespace SpaceCG.Extensions
                                         where method.Name == methodName && method.IsDefined(typeof(ExtensionAttribute), false) && method.GetParameters()[0].ParameterType == instanceObj.GetType()
                                         select method).ToList();
 
-            MoveOutMethodInfo(ref methods);
+            MoveOutMethodInfo(ref methods, parameters);
             int methodCount = methods == null ? 0 : methods.Count();
 
             if (methodCount != 1)
             {
                 Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的扩展函数 {methodName} 有 {methodCount} 个，取消执行");
-                return null;
+                return false;
             }
 
-            return CallInstanceMethod(instanceObj, methods.First(), parameters);
+            return CallInstanceMethod(instanceObj, methods.First(), parameters, out returnValue);
         }
         /// <summary>
         /// 动态调用 类的 静态方法
-        /// <para>按顺序查找方法：静态方法</para>
+        /// <para>按顺序查找方法：(类)静态方法</para>
         /// <para>示例：InstanceExtension.CallClassStaticMethod("System.Threading.Thread", "Sleep", new object[] { "1000" });</para>
         /// </summary>
         /// <param name="classFullName"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <returns>调用 Method 的返回值</returns>
-        public static object CallClassStaticMethod(String classFullName, String methodName, params object[] parameters)
+        /// <param name="returnValue">函数的返回值</param>
+        /// <returns>方法调用成功返回 true, 否则返回 false</returns>
+        public static bool CallClassStaticMethod(String classFullName, String methodName, object[] parameters, out object returnValue)
         {
-            if (String.IsNullOrWhiteSpace(classFullName) || String.IsNullOrWhiteSpace(methodName))
-            {
-#if RETURN
-                return null;
-#else
-                throw new ArgumentNullException($"{nameof(classFullName)},{nameof(methodName)}", "参数不能为空");
-#endif
-            }
+            returnValue = null;
+            if (String.IsNullOrWhiteSpace(classFullName) || String.IsNullOrWhiteSpace(methodName)) return false;
 
             List<MethodInfo> methods = (from assembly in AppDomain.CurrentDomain.GetAssemblies()
                                         let type = assembly.GetType(classFullName)
@@ -530,16 +483,16 @@ namespace SpaceCG.Extensions
                                         where paramInfo.ParameterType.IsValueType || paramInfo.ParameterType.IsArray || paramInfo.ParameterType.IsEnum
                                         select method).ToList();
 
-            MoveOutMethodInfo(ref methods);
+            MoveOutMethodInfo(ref methods, parameters);
             int methodCount = methods == null ? 0 : methods.Count();
 
             if (methodCount != 1)
             {
                 Logger.Warn($"在类 {classFullName} 中，找到匹配的静态函数 {methodName} 有 {methodCount} 个, 存在执行歧异, 取消函数执行");
-                return null;
+                return false;
             }
 
-            return CallInstanceMethod(null, methods.First(), parameters);
+            return CallInstanceMethod(null, methods.First(), parameters, out returnValue);
         }
 
     }

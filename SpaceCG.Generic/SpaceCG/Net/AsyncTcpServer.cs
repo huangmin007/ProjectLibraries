@@ -330,6 +330,11 @@ namespace SpaceCG.Net
             //GC.SuppressFinalize(this);
         }
 
+        public override string ToString()
+        {
+            return $"[{nameof(AsyncTcpServer)}] {LocalAddress}:{LocalPort}";
+        }
+
     }
 
 }
