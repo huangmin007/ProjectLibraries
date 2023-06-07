@@ -47,11 +47,16 @@ namespace Test2
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            
+            logger.Info("中文测试");
+            logger.Warn("Eng");
+
+            logger.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
         }
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)
         {
+            logger.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
+
         }
     }
 }

@@ -12,7 +12,7 @@ using System.Xml.Linq;
 namespace SpaceCG.Generic
 {
     /// <summary>
-    /// 简单的日志跟踪记录对象，支持跨平台
+    /// 轻量的日志跟踪记录对象，支持跨平台
     /// </summary>
     public sealed class LoggerTrace : IDisposable
     {
@@ -203,7 +203,10 @@ namespace SpaceCG.Generic
 
         private static string FormatMessage(object message)
         {
-            return $"[{DateTime.Now.ToString("HH:mm:ss.fff")}] {message}";
+            StackFrame frame = new StackFrame(2, true);
+            MethodBase method = frame.GetMethod();
+
+            return method != null ? $"({method.Name}) {message}" : $"{message}";
         }
     }
 
@@ -400,7 +403,7 @@ namespace SpaceCG.Generic
             StreamWriter writer = Writer as StreamWriter;
             if (writer?.BaseStream == null) return;
 
-            const long MaxSize = 1024 * 1024 * 2;
+            const long MaxSize = 1024;// * 1024 * 2;
             if (writer.BaseStream.Length >= MaxSize)
             {
                 FileStream fileStream = writer.BaseStream as FileStream;
@@ -415,10 +418,7 @@ namespace SpaceCG.Generic
                     String sourceFileName = curLogFile.FullName;
                     string destFileName = $"{curLogFile.Directory.FullName}\\{fileName}{count}{curLogFile.Extension}";
 
-                    writer.Flush();
-                    writer.Close();
-                    writer.Dispose();
-
+                    Writer.Flush();
                     Writer.Close();
                     Writer.Dispose();
                     Writer = null;
