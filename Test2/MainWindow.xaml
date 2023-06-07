@@ -7,6 +7,17 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800" Loaded="Window_Loaded">
     <Grid>
-        
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBox x:Name="TextBox_Trace" IsReadOnly="True" Grid.Row="0" Grid.Column="0"/>
+
+        <Button x:Name="Button_btn" Content="Button_Test" Grid.Column="0" Grid.Row="1" Click="Button_btn_Click" />
     </Grid>
 </Window>

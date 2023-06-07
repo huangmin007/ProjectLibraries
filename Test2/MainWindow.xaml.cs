@@ -41,34 +41,17 @@ namespace Test2
             //LoggerExtensions.Info($"Closed.");
 
             //Logger?.Dispose();
-
-
         }
 
-        ControlInterface controlInterface;
-        private static LoggerTrace Logger = new LoggerTrace(nameof(MainWindow));
-        private static LoggerTrace Logger2 = new LoggerTrace("aadafd", SourceLevels.Information);
+        private LoggerTrace logger = new LoggerTrace();
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            Logger.Debug("Logger Debug");
-            Logger2.Debug("Logger Debug");
-            Logger.Info("Logger Info");
-            Logger2.Info("Logger Info");
-            Logger.Warn("Logger Warn");
-            Logger2.Warn("Logger Warn");
-            Logger.Fatal("Logger Fatal");
-            Logger2.Fatal("Logger Fatal");
+            
+        }
 
-            Console.WriteLine("Window.Loaded");
-
-            Console.WriteLine(  ControlInterface.CreateMessage4Method("aaa", "bbb", ""));
-            Console.WriteLine(  ControlInterface.CreateMessage4Property("aaa", "bbb", null));
-
-            controlInterface = new ControlInterface(0);
-            controlInterface.InstallNetworkService(2023, "127.0.0.1");
-
-            //throw new Exception("aaaaaa");
+        private void Button_btn_Click(object sender, RoutedEventArgs e)
+        {
         }
     }
 }
