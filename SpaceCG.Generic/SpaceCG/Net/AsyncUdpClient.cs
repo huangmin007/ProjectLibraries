@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Net;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using SpaceCG.Generic;
@@ -94,17 +93,24 @@ namespace SpaceCG.Net
                     _UdpClient = new UdpClient();
                     _UdpClient.EnableBroadcast = true;
                     _UdpClient.ExclusiveAddressUse = true;
-                    if(Environment.OSVersion.Platform == PlatformID.Win32NT) _UdpClient.AllowNatTraversal(true);
                     _UdpClient.Connect(remoteAddress, remotePort);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     _UdpClient?.Close();
                     _UdpClient = null;
                     Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
                 }
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                {
+                    try
+                    {
+                        _UdpClient.AllowNatTraversal(true);
+                    }
+                    catch { }
+                }
 
-                if(_UdpClient.Client.Connected)
+                if (_UdpClient.Client.Connected)
                 {
                     first_io = true;
                     Connected?.Invoke(this, new AsyncEventArgs(_ConnectEP));

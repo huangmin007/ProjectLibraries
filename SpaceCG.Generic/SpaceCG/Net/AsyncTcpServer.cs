@@ -65,16 +65,20 @@ namespace SpaceCG.Net
             try
             {
                 _Listener = new TcpListener(localIPAddress, listenPort);
-                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-                {
-                    _Listener.AllowNatTraversal(true);
-                }
                 LocalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
             }
             catch (Exception ex)
             {
                 Logger.Error($"{ex}");
                 return;
+            }
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                try
+                {
+                    _Listener.AllowNatTraversal(true);
+                }
+                catch { }
             }
 
             _Buffers = new ConcurrentDictionary<EndPoint, byte[]>();

@@ -60,8 +60,8 @@ namespace Test2
             bool result = Regex.IsMatch(str, @"\*.Dispose", RegexOptions.Singleline);
             Console.WriteLine($"Result::{result}");
 
-            controlInterface = new ControlInterface(2023);            
-            controlInterface.AccessObjects.Add("window", "hello");
+            controlInterface = new ControlInterface(2023);
+            controlInterface.AccessObjects.Add("window", this);
 
         }
 
@@ -69,6 +69,11 @@ namespace Test2
         {
             logger.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
             
+        }
+
+        public int Add(int a, int b) 
+        {
+            return a + b;
         }
 
     }
