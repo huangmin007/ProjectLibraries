@@ -403,7 +403,7 @@ namespace SpaceCG.Generic
             StreamWriter writer = Writer as StreamWriter;
             if (writer?.BaseStream == null) return;
 
-            const long MaxSize = 1024;// * 1024 * 2;
+            const long MaxSize = 1024 * 1024 * 2;
             if (writer.BaseStream.Length >= MaxSize)
             {
                 FileStream fileStream = writer.BaseStream as FileStream;
