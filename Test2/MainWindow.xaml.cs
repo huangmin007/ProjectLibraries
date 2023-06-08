@@ -4,6 +4,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,6 +17,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using SpaceCG.Generic;
+using SpaceCG.Net;
 
 namespace Test2
 {
@@ -23,7 +26,7 @@ namespace Test2
     /// </summary>
     public partial class MainWindow : Window
     {
-        //ControllerInterface controllerInterface;
+        ControlInterface controlInterface;
 
         public MainWindow()
         {
@@ -33,7 +36,7 @@ namespace Test2
         protected override void OnClosing(CancelEventArgs e)
         {
             base.OnClosing(e);
-            //controllerInterface?.Dispose();
+            controlInterface?.Dispose();
         }
         protected override void OnClosed(EventArgs e)
         {
@@ -41,6 +44,7 @@ namespace Test2
             //LoggerExtensions.Info($"Closed.");
 
             //Logger?.Dispose();
+            
         }
 
         private LoggerTrace logger = new LoggerTrace();
@@ -51,12 +55,17 @@ namespace Test2
             logger.Warn("Eng");
 
             logger.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
+
+            String str = "test.Dispose";
+            bool result = Regex.IsMatch(str, @"\*.Dispose", RegexOptions.Singleline);
+            Console.WriteLine($"Result::{result}");
         }
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)
         {
             logger.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
-
+            
         }
+
     }
 }

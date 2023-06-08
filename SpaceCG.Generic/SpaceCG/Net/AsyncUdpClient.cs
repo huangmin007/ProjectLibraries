@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using SpaceCG.Generic;
@@ -16,13 +17,10 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public bool IsConnected => _UdpClient?.Client != null && _UdpClient.Client.Connected;
         /// <inheritdoc/>
-        public int RemotePort { get; private set; }
+        public IPEndPoint LocalEndPoint { get; private set; }
         /// <inheritdoc/>
-        public IPAddress RemoteAddress { get; private set; }
-        /// <inheritdoc/>
-        public int LocalPort { get; private set; }
-        /// <inheritdoc/>
-        public IPAddress LocalAddress { get; private set; }
+        public IPEndPoint RemoteEndPoint { get; private set; }
+
         /// <inheritdoc/>
         public int ReadTimeout
         {
@@ -54,13 +52,18 @@ namespace SpaceCG.Net
 
         private bool first_io;
         private UdpClient _UdpClient;
-        private IPEndPoint _RemoteEP;
+        /// <summary>
+        /// 连接参数
+        /// </summary>
+        private IPEndPoint _ConnectEP;
 
         /// <summary>
         /// AsyncUdpClient
         /// </summary>
         public AsyncUdpClient()
         {
+            LocalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
+            RemoteEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
         }
         /// <inheritdoc/>
         public bool Close()
@@ -70,7 +73,7 @@ namespace SpaceCG.Net
             {
                 _UdpClient.Close();
                 _UdpClient = null;
-                _RemoteEP = null;
+                _ConnectEP = null;
             }
 
             return true;
@@ -84,9 +87,7 @@ namespace SpaceCG.Net
         {
             if (_UdpClient == null)
             {
-                RemotePort = remotePort;
-                RemoteAddress = remoteAddress;
-                _RemoteEP = new IPEndPoint(remoteAddress, remotePort);
+                _ConnectEP = new IPEndPoint(remoteAddress, remotePort);
 
                 try
                 {
@@ -95,26 +96,26 @@ namespace SpaceCG.Net
                     _UdpClient.ExclusiveAddressUse = true;
                     if(Environment.OSVersion.Platform == PlatformID.Win32NT) _UdpClient.AllowNatTraversal(true);
                     _UdpClient.Connect(remoteAddress, remotePort);
-                    
-                    LocalPort = ((IPEndPoint)(_UdpClient.Client.LocalEndPoint)).Port;
-                    LocalAddress = ((IPEndPoint)(_UdpClient.Client.LocalEndPoint)).Address;
                 }
                 catch(Exception ex)
                 {
                     _UdpClient?.Close();
                     _UdpClient = null;
-                    Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                    Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
                 }
 
                 if(_UdpClient.Client.Connected)
                 {
                     first_io = true;
-                    Connected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
+                    Connected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
                     _UdpClient.BeginReceive(ReceiveCallback, _UdpClient);
+
+                    LocalEndPoint = _UdpClient.Client.LocalEndPoint as IPEndPoint;
+                    RemoteEndPoint = _UdpClient.Client.RemoteEndPoint as IPEndPoint;
                 }
                 else
                 {
-                    Disconnected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
+                    Disconnected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
                 }
             }
 
@@ -125,11 +126,12 @@ namespace SpaceCG.Net
             if (_UdpClient == null) return;
 
             byte[] data;
-            IPEndPoint remoteEP = _RemoteEP;
+            IPEndPoint remoteEP = _ConnectEP;
 
             try
             {
                 data = _UdpClient.EndReceive(ar, ref remoteEP);
+                RemoteEndPoint = remoteEP;
             }
             catch (Exception ex)
             {
@@ -160,7 +162,7 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
                 return false;
             }
         }
@@ -177,19 +179,19 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 count = 0;
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
             }
 
             if (count > 0 && !first_io)
             {
                 first_io = true;
-                Connected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
+                Connected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
             }
 
             if (count == 0)
             {
                 Close();
-                Disconnected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
+                Disconnected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
             }
         }
 
@@ -198,19 +200,16 @@ namespace SpaceCG.Net
         {
             Close();
 
-            _RemoteEP = null;
+            _ConnectEP = null;
             _UdpClient = null;
 
-            LocalPort = -1;
-            LocalAddress = null;
-
-            RemotePort = -1;
-            RemoteAddress = null;
+            LocalEndPoint = null;
+            RemoteEndPoint = null;
         }
 
         public override string ToString()
         {
-            return $"[{nameof(AsyncUdpClient)}] {LocalAddress}:{LocalPort} => {RemoteAddress}:{RemotePort}";
+            return $"[{nameof(AsyncUdpClient)}] {LocalEndPoint} => {RemoteEndPoint}";
         }
     }
 }

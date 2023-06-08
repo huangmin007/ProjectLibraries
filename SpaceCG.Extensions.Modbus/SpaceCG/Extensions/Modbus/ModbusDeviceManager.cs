@@ -114,7 +114,7 @@ namespace SpaceCG.Extensions.Modbus
                 ControlInterface.InstallNetworkService(localPort, "0.0.0.0");
 
                 this.Name = Configuration.Attribute("Name").Value;
-                if (!String.IsNullOrWhiteSpace(Name)) ControlInterface.AddControlObject(Name, this);
+                if (!String.IsNullOrWhiteSpace(Name)) ControlInterface.AccessObjects.Add(Name, this);
             }
         }
         /// <summary>
@@ -140,11 +140,11 @@ namespace SpaceCG.Extensions.Modbus
                 switch(type.ToUpper().Replace(" ", ""))
                 {
                     case "SERIAL":
-                        ControlInterface.AddControlObject(name, new SerialPort(args[1], port));
+                        ControlInterface.AccessObjects.Add(name, new SerialPort(args[1], port));
                         break;
 
                     case "MODBUS":
-                        ControlInterface.AddControlObject(name, NModbus4Extensions.CreateNModbus4Master(args[0], args[1], port));
+                        ControlInterface.AccessObjects.Add(name, NModbus4Extensions.CreateNModbus4Master(args[0], args[1], port));
                         break;
 
                     case "SERVER":
@@ -159,7 +159,7 @@ namespace SpaceCG.Extensions.Modbus
                                 Logger.Warn($"连接参数错误：{name},{type},{parameters}");
 
                             if (Server != null && Server.Start())
-                                ControlInterface.AddControlObject(name, Server);
+                                ControlInterface.AccessObjects.Add(name, Server);
                         }
                         catch(Exception ex)
                         {
@@ -182,7 +182,7 @@ namespace SpaceCG.Extensions.Modbus
                                 Logger.Warn($"连接参数错误：{name},{type},{parameters}");
 
                             if (Client != null && Client.Connect(args[1], (ushort)port))
-                                ControlInterface.AddControlObject(name, Client);
+                                ControlInterface.AccessObjects.Add(name, Client);
                         }
                         catch(Exception ex)
                         {
@@ -208,7 +208,7 @@ namespace SpaceCG.Extensions.Modbus
                     transport.InputChangeEvent += Transport_InputChangeEvent;
                     transport.OutputChangeEvent += Transport_OutputChangeEvent;
 
-                    ControlInterface.AddControlObject(transport.Name, transport);
+                    ControlInterface.AccessObjects.Add(transport.Name, transport);
                 }
                 else
                 {
@@ -328,7 +328,7 @@ namespace SpaceCG.Extensions.Modbus
             }
 
             Type DisposableType = typeof(IDisposable);
-            foreach (KeyValuePair<String, Object> obj in ControlInterface.GetControlObjects())
+            foreach (KeyValuePair<String, Object> obj in ControlInterface.AccessObjects)
             {
                 if (obj.Key == this.Name || obj.Value == this) continue;
 
@@ -347,7 +347,7 @@ namespace SpaceCG.Extensions.Modbus
             }
 
             TransportDevices.Clear();
-            ControlInterface.RemoveControlObjects();
+            ControlInterface.AccessObjects.Clear();
             ControlInterface.UninstallNetworkServices();
 
             Configuration = null;

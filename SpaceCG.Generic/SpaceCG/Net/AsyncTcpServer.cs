@@ -19,10 +19,10 @@ namespace SpaceCG.Net
         public int ClientCount => _Clients != null ? _Clients.Count : 0;
         /// <inheritdoc/>
         public bool IsRunning { get; private set; }
+
         /// <inheritdoc/>
-        public int LocalPort { get; private set; }
-        /// <inheritdoc/>
-        public IPAddress LocalAddress { get; private set; }        
+        public IPEndPoint LocalEndPoint { get; private set; }
+
         /// <inheritdoc/>
         public ICollection<EndPoint> Clients => _Clients?.Keys;
         /// <inheritdoc/>
@@ -38,7 +38,6 @@ namespace SpaceCG.Net
         /// 服务器使用的异步TcpListener
         /// </summary>
         private TcpListener _Listener;
-        private IPEndPoint _LocalEndPoint;
         private ConcurrentDictionary<EndPoint, byte[]> _Buffers;// = new ConcurrentDictionary<EndPoint, byte[]>();
         private ConcurrentDictionary<EndPoint, TcpClient> _Clients;// = new ConcurrentDictionary<EndPoint, TcpClient>();
 
@@ -63,25 +62,23 @@ namespace SpaceCG.Net
         /// <param name="listenPort">监听的端口</param>
         public AsyncTcpServer(IPAddress localIPAddress, ushort listenPort)
         {
-            LocalPort = listenPort;
-            LocalAddress = localIPAddress;
-            _LocalEndPoint = new IPEndPoint(localIPAddress, listenPort);
-
-            _Buffers = new ConcurrentDictionary<EndPoint, byte[]>();
-            _Clients = new ConcurrentDictionary<EndPoint, TcpClient>();
-
             try
             {
-                _Listener = new TcpListener(LocalAddress, LocalPort);
+                _Listener = new TcpListener(localIPAddress, listenPort);
                 if (Environment.OSVersion.Platform == PlatformID.Win32NT)
                 {
                     _Listener.AllowNatTraversal(true);
                 }
+                LocalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error($"{ex}");
+                return;
             }
+
+            _Buffers = new ConcurrentDictionary<EndPoint, byte[]>();
+            _Clients = new ConcurrentDictionary<EndPoint, TcpClient>();
         }
         /// <summary>
         /// 异步 TCP 服务器
@@ -102,13 +99,13 @@ namespace SpaceCG.Net
             {
                 _Listener.Start(1024);
                 _Listener.BeginAcceptTcpClient(AcceptCallback, _Listener);
-                _LocalEndPoint = (IPEndPoint)_Listener.Server.LocalEndPoint;
+                LocalEndPoint = _Listener.Server.LocalEndPoint as IPEndPoint;
             }
             catch (Exception ex)
             {
                 IsRunning = _Listener.Server.IsBound;
                 Logger.Error($"{nameof(AsyncTcpServer)} 启动失败：{ex}");
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(_LocalEndPoint, ex));
+                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
                 return false;
             }
 
@@ -130,7 +127,7 @@ namespace SpaceCG.Net
             {
                 IsRunning = _Listener.Server.IsBound;
                 Logger.Error($"{nameof(AsyncTcpServer)} 停止失败：{ex}");
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(_LocalEndPoint, ex));
+                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
                 return false;
             }
 
@@ -191,7 +188,6 @@ namespace SpaceCG.Net
             if (!IsRunning || ar.AsyncState == null) return;
 
             TcpClient tcpClient = (TcpClient)ar.AsyncState;
-            //NetworkStream stream = tcpClient.GetStream();
             EndPoint endPoint = tcpClient.Client.RemoteEndPoint;
 
             int count = 0;
@@ -260,6 +256,11 @@ namespace SpaceCG.Net
                 return false;
             }
         }
+        /// <inheritdoc/>
+        public bool SendMessage(String message, EndPoint remote) => SendBytes(Encoding.UTF8.GetBytes(message), remote);
+        /// <inheritdoc/>
+        public bool SendMessage(String message, String ipAddress, int port) => SendBytes(Encoding.UTF8.GetBytes(message), ipAddress, port);
+
         /// <summary>
         /// 发送数据完成处理回调函数
         /// </summary>
@@ -327,12 +328,14 @@ namespace SpaceCG.Net
 
             _Clients = null;
             _Buffers = null;
+            LocalEndPoint = null;
+
             //GC.SuppressFinalize(this);
         }
 
         public override string ToString()
         {
-            return $"[{nameof(AsyncTcpServer)}] {LocalAddress}:{LocalPort}";
+            return $"[{nameof(AsyncTcpServer)}] {LocalEndPoint}";
         }
 
     }

@@ -20,9 +20,7 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public bool IsRunning { get; private set; }
         /// <inheritdoc/>
-        public int LocalPort { get; private set; }
-        /// <inheritdoc/>
-        public IPAddress LocalAddress { get; private set; }        
+        public IPEndPoint LocalEndPoint { get; private set; }
         /// <inheritdoc/>
         public ICollection<EndPoint> Clients => _Clients?.ToArray();
         /// <inheritdoc/>
@@ -35,7 +33,6 @@ namespace SpaceCG.Net
         public event EventHandler<AsyncExceptionEventArgs> ExceptionEventHandler;
 
         private UdpClient _Server;
-        private IPEndPoint _LocalEndPoint;
         private List<IPEndPoint> _Clients;
 
         /// <summary>
@@ -59,12 +56,9 @@ namespace SpaceCG.Net
         /// <param name="listenPort"></param>
         public AsyncUdpServer(IPAddress localIPAddress, ushort listenPort)
         {
-            this.LocalAddress = localIPAddress;
-            this.LocalPort = listenPort;
-
-            _LocalEndPoint = new IPEndPoint(localIPAddress, listenPort);
             _Clients = new List<IPEndPoint>();
-            _Server = new UdpClient(new IPEndPoint(this.LocalAddress, this.LocalPort));
+            _Server = new UdpClient(new IPEndPoint(localIPAddress, listenPort));
+            LocalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
         }
         /// <summary>
         /// 异步 UDP 服务
@@ -86,7 +80,9 @@ namespace SpaceCG.Net
                 {
                     _Server.AllowNatTraversal(true);
                 }
+
                 _Server.BeginReceive(ReceiveCallback, null);
+                LocalEndPoint = _Server.Client.LocalEndPoint as IPEndPoint;
             }
 
             return IsRunning;
@@ -104,7 +100,7 @@ namespace SpaceCG.Net
                 catch(Exception ex)
                 {
                     IsRunning = false;
-                    ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(_LocalEndPoint, ex));
+                    ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
                 }
 
                 _Clients.Clear();
@@ -184,6 +180,10 @@ namespace SpaceCG.Net
             }
             return true;
         }
+        /// <inheritdoc/>
+        public bool SendMessage(String message, EndPoint remote) => SendBytes(Encoding.UTF8.GetBytes(message), remote);
+        /// <inheritdoc/>
+        public bool SendMessage(String message, String ipAddress, int port) => SendBytes(Encoding.UTF8.GetBytes(message), ipAddress, port);
         private void SendCallback(IAsyncResult ar)
         {
             if (!ar.IsCompleted) return;
@@ -221,11 +221,13 @@ namespace SpaceCG.Net
 
             _Server?.Dispose();
             _Server = null;
+
+            LocalEndPoint = null;
         }
 
         public override string ToString()
         {
-            return $"[{nameof(AsyncUdpServer)}] {LocalAddress}:{LocalPort}";
+            return $"[{nameof(AsyncUdpServer)}] {LocalEndPoint}";
         }
 
     }

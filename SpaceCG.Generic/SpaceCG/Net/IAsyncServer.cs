@@ -39,13 +39,9 @@ namespace SpaceCG.Net
         /// </summary>
         bool IsRunning { get; }
         /// <summary>
-        /// 服务端绑定的本地端口号
+        /// 绑定的本地 IP 地址和端口号
         /// </summary>
-        int LocalPort { get; }
-        /// <summary>
-        /// 服务端绑定的 IP 地址
-        /// </summary>
-        IPAddress LocalAddress { get; }
+        IPEndPoint LocalEndPoint { get; }
 
         /// <summary>
         /// 启动服务
@@ -68,11 +64,26 @@ namespace SpaceCG.Net
         /// <summary>
         /// 异步发送数据到远程客户端
         /// </summary>
+        /// <param name="data">要发送的数据</param>
         /// <param name="ipAddress">远程 IP 地址</param>
         /// <param name="port">远程端口号</param>
-        /// <param name="data">要发送的数据</param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
         bool SendBytes(byte[] data, String ipAddress, int port);
+        /// <summary>
+        /// 步发送文本消息到远程客户端
+        /// </summary>
+        /// <param name="message">要发送的消息</param>
+        /// <param name="remote">远程地址</param>
+        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
+        bool SendMessage(String message, EndPoint remote);
+        /// <summary>
+        /// 步发送文本消息到远程客户端
+        /// </summary>
+        /// <param name="message">要发送的消息</param>
+        /// <param name="ipAddress">远程 IP 地址</param>
+        /// <param name="port">远程端口号</param>
+        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
+        bool SendMessage(String message,  String ipAddress, int port);
 
         /// <summary>
         /// 异步发送数据到所有远程客户端

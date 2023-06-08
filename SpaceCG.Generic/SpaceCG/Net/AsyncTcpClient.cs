@@ -15,14 +15,12 @@ namespace SpaceCG.Net
 
         /// <inheritdoc/>
         public bool IsConnected => _TcpClient != null && _TcpClient.Connected;
+
         /// <inheritdoc/>
-        public int RemotePort { get; private set; }
+        public IPEndPoint LocalEndPoint { get; private set; }
         /// <inheritdoc/>
-        public IPAddress RemoteAddress { get; private set; }
-        /// <inheritdoc/>
-        public int LocalPort { get; private set; }
-        /// <inheritdoc/>
-        public IPAddress LocalAddress { get; private set; }
+        public IPEndPoint RemoteEndPoint { get; private set; }       
+        
         /// <inheritdoc/>
         public int ReadTimeout
         {
@@ -55,7 +53,10 @@ namespace SpaceCG.Net
 
         private byte[] _Buffer;
         private TcpClient _TcpClient;
-        private IPEndPoint _RemoteEP;
+        /// <summary>
+        /// 连接参数
+        /// </summary>
+        private IPEndPoint _ConnectEP;
         private String _ConnectStatus = "Ready";
 
         /// <summary>
@@ -63,6 +64,14 @@ namespace SpaceCG.Net
         /// </summary>
         public AsyncTcpClient() 
         {
+            LocalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
+            RemoteEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
+        }
+
+        internal AsyncTcpClient(TcpClient tcpClient):base()
+        {
+            this._TcpClient = tcpClient;
+            _ConnectEP = tcpClient.Client.RemoteEndPoint as IPEndPoint;
         }
 
         /// <inheritdoc/>
@@ -85,7 +94,7 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
                 return false;
             }
         }
@@ -101,12 +110,9 @@ namespace SpaceCG.Net
 
             if (_TcpClient == null)
             {
-                RemotePort = remotePort;
-                RemoteAddress = remoteAddress;
                 _ConnectStatus = "Connecting";
-
                 _TcpClient = new TcpClient();
-                _RemoteEP = new IPEndPoint(remoteAddress, remotePort);
+                _ConnectEP = new IPEndPoint(remoteAddress, remotePort);
                 _Buffer = new byte[Math.Max(Math.Min(_TcpClient.ReceiveBufferSize, 8192), 2048)];
             }
 
@@ -118,7 +124,7 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 _ConnectStatus = "ConnectException";
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
                 return false;
             }
         }
@@ -131,27 +137,23 @@ namespace SpaceCG.Net
             catch(Exception ex)
             {
                 _ConnectStatus = "ConnectException";
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
             }
 
             if (_TcpClient.Connected)
             {
-                //_ReconnectCount = 0;
                 _ConnectStatus = "ConnectSuccess";
 
-                RemotePort = _RemoteEP.Port;
-                RemoteAddress = _RemoteEP.Address;
-                _RemoteEP = (IPEndPoint)_TcpClient.Client.RemoteEndPoint;
-                LocalPort = ((IPEndPoint)_TcpClient.Client.LocalEndPoint).Port;
-                LocalAddress = ((IPEndPoint)_TcpClient.Client.LocalEndPoint).Address;
+                LocalEndPoint = _TcpClient.Client.LocalEndPoint as IPEndPoint;
+                RemoteEndPoint = _TcpClient.Client.RemoteEndPoint as IPEndPoint;
 
-                Connected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
+                Connected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
                 _TcpClient.GetStream().BeginRead(_Buffer, 0, _Buffer.Length, ReadCallback, _TcpClient);
             }
             else
             {
                 _ConnectStatus = "ConnectFailed";
-                Disconnected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
+                Disconnected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
             }
         }
         private void ReadCallback(IAsyncResult ar)
@@ -166,19 +168,19 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 count = 0;
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
             }
 
             if (count == 0)
             {
                 Close();
-                Disconnected?.Invoke(this, new AsyncEventArgs(_RemoteEP));
+                Disconnected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
                 return;
             }
 
             byte[] buffer = new byte[count];
             Buffer.BlockCopy(_Buffer, 0, buffer, 0, count);
-            DataReceived?.Invoke(this, new AsyncDataEventArgs(_RemoteEP, buffer));
+            DataReceived?.Invoke(this, new AsyncDataEventArgs(_ConnectEP, buffer));
 
             _TcpClient.GetStream().BeginRead(_Buffer, 0, _Buffer.Length, ReadCallback, _TcpClient);
         }
@@ -197,7 +199,7 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
                 return false;
             }
         }
@@ -209,7 +211,7 @@ namespace SpaceCG.Net
             }
             catch(Exception ex)
             {
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_RemoteEP, ex));
+                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
                 return;
             }
         }
@@ -220,20 +222,17 @@ namespace SpaceCG.Net
             Close();
 
             _Buffer = null;
-            _RemoteEP = null;
+            _ConnectEP = null;
             _TcpClient = null;
             _ConnectStatus = null;
 
-            LocalPort = -1;
-            LocalAddress = null;
-
-            RemotePort = -1;
-            RemoteAddress = null;
+            LocalEndPoint = null;
+            RemoteEndPoint = null;
         }
 
         public override string ToString()
         {
-            return $"[{nameof(AsyncTcpClient)}] {LocalAddress}:{LocalPort} => {RemoteAddress}:{RemotePort}";
+            return $"[{nameof(AsyncTcpClient)}] {LocalEndPoint} => {RemoteEndPoint}";
         }
     }
 }

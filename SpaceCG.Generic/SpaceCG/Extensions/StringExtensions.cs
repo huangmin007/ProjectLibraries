@@ -237,6 +237,9 @@ namespace SpaceCG.Extensions
         /// <summary> 正则匹配 ',' 分割, 或结尾部份 </summary>
         private static readonly String pattern_split = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";
         private static readonly String pattern_arguments = $@"{pattern_string}|{pattern_array}|{pattern_split}";
+        /// <summary>
+        /// 字符串参数正则表达式
+        /// </summary>
         public static readonly Regex RegexStringArguments = new Regex(pattern_arguments, RegexOptions.Compiled | RegexOptions.Singleline);
 
         /// <summary>
@@ -287,7 +290,9 @@ namespace SpaceCG.Extensions
                     args.Add(match.Value);
                 }
 #else
-                //.Net 4.7 或以上版本
+                //.Net Framework 4.7 或以上版本  
+                //.NET Standard 2.1 或以上版本
+                //.NET 5,6,7
                 foreach (Group group in match.Groups)
                 {
                     if (group.Success && match.Name != group.Name)

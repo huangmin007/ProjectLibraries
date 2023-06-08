@@ -16,22 +16,15 @@ namespace SpaceCG.Net
         /// 与服务端的连接状态
         /// </summary>
         bool IsConnected { get; }
+
         /// <summary>
-        /// 服务端绑定的本地端口号
+        /// 绑定的本地 IP 地址和端口号
         /// </summary>
-        int RemotePort { get; }
+        IPEndPoint LocalEndPoint { get; }
         /// <summary>
-        /// 服务端绑定的 IP 地址
+        /// 绑定的远程 IP 地址和端口号
         /// </summary>
-        IPAddress RemoteAddress { get; }
-        /// <summary>
-        /// 连接对象绑定的本地端口号
-        /// </summary>
-        int LocalPort { get; }
-        /// <summary>
-        /// 连接对象绑定的本地 IP 地址
-        /// </summary>
-        IPAddress LocalAddress { get; }
+        IPEndPoint RemoteEndPoint { get; }
 
         /// <summary>
         /// 这是一个同步参数？？？获取或设置一个值，该值指定之后同步 Overload:System.Net.Sockets.Socket.Receive 调用将超时的时间长度。
