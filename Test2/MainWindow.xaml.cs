@@ -16,6 +16,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using SpaceCG.Generic;
 using SpaceCG.Net;
 
@@ -62,16 +63,25 @@ namespace Test2
 
             controlInterface = new ControlInterface(2023);
             controlInterface.AccessObjects.Add("window", this);
-
         }
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)
         {
             logger.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
-            
+            int r = Add(5, 9);
+            logger.Info($"Result::{r}");
         }
 
         public int Add(int a, int b) 
+        {
+            return Task.Run<int>(() =>
+            {
+                Thread.Sleep(5000);
+                return a + b;
+            }).Result;
+        }
+
+        public int Add2(int a, int b)
         {
             return a + b;
         }

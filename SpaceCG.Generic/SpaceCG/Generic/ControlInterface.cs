@@ -9,6 +9,7 @@ using SpaceCG.Net;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Diagnostics;
 
 namespace SpaceCG.Generic
 {
@@ -53,10 +54,13 @@ namespace SpaceCG.Generic
         public List<String> PropertyFilters { get; } = new List<String>(16) { "*.Name" };
 
         /// <summary>
-        /// 反射控制接口对象
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Response="False" Async="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="False" Async="True" /&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
+        /// 当前线程同步上下文
         /// </summary>
+        private SynchronizationContext SyncContext = SynchronizationContext.Current;
+
+        /// <summary>
+        /// 反射控制接口对象
+        /// <para>控制协议(XML)：&lt;Action Target="object name;/
         /// <param name="localPort">服务端口，小于 1024 则不启动服务接口</param>
         public ControlInterface(ushort localPort = 2023)
         {
@@ -280,6 +284,7 @@ namespace SpaceCG.Generic
                 Logger.Error($"XML 格式数据 {xmlMessage} 错误，节点名称应为 Action");
                 return false;
             }
+
             if (String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value))
             {
                 Logger.Error($"XML 格式数据 {xmlMessage} 错误，节点属性 Target 不能为空");
@@ -342,39 +347,54 @@ namespace SpaceCG.Generic
 
             try
             {
+                TaskResult taskResult = new TaskResult(false, null);
                 object[] parameters = StringExtensions.SplitParameters(actionElement.Attribute("Params")?.Value);
 
-                if (Async)
+                if (Async)  //异步执行
                 {
-                    //在线程池上执行
-                    var Result = Task.Run<TaskResult>(() =>
+                    taskResult = Task.Run<TaskResult>(() =>
                     {
-                        bool success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
-                        return new TaskResult(success, value);
-                    }).Result;
+                        if (SyncContext != null)
+                        {
+                            TaskResult tResult = new TaskResult(false, null);
+                            //ManualResetEvent manualResetEvent = new ManualResetEvent(false);
+                            //SyncContext.Post((o) =>
+                            SyncContext.Send((o) =>
+                            {
+                                tResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
+                                tResult.ReturnValue = value;
+                                //manualResetEvent.Set();
+                            }, tResult);
 
-                    if (Result.Success) returnResult = Result.ReturnValue;
-                    return Result.Success;
+                            //bool wait = manualResetEvent.WaitOne(3_000);
+                            //manualResetEvent.Dispose();
+                            return tResult;
+                        }
+                        else
+                        {
+                            bool success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
+                            return new TaskResult(success, value);
+                        }
+                    }).Result;
+                    
+                    if (taskResult.Success) returnResult = taskResult.ReturnValue;
+                    return taskResult.Success;
                 }
                 else
                 {
-                    //在当前线程的同步止下文中执行同步方法
-                    SynchronizationContext syncContext = SynchronizationContext.Current;
-                    if (syncContext != null)
+                    if (SyncContext != null)
                     {
-                        var Result = new TaskResult(false, null);
-                        syncContext.Send((o) =>
+                        SyncContext.Send((o) =>
                         {
-                            Result.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
-                            Result.ReturnValue = value;
-                        }, Result);
+                            taskResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
+                            taskResult.ReturnValue = value;
+                        }, taskResult);
 
-                        if (Result.Success) returnResult = Result.ReturnValue;
-                        return Result.Success;
+                        if (taskResult.Success) returnResult = taskResult.ReturnValue;
+                        return taskResult.Success;
                     }
                     else
                     {
-                        //在当前线程(通信线程)中同步执行方法，是通信线程中执行
                         return InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out returnResult);
                     }
                 }
@@ -428,43 +448,61 @@ namespace SpaceCG.Generic
 
             try
             {
+                TaskResult taskResult = new TaskResult(false, null);
+
                 if (Async)
                 {
-                    //在当前线程(通信线程)中异步执行方法，是在线程池上执行
-                    var Result = Task.Run<TaskResult>(() =>
+                    taskResult = Task.Run<TaskResult>(() =>
                     {
-                        if (actionElement.Attribute("Value") != null)
-                            InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
+                        if (SyncContext != null)
+                        {
+                            TaskResult tResult = new TaskResult(false, null);
+                            ManualResetEvent manualResetEvent = new ManualResetEvent(false);
+                            SyncContext.Post((o) =>
+                            {
+                                if (actionElement.Attribute("Value") != null)
+                                    InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
 
-                        bool success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
-                        return new TaskResult(success, value);
-                    }).Result;
+                                tResult.Success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
+                                tResult.ReturnValue = value;
+                                manualResetEvent.Set();
+                            }, tResult);
 
-                    if (Result.Success) returnResult = Result.ReturnValue;
-                    return Result.Success;
-                }
-                else
-                {
-                    SynchronizationContext syncContext = SynchronizationContext.Current;
-                    if (syncContext != null)
-                    {
-                        //在当前线程的同步止下文中执行同步方法
-                        var Result = new TaskResult(false, null);
-                        syncContext.Send((o) =>
+                            bool wait = manualResetEvent.WaitOne(3_000);
+                            manualResetEvent.Dispose();
+                            return tResult;
+                        }
+                        else
                         {
                             if (actionElement.Attribute("Value") != null)
                                 InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
 
-                            Result.Success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
-                            Result.ReturnValue = value;
-                        }, Result);
+                            bool success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
+                            return new TaskResult(success, value);
+                        }
+                    }).Result;
 
-                        if (Result.Success) returnResult = Result.ReturnValue;
-                        return Result.Success;
+                    if (taskResult.Success) returnResult = taskResult.ReturnValue;
+                    return taskResult.Success;
+                }
+                else
+                {
+                    if (SyncContext != null)
+                    {
+                        SyncContext.Send((o) =>
+                        {
+                            if (actionElement.Attribute("Value") != null)
+                                InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
+
+                            taskResult.Success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
+                            taskResult.ReturnValue = value;
+                        }, taskResult);
+
+                        if (taskResult.Success) returnResult = taskResult.ReturnValue;
+                        return taskResult.Success;
                     }
                     else
                     {
-                        //在当前线程(通信线程)中同步执行方法，是通信线程中执行
                         if (actionElement.Attribute("Value") != null)
                             InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
                         return InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out returnResult);
@@ -493,6 +531,8 @@ namespace SpaceCG.Generic
 
             MessageGroups?.Clear();
             MessageGroups = null;
+
+            SyncContext = null;
         }
        
         /// <summary>
@@ -540,6 +580,7 @@ namespace SpaceCG.Generic
     {
         internal bool Success { get; set; }
         internal object ReturnValue { get; set; }
+
         public TaskResult(bool success, object value)
         {
             Success = success;
