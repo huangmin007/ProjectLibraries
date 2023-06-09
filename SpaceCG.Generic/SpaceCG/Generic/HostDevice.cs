@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 
 namespace SpaceCG.Generic
 {
+    /// <summary>
+    /// HostDevice
+    /// </summary>
     public class HostDevice
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(HostDevice));

@@ -214,7 +214,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// 同步寄存器数据
         /// </summary>
-        /// <param name="modbusTransport"></param>
+        /// <param name="token"></param>
         private void SyncModbusDevicesStatus(CancellationToken token)
         {
             //ModbusTransportDevice transport = this;// (ModbusTransportDevice)modbusTransport;

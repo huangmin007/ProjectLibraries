@@ -8,16 +8,16 @@ using Modbus.Device;
 
 namespace SpaceCG.Extensions
 {
+    /// <summary>
+    /// NModbus4Extensions
+    /// </summary>
     public static partial class NModbus4Extensions
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(NModbus4Extensions));
 
 #if NModbus4
-        public static void Sleep(this IModbusMaster master, int millisecondsTimeout)
-        {
-            if (millisecondsTimeout > 0) System.Threading.Thread.Sleep(millisecondsTimeout);
-        }
 
+        #region NModbus4 翻转线圈扩展函数
         /// <summary>
         /// 翻转单线圈
         /// </summary>
@@ -86,16 +86,67 @@ namespace SpaceCG.Extensions
 
             master.WriteMultipleCoils(slaveAddress, startAddress, value);
         }
-
+        /// <summary>
+        /// 翻转单线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
         public static void TurnSingleCoilAsync(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoilAsync((IModbusMaster)master, slaveAddress, startAddress);
+        /// <summary>
+        /// 翻转多线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
+        /// <param name="numberOfPoints"></param>
         public static void TurnMultipleCoilisAsync(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilisAsync((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        /// <summary>
+        /// 翻转单线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
         public static void TurnSingleCoilAsync(this ModbusIpMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoilAsync((IModbusMaster)master, slaveAddress, startAddress);
+        /// <summary>
+        /// 翻转多线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
+        /// <param name="numberOfPoints"></param>
         public static void TurnMultipleCoilisAsync(this ModbusIpMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilisAsync((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
-        
+        /// <summary>
+        /// 翻转单线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
         public static void TurnSingleCoil(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoil((IModbusMaster)master, slaveAddress, startAddress);
+        /// <summary>
+        /// 翻转多线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
+        /// <param name="numberOfPoints"></param>
         public static void TurnMultipleCoilis(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilis((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        /// <summary>
+        /// 翻转单线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
         public static void TurnSingleCoil(this ModbusIpMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoil((IModbusMaster)master, slaveAddress, startAddress);
+        /// <summary>
+        /// 翻转多线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
+        /// <param name="numberOfPoints"></param>
         public static void TurnMultipleCoilis(this ModbusIpMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilis((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        #endregion
 
         /// <summary>
         /// 创建 NModbus4 主机对象
@@ -164,6 +215,7 @@ namespace SpaceCG.Extensions
 
             return master;
         }
+        
         /// <summary>
         /// 关闭并清理 NModbus4Master 对象
         /// </summary>

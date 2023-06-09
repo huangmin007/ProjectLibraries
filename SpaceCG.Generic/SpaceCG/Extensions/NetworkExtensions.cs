@@ -8,6 +8,9 @@ using SpaceCG.Generic;
 
 namespace SpaceCG.Extensions
 {
+    /// <summary>
+    /// NetworkExtensions
+    /// </summary>
     public static partial class NetworkExtensions
     {
         /// <summary>

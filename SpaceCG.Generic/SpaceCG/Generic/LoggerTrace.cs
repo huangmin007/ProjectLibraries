@@ -24,8 +24,13 @@ namespace SpaceCG.Generic
         private static int id = 0;
         private static readonly TextWriterTraceListener consoleListener;
         private static readonly TextWriterTraceListener textFileListener;
-
+        /// <summary>
+        /// IsDebugEnabled
+        /// </summary>
         public bool IsDebugEnabled => TraceSource?.Switch.Level != SourceLevels.Off && TraceSource?.Switch.Level <= SourceLevels.Verbose;
+        /// <summary>
+        /// IsInfoEnabled
+        /// </summary>
         public bool IsInfoEnabled => TraceSource?.Switch.Level != SourceLevels.Off && TraceSource?.Switch.Level <= SourceLevels.Information;
 
         static LoggerTrace()
@@ -163,14 +168,20 @@ namespace SpaceCG.Generic
                 TraceSource = null;
             }
         }
-
+        /// <summary>
+        /// Debug
+        /// </summary>
+        /// <param name="message"></param>
         public void Debug(object message)
         {
             if (TraceSource == null) return;
             TraceSource.TraceEvent(TraceEventType.Verbose, id++, FormatMessage(message));
             TraceSource.Flush();
         }
-
+        /// <summary>
+        /// Info
+        /// </summary>
+        /// <param name="message"></param>
         public void Info(object message)
         {
             if (TraceSource == null) return;
@@ -178,7 +189,10 @@ namespace SpaceCG.Generic
             TraceSource.TraceEvent(TraceEventType.Information, id++, FormatMessage(message));
             TraceSource.Flush();
         }
-
+        /// <summary>
+        /// Warn
+        /// </summary>
+        /// <param name="message"></param>
         public void Warn(object message)
         {
             if (TraceSource == null) return;
@@ -186,13 +200,19 @@ namespace SpaceCG.Generic
             TraceSource.TraceEvent(TraceEventType.Warning, id++, FormatMessage(message));
             TraceSource.Flush();
         }
-
+        /// <summary>
+        /// Error
+        /// </summary>
+        /// <param name="message"></param>
         public void Error(object message)
         {
             TraceSource.TraceEvent(TraceEventType.Error, id++, FormatMessage(message));
             TraceSource.Flush();
         }
-
+        /// <summary>
+        /// Fatal
+        /// </summary>
+        /// <param name="message"></param>
         public void Fatal(object message)
         {
             if (TraceSource == null) return;
@@ -434,10 +454,20 @@ namespace SpaceCG.Generic
         }
     }
 
-    public class WriteEventArgs:EventArgs
+    /// <summary>
+    /// WriteEventArgs
+    /// </summary>
+    public class WriteEventArgs : EventArgs
     {
+        /// <summary>
+        /// Message
+        /// </summary>
         public string Message { get; internal set; }
 
+        /// <summary>
+        /// WriteEventArgs
+        /// </summary>
+        /// <param name="message"></param>
         public WriteEventArgs(string message)
         {
             this.Message = message;

@@ -151,6 +151,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="offset"></param>
         /// <param name="name"></param>
         /// <param name="units"></param>
+        /// <param name="enabledChangeEvent"></param>
         /// <returns></returns>
         public static Register Create(ushort address, RegisterType type, byte count = 1, bool isLittleEndian = true, byte offset = 0, string name = null, string units = null, bool enabledChangeEvent = true)
         {
@@ -206,7 +207,7 @@ namespace SpaceCG.Extensions.Modbus
     /// <summary>
     /// Modbus Input/Output Device 对象
     /// </summary>
-    public class ModbusIODevice:IDisposable
+    public class ModbusIODevice : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusIODevice));
 

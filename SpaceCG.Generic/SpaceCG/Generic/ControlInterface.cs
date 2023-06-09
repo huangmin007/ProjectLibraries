@@ -59,8 +59,10 @@ namespace SpaceCG.Generic
 
         /// <summary>
         /// 反射控制接口对象
-        /// <para>控制协议(XML)：&lt;Action Target="object name;/
+        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Response="False" Async="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="True" Async="False"/&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
         /// <param name="localPort">服务端口，小于 1024 则不启动服务接口</param>
+        /// </summary>
         public ControlInterface(ushort localPort = 2023)
         {
             InstallNetworkService(localPort);

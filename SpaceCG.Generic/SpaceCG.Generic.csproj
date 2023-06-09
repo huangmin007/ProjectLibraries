@@ -11,7 +11,18 @@
     <PackageProjectUrl />
     <RepositoryUrl>https://github.com/huangmin007/ProjectLibraries/tree/master/SpaceCG.Generic</RepositoryUrl>
     <Copyright>2023</Copyright>
-    <Version>1.0.9</Version>
+    <Version>1.0.10</Version>
+    <IncludeSymbols>False</IncludeSymbols>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>

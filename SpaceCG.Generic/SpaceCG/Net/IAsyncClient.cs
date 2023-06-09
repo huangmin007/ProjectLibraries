@@ -63,7 +63,7 @@ namespace SpaceCG.Net
         /// <summary>
         /// 连接远程主机
         /// </summary>
-        /// <param name="remoteEndPoint"></param>
+        /// <param name="remoteEP"></param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
         bool Connect(IPEndPoint remoteEP);
         /// <summary>

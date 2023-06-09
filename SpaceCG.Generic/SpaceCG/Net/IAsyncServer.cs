@@ -154,6 +154,7 @@ namespace SpaceCG.Net
         /// 异步连接对象异常事件参数
         /// </summary>
         /// <param name="endPoint"></param>
+        /// <param name="exception"></param>
         public AsyncExceptionEventArgs(EndPoint endPoint, Exception exception) : base(endPoint)
         {
             this.Exception = exception;

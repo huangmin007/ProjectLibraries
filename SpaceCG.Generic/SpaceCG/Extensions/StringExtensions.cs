@@ -8,6 +8,9 @@ using SpaceCG.Generic;
 
 namespace SpaceCG.Extensions
 {
+    /// <summary>
+    /// StringExtensions
+    /// </summary>
     public static partial class StringExtensions
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(StringExtensions));

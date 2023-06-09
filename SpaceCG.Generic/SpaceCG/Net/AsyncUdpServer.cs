@@ -228,7 +228,7 @@ namespace SpaceCG.Net
 
             LocalEndPoint = null;
         }
-
+        /// <inheritdoc/>
         public override string ToString()
         {
             return $"[{nameof(AsyncUdpServer)}] {LocalEndPoint}";

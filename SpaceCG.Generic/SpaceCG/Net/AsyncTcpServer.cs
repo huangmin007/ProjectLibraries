@@ -336,7 +336,7 @@ namespace SpaceCG.Net
 
             //GC.SuppressFinalize(this);
         }
-
+        /// <inheritdoc/>
         public override string ToString()
         {
             return $"[{nameof(AsyncTcpServer)}] {LocalEndPoint}";

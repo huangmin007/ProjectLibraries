@@ -26,12 +26,17 @@ namespace SpaceCG.Extensions.Modbus
         /// 传输对象协议封装对象
         /// </summary>
         public IModbusMaster Master { get; private set; }
-
+        /// <summary>
+        /// Read Timeout
+        /// </summary>
         public int ReadTimeout
         {
             get { return Master != null && Master.Transport != null ? Master.Transport.ReadTimeout : 0; }
             set { if (Master != null && Master.Transport != null) Master.Transport.ReadTimeout = value; }
         }
+        /// <summary>
+        /// Write Timeout
+        /// </summary>
         public int WriteTimeout
         {
             get { return Master != null && Master.Transport != null ? Master.Transport.WriteTimeout : 0; }
@@ -49,7 +54,6 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         /// <param name="slaveAddress"></param>
         /// <param name="coilAddress"></param>
-        /// <param name="value"></param>
         public void TurnSingleCoil(byte slaveAddress, ushort coilAddress)
         {
             ModbusIODevice device = GetIODevice(slaveAddress);
@@ -152,7 +156,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <para>在 addresses 中，最小地址 到 最大地址 有连续的存储记录</para>
         /// </summary>
         /// <param name="slaveAddress"></param>
-        /// <param name="addreses"></param>
+        /// <param name="addresses"></param>
         /// <param name="data"></param>
         public void WriteMultipleCoils(byte slaveAddress, ushort[] addresses, bool[] data)
         {
@@ -341,6 +345,11 @@ namespace SpaceCG.Extensions.Modbus
 
         }
 
+        /// <summary>
+        /// TestEcho
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
         public bool TestEcho(String message)
         {
             if (String.IsNullOrWhiteSpace(message))
