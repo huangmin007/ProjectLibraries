@@ -249,7 +249,7 @@ namespace SpaceCG.Generic
             base.Write(message);
             WriteEvent?.Invoke(this, new WriteEventArgs(message));
 
-            CheckWriter();
+            CheckFileSize();
         }
         /// <inheritdoc/>
         public override void WriteLine(string message)
@@ -257,7 +257,7 @@ namespace SpaceCG.Generic
             base.WriteLine(message);
             WriteEvent?.Invoke(this, new WriteEventArgs(message + Environment.NewLine));
 
-            CheckWriter();
+            CheckFileSize();
         }
 
         /// <inheritdoc/>
@@ -396,7 +396,7 @@ namespace SpaceCG.Generic
                 WriteLine(string.Empty);
             }
         }
-        private void CheckWriter()
+        private void CheckFileSize()
         {
             if (Writer == null) return;
 
@@ -404,33 +404,32 @@ namespace SpaceCG.Generic
             if (writer?.BaseStream == null) return;
 
             const long MaxSize = 1024 * 1024 * 2;
-            if (writer.BaseStream.Length >= MaxSize)
+            if (writer.BaseStream.Length < MaxSize) return;
+
+            FileStream fileStream = writer.BaseStream as FileStream;
+            if (fileStream == null) return;
+
+            try
             {
-                FileStream fileStream = writer.BaseStream as FileStream;
-                if (fileStream == null) return;
+                FileInfo curLogFile = new FileInfo(fileStream.Name);
+                String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);
+                int count = (int)(curLogFile.Directory.GetFiles($"{fileName}*", SearchOption.TopDirectoryOnly)?.Length) - 1;
 
-                try
-                {
-                    FileInfo curLogFile = new FileInfo(fileStream.Name);
-                    String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);
-                    int count = (int)(curLogFile.Directory.GetFiles($"{fileName}*", SearchOption.TopDirectoryOnly)?.Length) - 1;
+                String sourceFileName = curLogFile.FullName;
+                string destFileName = $"{curLogFile.Directory.FullName}\\{fileName}{count}{curLogFile.Extension}";
 
-                    String sourceFileName = curLogFile.FullName;
-                    string destFileName = $"{curLogFile.Directory.FullName}\\{fileName}{count}{curLogFile.Extension}";
+                Writer.Flush();
+                Writer.Close();
+                Writer.Dispose();
+                Writer = null;
 
-                    Writer.Flush();
-                    Writer.Close();
-                    Writer.Dispose();
-                    Writer = null;
-
-                    File.Move(sourceFileName, destFileName);
-                }
-                catch (Exception ex)
-                {
-                    WriteLine($"备份日志文件失败：{fileStream.Name}");
-                    WriteLine(ex.ToString());
-                    Flush();
-                }
+                File.Move(sourceFileName, destFileName);
+            }
+            catch (Exception ex)
+            {
+                WriteLine($"备份日志文件失败：{fileStream.Name}");
+                WriteLine(ex.ToString());
+                Flush();
             }
         }
     }

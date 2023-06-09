@@ -11,3 +11,8 @@
     - UDP,TCP 通信包 SpaceCG.Net
     - 反射函数、文本操作扩展函数
     - 等
+    - 
+
+```
+NuGet install-package: SpaceCG.Generic
+```

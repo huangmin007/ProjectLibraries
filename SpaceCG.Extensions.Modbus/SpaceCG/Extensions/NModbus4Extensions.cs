@@ -96,26 +96,7 @@ namespace SpaceCG.Extensions
         public static void TurnMultipleCoilis(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilis((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
         public static void TurnSingleCoil(this ModbusIpMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoil((IModbusMaster)master, slaveAddress, startAddress);
         public static void TurnMultipleCoilis(this ModbusIpMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilis((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
-#if false
-        /// <summary>
-        /// 创建 NModbus4 主机对象
-        /// <para>配置的键值格式：Type,RemoteHostORcomm,RemotePortORbaudRate</para>
-        /// <para>Type支持：TCP/TCP-RTU/UDP/UDP-RTU/SERIAL </para>
-        /// </summary>
-        /// <param name="cfgKey">Config Key Format:(type,hostORcom,portORbaudRate)</param>
-        /// <returns></returns>
-        public static IModbusMaster CreateNModbus4Master(string cfgKey)
-        {
-            if (String.IsNullOrWhiteSpace(ConfigurationManager.AppSettings[cfgKey])) return null;
 
-            String[] args = ConfigurationManager.AppSettings[cfgKey].Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (args.Length != 3) throw new ArgumentException("参数格式不正确");
-
-            if (!int.TryParse(args[2], out int portOrbaudRate)) return null;
-
-            return CreateNModbus4Master(args[0], args[1], portOrbaudRate);
-        }
-#endif
         /// <summary>
         /// 创建 NModbus4 主机对象
         /// </summary>

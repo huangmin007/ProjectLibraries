@@ -9,7 +9,6 @@ using SpaceCG.Net;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Diagnostics;
 
 namespace SpaceCG.Generic
 {
