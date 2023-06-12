@@ -37,7 +37,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// Transport Devices 列表
         /// </summary>
-        private List<ModbusTransportDevice> TransportDevices = new List<ModbusTransportDevice>(8);
+        private List<ModbusTransport> TransportDevices = new List<ModbusTransport>(8);
 
         /// <summary>
         /// Modbus 设备管理对象
@@ -46,14 +46,15 @@ namespace SpaceCG.Extensions.Modbus
         {
         }
 
+#if true
         /// <summary>
         /// 添加传输总线设备
         /// </summary>
         /// <param name="device"></param>
         /// <returns></returns>
-        public bool AddTransportDevice(ModbusTransportDevice device)
+        protected bool AddTransportDevice(ModbusTransport device)
         {
-            foreach (ModbusTransportDevice td in TransportDevices)
+            foreach (ModbusTransport td in TransportDevices)
                 if (td.Name == device.Name) return false;
 
             TransportDevices.Add(device);
@@ -64,14 +65,14 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         /// <param name="name"></param>
         /// <returns></returns>
-        public ModbusTransportDevice GetTransportDevice(String name)
+        protected ModbusTransport GetTransportDevice(String name)
         {
-            foreach (ModbusTransportDevice td in TransportDevices)
+            foreach (ModbusTransport td in TransportDevices)
                 if (td.Name == name) return td;
 
             return null;
         }
-
+#endif
         /// <summary>
         /// 加载设备配置文件，配置文件参考 ModbusDevices.Config
         /// </summary>
@@ -94,7 +95,7 @@ namespace SpaceCG.Extensions.Modbus
             ParseModbusDevicesConfig(Configuration.Elements("Modbus"));
 
             //Initialize
-            foreach (ModbusTransportDevice transport in TransportDevices)
+            foreach (ModbusTransport transport in TransportDevices)
             {
                 CallEventName(transport.Name, "Initialize");
                 Thread.Sleep(128);
@@ -202,7 +203,7 @@ namespace SpaceCG.Extensions.Modbus
 
             foreach(XElement modbusElement in modbusElements)
             {
-                if (ModbusTransportDevice.TryParse(modbusElement, out ModbusTransportDevice transport) && AddTransportDevice(transport))
+                if (ModbusTransport.TryParse(modbusElement, out ModbusTransport transport) && AddTransportDevice(transport))
                 {
                     transport.StartTransport();
                     transport.InputChangeEvent += Transport_InputChangeEvent;
@@ -223,7 +224,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="transportDevice"></param>
         /// <param name="ioDevice"></param>
         /// <param name="register"></param>
-        private void Transport_OutputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice ioDevice, Register register)
+        private void Transport_OutputChangeEvent(ModbusTransport transportDevice, ModbusIODevice ioDevice, Register register)
         {
             InputOutputEventHandler("OutputChange", transportDevice.Name, ioDevice.Address, register);
         }
@@ -233,7 +234,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="transportDevice"></param>
         /// <param name="ioDevice"></param>
         /// <param name="register"></param>
-        private void Transport_InputChangeEvent(ModbusTransportDevice transportDevice, ModbusIODevice ioDevice, Register register)
+        private void Transport_InputChangeEvent(ModbusTransport transportDevice, ModbusIODevice ioDevice, Register register)
         {
             InputOutputEventHandler("InputChange", transportDevice.Name, ioDevice.Address, register);
         }
@@ -319,7 +320,7 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         private void ResetAndClear()
         {
-            foreach (ModbusTransportDevice transport in TransportDevices)
+            foreach (ModbusTransport transport in TransportDevices)
             {
                 CallEventName(transport.Name, "Dispose");
                 Thread.Sleep(128);

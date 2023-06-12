@@ -19,8 +19,10 @@ namespace SpaceCG.Extensions.Modbus
         public object Value;
     }
 
-
-    public partial class ModbusTransportDevice
+    /// <summary>
+    /// Modbus 传输总线
+    /// </summary>
+    public partial class ModbusTransport
     {
         /// <summary>
         /// 传输对象协议封装对象
@@ -56,11 +58,11 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="coilAddress"></param>
         public void TurnSingleCoil(byte slaveAddress, ushort coilAddress)
         {
-            ModbusIODevice device = GetIODevice(slaveAddress);
+            ModbusIODevice device = GetDevice(slaveAddress);
             if (device == null) return;
-            if (!device.CoilsStatus.ContainsKey(coilAddress)) return;
+            if (!device.RawCoilsStatus.ContainsKey(coilAddress)) return;
 
-            bool value = device.CoilsStatus[coilAddress];
+            bool value = device.RawCoilsStatus[coilAddress];
             WriteSingleCoil(device.Address, coilAddress, !value);
         }
         /// <summary>
@@ -72,7 +74,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="count"></param>
         public void TurnMultipleCoils(byte slaveAddress, ushort startAddress, byte count)
         {
-            ModbusIODevice device = GetIODevice(slaveAddress);
+            ModbusIODevice device = GetDevice(slaveAddress);
             if (device == null) return;
 
             ushort address = startAddress;
@@ -80,8 +82,8 @@ namespace SpaceCG.Extensions.Modbus
 
             for(int i = 0; i < count; i ++)
             {
-                if (!device.CoilsStatus.ContainsKey(address)) return;
-                values[i] = !device.CoilsStatus[startAddress];
+                if (!device.RawCoilsStatus.ContainsKey(address)) return;
+                values[i] = !device.RawCoilsStatus[startAddress];
 
                 address++;
             }
@@ -93,22 +95,22 @@ namespace SpaceCG.Extensions.Modbus
         /// <para>在 addresses 中，最小地址 到 最大地址 有连续的存储记录</para>
         /// </summary>
         /// <param name="slaveAddress"></param>
-        /// <param name="addresses"></param>
-        public void TurnMultipleCoils(byte slaveAddress, ushort[] addresses)
+        /// <param name="coilsAddresses"></param>
+        public void TurnMultipleCoils(byte slaveAddress, ushort[] coilsAddresses)
         {
-            ModbusIODevice device = GetIODevice(slaveAddress);
+            ModbusIODevice device = GetDevice(slaveAddress);
             if (device == null) return;
 
-            ushort minAddress = addresses.Min();
-            ushort maxAddress = addresses.Max();
+            ushort minAddress = coilsAddresses.Min();
+            ushort maxAddress = coilsAddresses.Max();
 
             int i = 0;
             bool[] values = new bool[maxAddress - minAddress];
 
             for(ushort address = minAddress; address <= maxAddress; address ++, i ++)
             {
-                if (!device.CoilsStatus.ContainsKey(address)) return;
-                values[i] = Array.IndexOf(addresses, address) >= 0 ? !device.CoilsStatus[address] : device.CoilsStatus[address];
+                if (!device.RawCoilsStatus.ContainsKey(address)) return;
+                values[i] = Array.IndexOf(coilsAddresses, address) >= 0 ? !device.RawCoilsStatus[address] : device.RawCoilsStatus[address];
             }
 
             WriteMultipleCoils(device.Address, minAddress, values);
@@ -160,7 +162,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="data"></param>
         public void WriteMultipleCoils(byte slaveAddress, ushort[] addresses, bool[] data)
         {
-            ModbusIODevice device = GetIODevice(slaveAddress);
+            ModbusIODevice device = GetDevice(slaveAddress);
             if (device == null) return;
             if (addresses.Length != data.Length) return;
 
@@ -172,8 +174,8 @@ namespace SpaceCG.Extensions.Modbus
 
             for (ushort address = minAddress; address <= maxAddress; address++, i++)
             {
-                if (!device.CoilsStatus.ContainsKey(address)) return;
-                values[i] = Array.IndexOf(addresses, address) >= 0 ? !device.CoilsStatus[address] : device.CoilsStatus[address];
+                if (!device.RawCoilsStatus.ContainsKey(address)) return;
+                values[i] = Array.IndexOf(addresses, address) >= 0 ? !device.RawCoilsStatus[address] : device.RawCoilsStatus[address];
             }
 
             WriteMultipleCoils(device.Address, minAddress, values);
@@ -241,19 +243,24 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="timeout">超时恢复，大于 0 时，表示会自动恢复启用 IO 事件同步；-1 表示一直禁用</param>
         public void DisableIOEventSync(byte slaveAddress, int registerAddress = -1, RegisterType type = RegisterType.DiscreteInput, int timeout = -1)
         {
-            ModbusIODevice device = GetIODevice(slaveAddress);
+            ModbusIODevice device = GetDevice(slaveAddress);
             if (device == null) return;
 
             if (registerAddress <= -1)
             {
-                Register[] registers = device.GetRegisters();
-                foreach (var register in registers)
+                foreach (var register in device.Registers)
                     register.EnabledChangeEvent = false;
             }
             else
             {
-                Register register = device.GetRegister((ushort)registerAddress, type);
-                if (register != null) register.EnabledChangeEvent = false;
+                foreach (var register in device.Registers)
+                {
+                    if (register.Address == registerAddress && register.Type == type)
+                    {
+                        register.EnabledChangeEvent = false;
+                        break;
+                    }
+                }
             }
 
             //自动复位
@@ -274,19 +281,24 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="type"></param>
         public void EnabledIOEventSync(byte slaveAddress, int registerAddress = -1, RegisterType type = RegisterType.DiscreteInput)
         {
-            ModbusIODevice device = GetIODevice(slaveAddress);
+            ModbusIODevice device = GetDevice(slaveAddress);
             if (device == null) return;
 
             if (registerAddress <= -1)
             {
-                Register[] registers = device.GetRegisters();
-                foreach (var register in registers)
+                foreach (var register in device.Registers)
                     register.EnabledChangeEvent = true;
             }
             else
             {
-                Register register = device.GetRegister((ushort)registerAddress, type);
-                if (register != null) register.EnabledChangeEvent = true;
+                foreach (var register in device.Registers)
+                {
+                    if (register.Address == registerAddress && register.Type == type)
+                    {
+                        register.EnabledChangeEvent = true;
+                        break;
+                    }
+                }
             }
         }
 
@@ -295,7 +307,7 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         private void SyncOutputMethodQueues()
         {
-            if (MethodQueues.Count() <= 0 || !IOThreadRunning || Master == null) return;
+            if (MethodQueues.Count() <= 0 || !IOThreadRunning || Master?.Transport == null) return;
             if (!MethodQueues.TryDequeue(out ModbusMethod method)) return;
 
             if (method.Name == "Sleep")
@@ -304,7 +316,7 @@ namespace SpaceCG.Extensions.Modbus
                 return;
             }
 
-            ModbusIODevice device = GetIODevice(method.SlaveAddress);
+            ModbusIODevice device = GetDevice(method.SlaveAddress);
             if (device == null) return;
 
             try
@@ -314,25 +326,25 @@ namespace SpaceCG.Extensions.Modbus
                     case "WriteSingleCoil":
                         bool bool_value = (bool)method.Value;
                         Master.WriteSingleCoil(method.SlaveAddress, method.StartAddress, bool_value);
-                        device.UpdateRegisterValues(method.StartAddress, RegisterType.CoilsStatus, new bool[] { bool_value });
+                        device.UpdateRawRegisterValues(method.StartAddress, RegisterType.CoilsStatus, new bool[] { bool_value });
                         break;
 
                     case "WriteMultipleCoils":
                         bool[] bool_values = (bool[])method.Value;
                         Master.WriteMultipleCoils(method.SlaveAddress, method.StartAddress, bool_values);
-                        device.UpdateRegisterValues(method.StartAddress, RegisterType.CoilsStatus, bool_values);
+                        device.UpdateRawRegisterValues(method.StartAddress, RegisterType.CoilsStatus, bool_values);
                         break;
 
                     case "WriteSingleRegister":
                         ushort ushort_value = (ushort)method.Value;
                         Master.WriteSingleRegister(method.SlaveAddress, method.StartAddress, ushort_value);
-                        device.UpdateRegisterValues(method.StartAddress, RegisterType.HoldingRegister, new ushort[] { ushort_value });
+                        device.UpdateRawRegisterValues(method.StartAddress, RegisterType.HoldingRegister, new ushort[] { ushort_value });
                         break;
 
                     case "WriteMultipleRegisters":
                         ushort[] ushort_values = (ushort[])method.Value;
                         Master.WriteMultipleRegisters(method.SlaveAddress, method.StartAddress, ushort_values);
-                        device.UpdateRegisterValues(method.StartAddress, RegisterType.HoldingRegister, ushort_values);
+                        device.UpdateRawRegisterValues(method.StartAddress, RegisterType.HoldingRegister, ushort_values);
                         break;
                 }
             }

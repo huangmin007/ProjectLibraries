@@ -71,13 +71,10 @@ namespace SpaceCG.Extensions
             result = default;
             if (String.IsNullOrWhiteSpace(numberString)) return false;
 
-            object[] parameters;
-            bool isFloatType = false;
             IEnumerable<MethodInfo> methods;
             String methodName = $"To{typeof(NumberType).Name}";
             if (typeof(NumberType) == typeof(double) || typeof(NumberType) == typeof(float))
             {
-                isFloatType = true;
                 methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                           where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == typeof(NumberType)
                           let m_params = method.GetParameters()
@@ -86,7 +83,6 @@ namespace SpaceCG.Extensions
             }
             else
             {
-                isFloatType = false;
                 methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                           where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
                           let m_params = method.GetParameters()
@@ -95,12 +91,13 @@ namespace SpaceCG.Extensions
             }
 
             if (methods?.Count() != 1) return false;
+            MethodInfo ConvertToNumber = methods.First();
             numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
-            parameters = isFloatType ? new object[] { numberString } : GetNumberStringBase(numberString);
+            object[] parameters = ConvertToNumber.GetParameters().Length == 1 ? new object[] { numberString } : GetNumberStringBase(numberString);
 
             try
             {
-                result = (NumberType)methods.First().Invoke(null, parameters);
+                result = (NumberType)ConvertToNumber.Invoke(null, parameters);
             }
             catch (Exception ex)
             {
@@ -124,12 +121,10 @@ namespace SpaceCG.Extensions
         {
             if (String.IsNullOrWhiteSpace(numberString)) return false;
 
-            bool isFloatType = false;
             IEnumerable<MethodInfo> methods;
             String methodName = $"To{typeof(NumberType).Name}";
             if (typeof(NumberType) == typeof(double) || typeof(NumberType) == typeof(float))
             {
-                isFloatType = true;
                 methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                           where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == typeof(NumberType)
                           let m_params = method.GetParameters()
@@ -138,7 +133,6 @@ namespace SpaceCG.Extensions
             }
             else
             {
-                isFloatType = false;
                 methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                           where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
                           let m_params = method.GetParameters()
@@ -153,6 +147,7 @@ namespace SpaceCG.Extensions
             if (defaultValues == null || defaultValues.Length <= 0) defaultValues = new NumberType[stringArray.Length];
 
             MethodInfo ConvertToNumber = methods.First();
+            ParameterInfo[] ParamsInfo = ConvertToNumber.GetParameters();
             int length = Math.Min(stringArray.Length, defaultValues.Length);
 
             for (int i = 0; i < length; i++)
@@ -160,7 +155,7 @@ namespace SpaceCG.Extensions
                 if (String.IsNullOrWhiteSpace(stringArray[i])) continue;
 
                 NumberType newValue = default;
-                object[] parameters = isFloatType ? new object[] { stringArray[i] } : GetNumberStringBase(stringArray[i]);
+                object[] parameters = ParamsInfo.Length == 1 ? new object[] { stringArray[i] } : GetNumberStringBase(stringArray[i]);
 
                 try
                 {
@@ -318,6 +313,7 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="paramType"></param>
         /// <param name="paramValues"></param>
+        /// <exception cref="ArgumentException"></exception>
         /// <returns></returns>
         public static System.Array ConvertParamsToArrayType(Type paramType, Array paramValues)
         {
@@ -326,6 +322,8 @@ namespace SpaceCG.Extensions
             if (!paramType.IsArray) throw new ArgumentException(nameof(paramType), "参数应为数组或集合类型数据");
 
             Type elementType = paramType.GetElementType();
+            if(!elementType.IsValueType) throw new ArgumentException(nameof(paramValues), "数组或集合类型元素应为值类型数据");
+
             Array arguments = Array.CreateInstance(elementType, paramValues.Length);
 
             for (int i = 0; i < paramValues.Length; i++)

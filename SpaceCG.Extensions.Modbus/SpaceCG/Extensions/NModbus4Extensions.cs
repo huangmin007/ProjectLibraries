@@ -1,10 +1,10 @@
 ﻿#define NModbus4
 
 using System;
-using System.IO.Ports;
 using System.Net.Sockets;
 using SpaceCG.Generic;
 using Modbus.Device;
+using System.Linq;
 
 namespace SpaceCG.Extensions
 {
@@ -28,10 +28,10 @@ namespace SpaceCG.Extensions
         {
             if (master?.Transport == null) return;
 
-            bool[] value = await master.ReadCoilsAsync(slaveAddress, startAddress, 1);
-            if (value?.Length != 1) return;
+            bool[] values = await master.ReadCoilsAsync(slaveAddress, startAddress, 1);
+            if (values?.Length != 1) return;
 
-            await master.WriteSingleCoilAsync(slaveAddress, startAddress, !value[0]);
+            await master.WriteSingleCoilAsync(slaveAddress, startAddress, !values[0]);
         }
         /// <summary>
         /// 翻转多线圈
@@ -40,17 +40,42 @@ namespace SpaceCG.Extensions
         /// <param name="slaveAddress"></param>
         /// <param name="startAddress"></param>
         /// <param name="numberOfPoints"></param>
-        public static async void TurnMultipleCoilisAsync(this IModbusMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints)
+        public static async void TurnMultipleCoilsAsync(this IModbusMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints)
         {
             if (master?.Transport == null) return;
 
-            bool[] value = await master.ReadCoilsAsync(slaveAddress, startAddress, numberOfPoints);
-            if (value?.Length <= 0) return;
+            bool[] values = await master.ReadCoilsAsync(slaveAddress, startAddress, numberOfPoints);
+            if (values?.Length <= 0) return;
 
-            for (int i = 0; i < value.Length; i++)
-                value[i] = !value[i];
+            for (int i = 0; i < values.Length; i++)
+                values[i] = !values[i];
 
-            await master.WriteMultipleCoilsAsync(slaveAddress, startAddress, value);
+            await master.WriteMultipleCoilsAsync(slaveAddress, startAddress, values);
+        }
+        /// <summary>
+        /// 翻转多个线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="coilsAddresses"></param>
+        public static async void TurnMultipleCoilsAsync(this IModbusMaster master, byte slaveAddress, ushort[] coilsAddresses)
+        {
+            if (master?.Transport == null) return;
+
+            ushort startAddress = coilsAddresses.Min();
+            ushort maxAddress = coilsAddresses.Max();
+            ushort numberOfPoints = (ushort)(maxAddress - startAddress + 1);
+
+            bool[] values = await master.ReadCoilsAsync(slaveAddress, startAddress, numberOfPoints);
+            if (values?.Length <= 0) return;
+
+            int i = 0;
+            for (ushort address = startAddress; address <= maxAddress; address++, i++)
+            {
+                values[i] = Array.IndexOf(coilsAddresses, address) >= 0 ? !values[i] : values[i];
+            }
+
+            await master.WriteMultipleCoilsAsync(slaveAddress, startAddress, values);
         }
         /// <summary>
         /// 翻转单线圈
@@ -62,10 +87,10 @@ namespace SpaceCG.Extensions
         {
             if (master?.Transport == null) return;
 
-            bool[] value = master.ReadCoils(slaveAddress, startAddress, 1);
-            if (value?.Length != 1) return;
+            bool[] values = master.ReadCoils(slaveAddress, startAddress, 1);
+            if (values?.Length != 1) return;
 
-            master.WriteSingleCoil(slaveAddress, startAddress, !value[0]);
+            master.WriteSingleCoil(slaveAddress, startAddress, !values[0]);
         }
         /// <summary>
         /// 翻转多线圈
@@ -74,18 +99,44 @@ namespace SpaceCG.Extensions
         /// <param name="slaveAddress"></param>
         /// <param name="startAddress"></param>
         /// <param name="numberOfPoints"></param>
-        public static void TurnMultipleCoilis(this IModbusMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints)
+        public static void TurnMultipleCoils(this IModbusMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints)
         {
             if (master?.Transport == null) return;
 
-            bool[] value = master.ReadCoils(slaveAddress, startAddress, numberOfPoints);
-            if (value?.Length <= 0) return;
+            bool[] values = master.ReadCoils(slaveAddress, startAddress, numberOfPoints);
+            if (values?.Length <= 0) return;
 
-            for (int i = 0; i < value.Length; i++)
-                value[i] = !value[i];
+            for (int i = 0; i < values.Length; i++)
+                values[i] = !values[i];
 
-            master.WriteMultipleCoils(slaveAddress, startAddress, value);
+            master.WriteMultipleCoils(slaveAddress, startAddress, values);
         }
+        /// <summary>
+        /// 翻转多个线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="coilsAddresses"></param>
+        public static void TurnMultipleCoils(this IModbusMaster master, byte slaveAddress, ushort[] coilsAddresses)
+        {
+            if (master?.Transport == null) return;
+
+            ushort startAddress = coilsAddresses.Min();
+            ushort maxAddress = coilsAddresses.Max();
+            ushort numberOfPoints = (ushort)(maxAddress - startAddress + 1);
+
+            bool[] values = master.ReadCoils(slaveAddress, startAddress, numberOfPoints);
+            if (values?.Length <= 0) return;
+
+            int i = 0;
+            for (ushort address = startAddress; address <= maxAddress; address++, i ++)
+            {
+                values[i] = Array.IndexOf(coilsAddresses, address) >= 0 ? !values[i] : values[i];
+            }
+
+            master.WriteMultipleCoils(slaveAddress, startAddress, values);
+        }
+        
         /// <summary>
         /// 翻转单线圈
         /// </summary>
@@ -100,22 +151,14 @@ namespace SpaceCG.Extensions
         /// <param name="slaveAddress"></param>
         /// <param name="startAddress"></param>
         /// <param name="numberOfPoints"></param>
-        public static void TurnMultipleCoilisAsync(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilisAsync((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
-        /// <summary>
-        /// 翻转单线圈
-        /// </summary>
-        /// <param name="master"></param>
-        /// <param name="slaveAddress"></param>
-        /// <param name="startAddress"></param>
-        public static void TurnSingleCoilAsync(this ModbusIpMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoilAsync((IModbusMaster)master, slaveAddress, startAddress);
+        public static void TurnMultipleCoilsAsync(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilsAsync((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
         /// <summary>
         /// 翻转多线圈
         /// </summary>
         /// <param name="master"></param>
         /// <param name="slaveAddress"></param>
-        /// <param name="startAddress"></param>
-        /// <param name="numberOfPoints"></param>
-        public static void TurnMultipleCoilisAsync(this ModbusIpMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilisAsync((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        /// <param name="coilsAddresses"></param>
+        public static void TurnMultipleCoilsAsync(this ModbusSerialMaster master, byte slaveAddress, ushort[] coilsAddresses) => TurnMultipleCoilsAsync((IModbusMaster)master, slaveAddress, coilsAddresses);
         /// <summary>
         /// 翻转单线圈
         /// </summary>
@@ -130,7 +173,37 @@ namespace SpaceCG.Extensions
         /// <param name="slaveAddress"></param>
         /// <param name="startAddress"></param>
         /// <param name="numberOfPoints"></param>
-        public static void TurnMultipleCoilis(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilis((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        public static void TurnMultipleCoils(this ModbusSerialMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoils((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        /// <summary>
+        /// 翻转多线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="coilsAddresses"></param>
+        public static void TurnMultipleCoils(this ModbusSerialMaster master, byte slaveAddress, ushort[] coilsAddresses) => TurnMultipleCoils((IModbusMaster)master, slaveAddress, coilsAddresses);
+
+        /// <summary>
+        /// 翻转单线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
+        public static void TurnSingleCoilAsync(this ModbusIpMaster master, byte slaveAddress, ushort startAddress) => TurnSingleCoilAsync((IModbusMaster)master, slaveAddress, startAddress);
+        /// <summary>
+        /// 翻转多线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="startAddress"></param>
+        /// <param name="numberOfPoints"></param>
+        public static void TurnMultipleCoilsAsync(this ModbusIpMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilsAsync((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        /// <summary>
+        /// 翻转多线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="coilsAddresses"></param>
+        public static void TurnMultipleCoilsAsync(this ModbusIpMaster master, byte slaveAddress, ushort[] coilsAddresses) => TurnMultipleCoilsAsync((IModbusMaster)master, slaveAddress, coilsAddresses);
         /// <summary>
         /// 翻转单线圈
         /// </summary>
@@ -145,7 +218,14 @@ namespace SpaceCG.Extensions
         /// <param name="slaveAddress"></param>
         /// <param name="startAddress"></param>
         /// <param name="numberOfPoints"></param>
-        public static void TurnMultipleCoilis(this ModbusIpMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoilis((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        public static void TurnMultipleCoils(this ModbusIpMaster master, byte slaveAddress, ushort startAddress, ushort numberOfPoints) => TurnMultipleCoils((IModbusMaster)master, slaveAddress, startAddress, numberOfPoints);
+        /// <summary>
+        /// 翻转多线圈
+        /// </summary>
+        /// <param name="master"></param>
+        /// <param name="slaveAddress"></param>
+        /// <param name="coilsAddresses"></param>
+        public static void TurnMultipleCoils(this ModbusIpMaster master, byte slaveAddress, ushort[] coilsAddresses) => TurnMultipleCoils((IModbusMaster)master, slaveAddress, coilsAddresses);
         #endregion
 
         /// <summary>
@@ -188,7 +268,7 @@ namespace SpaceCG.Extensions
                 }
                 else if (type.IndexOf("SERIAL") >= 0)
                 {
-                    SerialPort serialPort = new SerialPort(hostORcom, portORbaudRate);
+                    System.IO.Ports.SerialPort serialPort = new System.IO.Ports.SerialPort(hostORcom, portORbaudRate);
                     serialPort.Open();
 
                     master = ModbusSerialMaster.CreateRtu(serialPort);

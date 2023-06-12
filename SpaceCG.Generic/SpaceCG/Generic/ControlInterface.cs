@@ -112,32 +112,6 @@ namespace SpaceCG.Generic
             return false;
         }
         /// <summary>
-        /// 卸载指定的网络服务接口
-        /// <para>IPEndPoint == $"{address}:{port}"</para>
-        /// </summary>
-        /// <param name="endPoint"></param>
-        /// <returns></returns>
-        public bool UninstallNetworkService(IPEndPoint endPoint)
-        {
-            if (NetworkServices?.Count() == 0) return false;
-            if (!NetworkServices.ContainsKey(endPoint.ToString())) return false;
-
-            String keyName = endPoint.ToString();
-            foreach (var obj in NetworkServices)
-            {
-                if (obj.Key != keyName) continue;
-
-                if (typeof(IDisposable).IsAssignableFrom(obj.Value.GetType()))
-                {
-                    IDisposable server = (IDisposable)obj.Value;
-                    server?.Dispose();
-                    return NetworkServices.Remove(keyName);
-                }                
-            }
-
-            return false;
-        }
-        /// <summary>
         /// 卸载所有网络服务接口
         /// </summary>
         public void UninstallNetworkServices()
@@ -148,7 +122,7 @@ namespace SpaceCG.Generic
             {
                 if (typeof(IDisposable).IsAssignableFrom(obj.Value.GetType()))
                 {
-                    IDisposable connection = obj.Value as IDisposable;
+                    IDisposable connection = obj.Value;
                     connection?.Dispose();
                 }               
             }
@@ -317,7 +291,7 @@ namespace SpaceCG.Generic
         public bool TryParseCallMethod(XElement actionElement, out object returnResult)
         {
             returnResult = null;
-            if (actionElement == null || AccessObjects == null) return false;
+            if (actionElement == null || AccessObjects == null || MethodFilters.IndexOf("*.*") != -1) return false;
 
             if (actionElement.Name?.LocalName != "Action" ||
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||
@@ -418,7 +392,7 @@ namespace SpaceCG.Generic
         public bool TryParseChangeValue(XElement actionElement, out object returnResult)
         {
             returnResult = null;
-            if (actionElement == null || AccessObjects == null) return false;
+            if (actionElement == null || AccessObjects == null || PropertyFilters.IndexOf("*.*") != -1) return false;
 
             if (actionElement.Name?.LocalName != "Action" ||
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||

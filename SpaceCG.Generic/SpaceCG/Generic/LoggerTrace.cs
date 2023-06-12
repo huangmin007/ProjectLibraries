@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Xml.Linq;
+using SpaceCG.Extensions;
 
 namespace SpaceCG.Generic
 {
@@ -37,12 +38,12 @@ namespace SpaceCG.Generic
         {
             string path = "logs";
             if (!Directory.Exists(path)) Directory.CreateDirectory(path);
-            String defaultFileName = $"{path}/Trace.{DateTime.Today.ToString("yyyy-MM-dd")}.log";
+            String defaultFileName = $"{path}/trace.{DateTime.Today.ToString("yyyy-MM-dd")}.log";
 
-            textFileListener = new ETextWriterTraceListener(defaultFileName, "File");
+            textFileListener = new ETextWriterTraceListener(defaultFileName, "FileTrace");
             textFileListener.Filter = new EventTypeFilter(SourceLevels.Information);
 
-            consoleListener = new ETextWriterTraceListener(Console.Out, "Console");
+            consoleListener = new ETextWriterTraceListener(Console.Out, "ConsoleTrace");
             consoleListener.Filter = new EventTypeFilter(SourceLevels.All);
 
             OperatingSystem os = Environment.OSVersion;
@@ -53,63 +54,7 @@ namespace SpaceCG.Generic
             consoleListener.Flush();
             textFileListener.Flush();
 
-            ReserveFileDays(30, path, "Trace.*.log");
-        }
-
-        /// <summary>
-        /// 保留目录中的文件数量
-        /// <para>跟据文件创建日期排序，保留 count 个最新文件，超出 count 数量的文件删除</para>
-        /// <para>注意：该函数是比较文件的创建日期</para>
-        /// </summary>
-        /// <param name="count">要保留的数量</param>
-        /// <param name="path">文件目录，当前目录 "/" 表示，不可为空</param>
-        /// <param name="searchPattern">只在目录中(不包括子目录)，查找匹配的文件；例如："*.jpg" 或 "temp_*.png"</param>
-        public static void ReserveFileCount(int count, string path, string searchPattern = null)
-        {
-            if (count < 0 || String.IsNullOrWhiteSpace(path)) throw new ArgumentException("参数错误");
-
-            DirectoryInfo dir = new DirectoryInfo(path);
-            FileInfo[] files = searchPattern == null ? dir.GetFiles() : dir.GetFiles(searchPattern, SearchOption.TopDirectoryOnly);
-
-            if (files.Length <= count) return;
-
-            //按文件的创建时间，升序排序(最新创建的排在最前面)
-            Array.Sort(files, (f1, f2) =>
-            {
-                return f2.CreationTime.CompareTo(f1.CreationTime);
-            });
-
-            for (int i = count; i < files.Length; i++)
-            {
-                files[i].Delete();
-            }
-        }
-
-        /// <summary>
-        /// 保留目录中的文件天数
-        /// <para>跟据文件上次修时间起计算，保留 days 天的文件，超出 days 天的文件删除</para>
-        /// <para>注意：该函数是比较文件的上次修改日期</para>
-        /// </summary>
-        /// <param name="days">保留天数</param>
-        /// <param name="path">文件夹目录</param>
-        /// <param name="searchPattern">文件匹配类型, 只在目录中(不包括子目录)，查找匹配的文件；例如："*.jpg" 或 "temp_*.png"</param>
-        public static void ReserveFileDays(int days, string path, string searchPattern = null)
-        {
-            if (days < 0 || String.IsNullOrWhiteSpace(path)) return;
-
-            DirectoryInfo dir = new DirectoryInfo(path);
-            FileInfo[] files = searchPattern == null ? dir.GetFiles() : dir.GetFiles(searchPattern, SearchOption.TopDirectoryOnly);
-            if (files.Length == 0) return;
-
-            IEnumerable<FileInfo> removes =
-                  from file in files
-                  where file.LastWriteTime < DateTime.Today.AddDays(-days)
-                  select file;
-
-            foreach (var file in removes)
-            {
-                file.Delete();
-            }
+            FileExtensions.ReserveFileDays(30, path, "trace.*.log");
         }
 
         /// <summary>
@@ -118,15 +63,23 @@ namespace SpaceCG.Generic
         /// <exception cref="Exception"></exception>
         public LoggerTrace()
         {
-            StackFrame frame = new StackFrame(1, true);
-            MethodBase method = frame.GetMethod();
-            if (method == null) throw new Exception("获取在其中执行帧的方法失败");
-
-            Type declaringType = method.DeclaringType;
-            if (declaringType == null) throw new Exception("获取声明该成员的类失败");
-            //Console.WriteLine($"Logger Name: {declaringType.Name}");
-
-            Initialize(declaringType.Name, SourceLevels.All);
+            Initialize(null, SourceLevels.All);
+        }
+        /// <summary>
+        /// 日志跟踪对象
+        /// </summary>
+        /// <param name="name"></param>
+        public LoggerTrace(String name)
+        {
+            Initialize(name, SourceLevels.All);
+        }
+        /// <summary>
+        /// 日志跟踪对象
+        /// </summary>
+        /// <param name="defaultLevel"></param>
+        public LoggerTrace(SourceLevels defaultLevel)
+        {
+            Initialize(null, defaultLevel);
         }
         /// <summary>
         /// 日志跟踪对象
@@ -135,19 +88,29 @@ namespace SpaceCG.Generic
         /// <param name="defaultLevel"></param>
         public LoggerTrace(String name, SourceLevels defaultLevel)
         {
-            if (String.IsNullOrWhiteSpace(name)) throw new ArgumentNullException(nameof(name), "参数不能为空");
             Initialize(name, defaultLevel);
         }
+
         /// <summary>
-        /// 日志跟踪对象
+        /// Initialize Trace Source
         /// </summary>
         /// <param name="name"></param>
-        public LoggerTrace(String name) : this(name, SourceLevels.All)
-        {
-        }
-
+        /// <param name="defaultLevel"></param>
+        /// <exception cref="Exception"></exception>
         private void Initialize(String name, SourceLevels defaultLevel)
         {
+            if(String.IsNullOrWhiteSpace(name))
+            {
+                StackFrame frame = new StackFrame(2, true);
+                MethodBase method = frame.GetMethod();
+                if (method == null) throw new Exception("获取在其中执行帧的方法失败");
+
+                Type declaringType = method.DeclaringType;
+                if (declaringType == null) throw new Exception("获取声明该成员的类失败");
+
+                name = declaringType.Name;
+            }
+
             TraceSource = new TraceSource(name, defaultLevel);
             TraceSource.Switch = new SourceSwitch($"{name}_Switch", defaultLevel.ToString());
             TraceSource.Switch.Level = defaultLevel;

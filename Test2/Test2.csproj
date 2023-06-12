@@ -35,9 +35,15 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="NModbus4.Core, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\NModbus4.Core.1.0.2\lib\netstandard2.0\NModbus4.Core.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Data" />
+    <Reference Include="System.IO.Ports, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.IO.Ports.7.0.0\lib\net462\System.IO.Ports.dll</HintPath>
+    </Reference>
     <Reference Include="System.Web" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
@@ -98,6 +104,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\SpaceCG.Extensions.Modbus\SpaceCG.Extensions.Modbus.csproj">
+      <Project>{31EEB8D3-BD76-4DEE-86A1-1CA34FC70B7C}</Project>
+      <Name>SpaceCG.Extensions.Modbus</Name>
+    </ProjectReference>
     <ProjectReference Include="..\SpaceCG.Generic\SpaceCG.Generic.csproj">
       <Project>{d00bc3ee-2fc1-46fb-92ec-4ed23528bc01}</Project>
       <Name>SpaceCG.Generic</Name>

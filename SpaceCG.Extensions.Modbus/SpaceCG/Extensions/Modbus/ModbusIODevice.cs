@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -39,7 +38,6 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         InputRegister,
     }
-
 
     /// <summary>
     /// 寄存器描述对象
@@ -212,27 +210,6 @@ namespace SpaceCG.Extensions.Modbus
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusIODevice));
 
         /// <summary>
-        /// 读取线圈状态的代理函数
-        /// <para>(byte slaveAddress, ushort startAddress, ushort numberOfPoints)</para>
-        /// </summary> 
-        internal Func<byte, ushort, ushort, bool[]> ReadCoilsStatus;
-        /// <summary>
-        /// 读取保持寄存器的代理函数
-        /// <para>(byte slaveAddress, ushort startAddress, ushort numberOfPoints)</para>
-        /// </summary>
-        internal Func<byte, ushort, ushort, ushort[]> ReadHoldingRegisters;
-        /// <summary>
-        /// 读取离散输入的代理函数
-        /// <para>(byte slaveAddress, ushort startAddress, ushort numberOfPoints)</para>
-        /// </summary>
-        internal Func<byte, ushort, ushort, bool[]> ReadDiscreteInputs;
-        /// <summary>
-        /// 读取输入寄存器的代理函数
-        /// <para>(byte slaveAddress, ushort startAddress, ushort numberOfPoints)</para>
-        /// </summary>
-        internal Func<byte, ushort, ushort, ushort[]> ReadInputRegisters;
-
-        /// <summary>
         /// Read Only 寄存器数据 Change 处理
         /// <para>(ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
@@ -251,34 +228,36 @@ namespace SpaceCG.Extensions.Modbus
         /// 设备地址
         /// </summary>
         public byte Address { get; private set; } = 0x01;
+        /// <summary>
+        /// 当前设备上的寄存器集合，用于描述寄存器及数据
+        /// </summary>
+        public List<Register> Registers { get; private set; } = new List<Register>(32);
+        //public ConcurrentBag<Register> Registers { get; private set; } = new ConcurrentBag<Register>();
 
         /// <summary>
-        /// 线圈状态，原始数据存储对象，数据类型为 bool 类型，RW-ReadWrite
+        /// 寄存器数量
         /// </summary>
-        internal ConcurrentDictionary<ushort, bool> CoilsStatus { get; private set; } = new ConcurrentDictionary<ushort, bool>(2, 16);
-        /// <summary>
-        /// 离散输入，原始数据存储对象，数据类型为 bool 类型，RO-ReadOnly
-        /// </summary>
-        private ConcurrentDictionary<ushort, bool> DiscreteInputs { get; set; } = new ConcurrentDictionary<ushort, bool>(2, 16);
-        /// <summary>
-        /// 保持寄存器，原始数据存储对象，数据类型为 ushort 类型，RW-ReadyWrite
-        /// </summary>
-        private ConcurrentDictionary<ushort, ushort> HoldingRegisters { get; set; } = new ConcurrentDictionary<ushort, ushort>(2, 16);
-        /// <summary>
-        /// 输入寄存器，原始数据存储对象，数据类型为 ushort 类型，RO-ReadOnly
-        /// </summary>
-        private ConcurrentDictionary<ushort, ushort> InputRegisters { get; set; } = new ConcurrentDictionary<ushort, ushort>(2, 16);
+        private int RegistersCount = 0;
 
-        //startAddress,numberOfPoint
-        private ConcurrentDictionary<ushort, ushort> CoilsStatusAddresses = new ConcurrentDictionary<ushort, ushort>();
-        private ConcurrentDictionary<ushort, ushort> DiscreteInputsAddresses = new ConcurrentDictionary<ushort, ushort>();
-        private ConcurrentDictionary<ushort, ushort> HoldingRegistersAddresses = new ConcurrentDictionary<ushort, ushort>();
-        private ConcurrentDictionary<ushort, ushort> InputRegistersAddresses = new ConcurrentDictionary<ushort, ushort>();
+        /// <summary> 线圈状态，原始数据存储对象，数据类型为 bool 类型，RW-ReadWrite </summary>
+        internal Dictionary<ushort, bool> RawCoilsStatus { get; private set; } = new Dictionary<ushort, bool>(16);
+        /// <summary> 离散输入，原始数据存储对象，数据类型为 bool 类型，RO-ReadOnly </summary>
+        private Dictionary<ushort, bool> RawDiscreteInputs { get; set; } = new Dictionary<ushort, bool>(16);
+        /// <summary>保持寄存器，原始数据存储对象，数据类型为 ushort 类型，RW-ReadyWrite </summary>
+        private Dictionary<ushort, ushort> RawHoldingRegisters { get; set; } = new Dictionary<ushort, ushort>(16);
+        /// <summary> 输入寄存器，原始数据存储对象，数据类型为 ushort 类型，RO-ReadOnly </summary>
+        private Dictionary<ushort, ushort> RawInputRegisters { get; set; } = new Dictionary<ushort, ushort>(16);
 
-        /// <summary>
-        /// 寄存器描述对象，用于描述寄存器数据或及组合
-        /// </summary>
-        private List<Register> RegistersDescription = new List<Register>();
+        /// <summary> startAddress, numberOfPoint </summary>
+        private Dictionary<ushort, ushort> RawCoilsStatusAddresses = new Dictionary<ushort, ushort>();
+        /// <summary> startAddress, numberOfPoint </summary>
+        private Dictionary<ushort, ushort> RawDiscreteInputsAddresses = new Dictionary<ushort, ushort>();
+        /// <summary> startAddress, numberOfPoint </summary>
+        private Dictionary<ushort, ushort> RawHoldingRegistersAddresses = new Dictionary<ushort, ushort>();
+        /// <summary> startAddress, numberOfPoint </summary>
+        private Dictionary<ushort, ushort> RawInputRegistersAddresses = new Dictionary<ushort, ushort>();
+
+        private IModbusMaster Master;
 
         /// <summary>
         /// Modbus Input/Output Device 构造函数
@@ -294,144 +273,20 @@ namespace SpaceCG.Extensions.Modbus
                 this.Name = String.Format("Device#{0:00}", this.Address);
         }
 
-#region Add,Remove,Update
         /// <summary>
-        /// 添加寄存器对象
-        /// <para>注意：只有添加的寄存器 address 才会产生 Input/Output Change 事件</para>
+        /// 清除所有寄存器
         /// </summary>
-        /// <param name="register"></param>
-        public bool AddRegister(Register register)
+        private void ClearRawRegisters()
         {
-            var registers = from reg in RegistersDescription
-                            where reg.Address == register.Address && reg.Type == register.Type
-                            select reg;
+            RawCoilsStatus.Clear();
+            RawDiscreteInputs.Clear();
+            RawHoldingRegisters.Clear();
+            RawInputRegisters.Clear();
 
-            int fCount = registers != null ? registers.Count() : 0;
-
-            if (fCount == 0) RegistersDescription.Add(register);
-            else if (fCount == 1 && registers.First().Count != register.Count) registers.First().Count = register.Count;
-            else return false;
-
-            byte count = register.Count;
-            RegisterType type = register.Type;
-            ushort startAddress = register.Address;
-
-            if (type == RegisterType.CoilsStatus)
-            {
-                for (ushort address = startAddress; address < startAddress + count; address++)
-                {
-                    if (!CoilsStatus.ContainsKey(address)) CoilsStatus.TryAdd(address, default);
-                }
-            }
-            else if (type == RegisterType.DiscreteInput)
-            {
-                for (ushort address = startAddress; address < startAddress + count; address++)
-                {
-                    if (!DiscreteInputs.ContainsKey(address)) DiscreteInputs.TryAdd(address, default);
-                }
-            }
-            else if (type == RegisterType.HoldingRegister)
-            {
-                for (ushort address = startAddress; address < startAddress + count; address++)
-                {
-                    if (!HoldingRegisters.ContainsKey(address)) HoldingRegisters.TryAdd(address, default);
-                }
-            }
-            else if (type == RegisterType.InputRegister)
-            {
-                for (ushort address = startAddress; address < startAddress + count; address++)
-                {
-                    if (!InputRegisters.ContainsKey(address)) InputRegisters.TryAdd(address, default);
-                }
-            }
-
-            return true;
-        }
-        /// <summary>
-        /// 添加寄存器对象
-        /// <para>注意：只有添加的寄存器 address 才会产生 Input/Output Change 事件</para>
-        /// </summary>
-        /// <param name="registerAddress"></param>
-        /// <param name="count"></param>
-        /// <param name="type"></param>
-        public bool AddRegister(ushort registerAddress, RegisterType type, byte count = 1)
-        {
-            var registers = from reg in RegistersDescription
-                            where reg.Address == registerAddress && reg.Type == type
-                            select reg;
-
-            int fCount = registers != null ? registers.Count() : 0;
-
-            if (fCount == 0)
-                return AddRegister(new Register(registerAddress, type, count));
-
-            if (fCount == 1 && registers.First().Count != count)
-                return AddRegister(registers.First());
-
-            return false;
-        }
-        
-        /// <summary>
-        /// 移除寄存器对象
-        /// </summary>
-        /// <param name="register"></param>
-        /// <returns></returns>
-        public bool RemoveRegister(Register register)
-        {
-            var registers = from reg in RegistersDescription
-                            where reg.Address == register.Address && reg.Type == register.Type // && reg.Count == register.Count
-                            select reg;
-
-            if (registers?.Count() != 1) return false;
-
-            register = registers.First();
-            if (!RegistersDescription.Remove(register)) return false;
-
-            if (register.Type == RegisterType.CoilsStatus)
-            {
-                for(ushort address = register.Address; address < register.Address + register.Count; address ++)
-                {
-                    if (CoilsStatus.ContainsKey(address)) CoilsStatus.TryRemove(address, out bool value);
-                }
-            }
-            else if (register.Type == RegisterType.DiscreteInput)
-            {
-                for (ushort address = register.Address; address < register.Address + register.Count; address++)
-                {
-                    if (DiscreteInputs.ContainsKey(address)) DiscreteInputs.TryRemove(address, out bool value);
-                }
-            }
-            else if (register.Type == RegisterType.HoldingRegister)
-            {
-                for (ushort address = register.Address; address < register.Address + register.Count; address++)
-                {
-                    if (HoldingRegisters.ContainsKey(address)) HoldingRegisters.TryRemove(address, out ushort value);
-                }
-            }
-            else if (register.Type == RegisterType.InputRegister)
-            {
-                for (ushort address = register.Address; address < register.Address + register.Count; address++)
-                {
-                    if (InputRegisters.ContainsKey(address)) InputRegisters.TryRemove(address, out ushort value);
-                }
-            }
-
-            return true;
-        }
-        /// <summary>
-        /// 移除寄存器对象
-        /// </summary>
-        /// <param name="registerAddress"></param>
-        /// <param name="type"></param>
-        /// <returns></returns>
-        public bool RemoveRegister(ushort registerAddress, RegisterType type)
-        {
-            var registers = from reg in RegistersDescription
-                            where reg.Address == registerAddress && reg.Type == type
-                            select reg;
-
-            if (registers?.Count() != 1) return false;
-            return RemoveRegister(registers.First());
+            RawCoilsStatusAddresses.Clear();
+            RawDiscreteInputsAddresses.Clear();
+            RawHoldingRegistersAddresses.Clear();
+            RawInputRegistersAddresses.Clear();
         }
 
         /// <summary>
@@ -440,7 +295,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="startAddress"></param>
         /// <param name="type"></param>
         /// <param name="values"></param>
-        internal void UpdateRegisterValues(ushort startAddress, RegisterType type, bool[] values)
+        internal void UpdateRawRegisterValues(ushort startAddress, RegisterType type, bool[] values)
         {
             if (values == null || type == RegisterType.Unknown) return;
 
@@ -449,34 +304,16 @@ namespace SpaceCG.Extensions.Modbus
             {
                 for (address = startAddress; address < startAddress + values.Length; address++, i++)
                 {
-                    if (CoilsStatus.ContainsKey(address)) CoilsStatus[address] = values[i];
-#if false
-                    else
-                    {
-                        if (CoilsStatus.TryAdd(address, values[i]))
-                        {
-                            AddRegisters(new Register(address, type, 1));
-                            CoilsStatusAddresses = SpliteAddresses(CoilsStatus.Keys.ToArray());
-                        }
-                    }
-#endif
+                    if (RawCoilsStatus.ContainsKey(address)) RawCoilsStatus[address] = values[i];
+                    else RawCoilsStatus.Add(address, values[i]);
                 }
             }
             else if (type == RegisterType.DiscreteInput)
             {
                 for (address = startAddress; address < startAddress + values.Length; address++, i++)
                 {
-                    if (DiscreteInputs.ContainsKey(address)) DiscreteInputs[address] = values[i];
-#if fasle
-                    else
-                    {
-                        if (DiscreteInputs.TryAdd(address, values[i]))
-                        {
-                            AddRegisters(new Register(address, type, 1));
-                            DiscreteInputsAddresses = SpliteAddresses(DiscreteInputs.Keys.ToArray());
-                        }
-                    }
-#endif
+                    if (RawDiscreteInputs.ContainsKey(address)) RawDiscreteInputs[address] = values[i];
+                    else RawDiscreteInputs.Add(address, values[i]);
                 }
             }
         }
@@ -486,7 +323,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="startAddress"></param>
         /// <param name="type"></param>
         /// <param name="values"></param>
-        internal void UpdateRegisterValues(ushort startAddress, RegisterType type, ushort[] values)
+        internal void UpdateRawRegisterValues(ushort startAddress, RegisterType type, ushort[] values)
         {
             if (values == null || type == RegisterType.Unknown) return;
 
@@ -495,116 +332,19 @@ namespace SpaceCG.Extensions.Modbus
             {
                 for (address = startAddress; address < startAddress + values.Length; address++, i++)
                 {
-                    if (HoldingRegisters.ContainsKey(address)) HoldingRegisters[address] = values[i];
-#if false
-                    else
-                    {
-                        if (HoldingRegisters.TryAdd(address, values[i]))
-                        {
-                            AddRegisters(new Register(address, type, 1));
-                            HoldingRegistersAddresses = SpliteAddresses(HoldingRegisters.Keys.ToArray());
-                        }
-                    }
-#endif
+                    if (RawHoldingRegisters.ContainsKey(address)) RawHoldingRegisters[address] = values[i];
+                    else RawHoldingRegisters.Add(address, values[i]);
                 }
             }
             else if (type == RegisterType.InputRegister)
             {
                 for (address = startAddress; address < startAddress + values.Length; address++, i++)
                 {
-                    if (InputRegisters.ContainsKey(address)) InputRegisters[address] = values[i];
-#if false
-                    else
-                    {
-                        if (InputRegisters.TryAdd(address, values[i]))
-                        {
-                            AddRegisters(new Register(address, type, 1));
-                            InputRegistersAddresses = SpliteAddresses(InputRegisters.Keys.ToArray());
-                        }
-                    }
-#endif
+                    if (RawInputRegisters.ContainsKey(address)) RawInputRegisters[address] = values[i];
+                    else RawInputRegisters.Add(address, values[i]);
                 }
             }
         }
-
-        /// <summary>
-        /// 获取寄存器对象
-        /// </summary>
-        /// <param name="registerAddress"></param>
-        /// <param name="type"></param>
-        /// <returns></returns>
-        public Register GetRegister(ushort registerAddress, RegisterType type)
-        {
-            var regs = from reg in RegistersDescription
-                       where reg.Address == registerAddress && reg.Type == type
-                       select reg;
-
-            return regs?.Count() == 1 ? regs.First() : null;
-        }
-        /// <summary>
-        /// 获取所有寄存器对象
-        /// </summary>
-        public Register[] GetRegisters() => RegistersDescription.ToArray();
-
-        /// <summary>
-        /// 获取寄存器的值
-        /// </summary>
-        /// <param name="register"></param>
-        /// <returns></returns>
-        public ulong GetRegisterValue(Register register)
-        {
-            ulong value = 0;
-
-            if (register.Type == RegisterType.CoilsStatus)
-            {
-                value = GetRegisterValue(CoilsStatus, register);
-            }
-            else if (register.Type == RegisterType.DiscreteInput)
-            {
-                value = GetRegisterValue(DiscreteInputs, register);
-            }
-            else if (register.Type == RegisterType.HoldingRegister)
-            {
-                value = GetRegisterValue(HoldingRegisters, register);
-            }
-            else if (register.Type == RegisterType.InputRegister)
-            {
-                value = GetRegisterValue(InputRegisters, register);
-            }
-
-            return value;
-        }
-        /// <summary>
-        /// 获取寄存器的值
-        /// </summary>
-        /// <param name="registerAddress"></param>
-        /// <param name="type"></param>
-        /// <returns></returns>
-        public ulong GetRegisterValue(ushort registerAddress, RegisterType type)
-        {
-            Register register = GetRegister(registerAddress, type);
-            return register != null ? GetRegisterValue(register) : 0;
-        }
-
-        /// <summary>
-        /// 清除所有寄存器
-        /// </summary>
-        public void ClearRegisters()
-        {
-            CoilsStatus.Clear();
-            DiscreteInputs.Clear();
-            HoldingRegisters.Clear();
-            InputRegisters.Clear();
-
-            RegistersDescription.Clear();
-
-            CoilsStatusAddresses.Clear();
-            DiscreteInputsAddresses.Clear();
-            HoldingRegistersAddresses.Clear();
-            InputRegistersAddresses.Clear();
-        }
-        
-#endregion
 
         /// <summary>
         /// 初使化设备，将寄存器数据归零，寄存器描述归零
@@ -612,43 +352,61 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         internal void InitializeDevice(IModbusMaster master)
         {
-            if (master?.Transport != null)
-            {
-                this.ReadCoilsStatus = master.ReadCoils;
-                this.ReadDiscreteInputs = master.ReadInputs;
+            this.Master = master;
 
-                this.ReadInputRegisters = master.ReadInputRegisters;
-                this.ReadHoldingRegisters = master.ReadHoldingRegisters;
-            }
-            else
+            ClearRawRegisters();
+            RegistersCount = Registers.Count;
+            foreach (Register register in Registers)
             {
-                this.ReadCoilsStatus = null;
-                this.ReadDiscreteInputs = null;
+                byte count = register.Count;
+                ushort startAddress = register.Address;
 
-                this.ReadInputRegisters = null;
-                this.ReadHoldingRegisters = null;
+                switch (register.Type) 
+                {
+                    case RegisterType.CoilsStatus:
+                        for (ushort address = startAddress; address < startAddress + count; address++)
+                        {
+                            if (!RawCoilsStatus.ContainsKey(address)) RawCoilsStatus.Add(address, default);
+                        }
+                        break;
+
+                    case RegisterType.DiscreteInput:
+                        for (ushort address = startAddress; address < startAddress + count; address++)
+                        {
+                            if (!RawDiscreteInputs.ContainsKey(address)) RawDiscreteInputs.Add(address, default);
+                        }
+                        break;
+
+                    case RegisterType.HoldingRegister:
+                        for (ushort address = startAddress; address < startAddress + count; address++)
+                        {
+                            if (!RawHoldingRegisters.ContainsKey(address)) RawHoldingRegisters.Add(address, default);
+                        }
+                        break;
+
+                    case RegisterType.InputRegister:
+                        for (ushort address = startAddress; address < startAddress + count; address++)
+                        {
+                            if (!RawInputRegisters.ContainsKey(address)) RawInputRegisters.Add(address, default);
+                        }
+                        break;
+                }
             }
             
-            foreach (var kv in CoilsStatus) CoilsStatus[kv.Key] = default;
-            foreach (var kv in DiscreteInputs) DiscreteInputs[kv.Key] = default;
-            foreach (var kv in HoldingRegisters) HoldingRegisters[kv.Key] = default;
-            foreach (var kv in InputRegisters) InputRegisters[kv.Key] = default;
+            RawCoilsStatusAddresses = SpliteAddresses(RawCoilsStatus.Keys.ToArray());
+            RawDiscreteInputsAddresses = SpliteAddresses(RawDiscreteInputs.Keys.ToArray());
+            RawHoldingRegistersAddresses = SpliteAddresses(RawHoldingRegisters.Keys.ToArray());
+            RawInputRegistersAddresses = SpliteAddresses(RawInputRegisters.Keys.ToArray());
 
-            foreach (var reg in RegistersDescription)
+            foreach (var reg in Registers)
             {
                 reg.Value = ulong.MaxValue;
                 reg.LastValue = ulong.MaxValue;
-                //Console.WriteLine($"Type:{reg.Type}  Address:{reg.Address} Count:{reg.Count}");
             }
-
-            CoilsStatusAddresses = SpliteAddresses(CoilsStatus.Keys.ToArray());
-            DiscreteInputsAddresses = SpliteAddresses(DiscreteInputs.Keys.ToArray());
-            HoldingRegistersAddresses = SpliteAddresses(HoldingRegisters.Keys.ToArray());
-            InputRegistersAddresses = SpliteAddresses(InputRegisters.Keys.ToArray());
 
             SyncInputRegisters();
             SyncOutputRegisters();
-            InitializeIORegisters();
+            InitializeRegistersEvents();
 
             Logger.Info($"{this} Initialize Device.");
         }
@@ -659,14 +417,15 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         internal void SyncOutputRegisters()
         {
-            if (CoilsStatus.Count > 0 && ReadCoilsStatus != null)
+            if (RawCoilsStatus?.Count > 0 && Master?.Transport != null)
             {
                 try
                 {
-                    foreach (var kv in CoilsStatusAddresses)
+                    foreach (var kv in RawCoilsStatusAddresses)
                     {
-                        bool[] result = ReadCoilsStatus(Address, kv.Key, kv.Value);
-                        UpdateRegisterValues(kv.Key, RegisterType.CoilsStatus, result);
+                        bool[] result = Master?.ReadCoils(Address, kv.Key, kv.Value);
+                        if (result != null) UpdateRawRegisterValues(kv.Key, RegisterType.CoilsStatus, result);
+                        else break;                        
                     }
                 }
                 catch (Exception ex)
@@ -676,14 +435,16 @@ namespace SpaceCG.Extensions.Modbus
                     Thread.Sleep(300);
                 }
             }
-            if (HoldingRegisters.Count > 0 && ReadHoldingRegisters != null)
+
+            if (RawHoldingRegisters?.Count > 0 && Master?.Transport != null)
             {
                 try
                 {
-                    foreach (var kv in HoldingRegistersAddresses)
+                    foreach (var kv in RawHoldingRegistersAddresses)
                     {
-                        ushort[] result = ReadHoldingRegisters(Address, kv.Key, kv.Value);
-                        UpdateRegisterValues(kv.Key, RegisterType.HoldingRegister, result);
+                        ushort[] result = Master?.ReadHoldingRegisters(Address, kv.Key, kv.Value);
+                        if (result != null) UpdateRawRegisterValues(kv.Key, RegisterType.HoldingRegister, result);
+                        else break;
                     }
                 }
                 catch (Exception ex)
@@ -694,21 +455,21 @@ namespace SpaceCG.Extensions.Modbus
                 }
             }
         }
-
         /// <summary>
         /// 同步传输输入寄存器
         /// <para>需要在线程中实时或间隔时间调用</para>
         /// </summary>
         internal void SyncInputRegisters()
         {
-            if (DiscreteInputs.Count > 0 && ReadDiscreteInputs != null)
+            if (RawDiscreteInputs?.Count > 0 && Master?.Transport != null)
             {
                 try
                 {
-                    foreach (var kv in DiscreteInputsAddresses)
+                    foreach (var kv in RawDiscreteInputsAddresses)
                     {
-                        bool[] result = ReadDiscreteInputs(Address, kv.Key, kv.Value);
-                        UpdateRegisterValues(kv.Key, RegisterType.DiscreteInput, result);
+                        bool[] result = Master?.ReadInputs(Address, kv.Key, kv.Value);
+                        if (result != null) UpdateRawRegisterValues(kv.Key, RegisterType.DiscreteInput, result);
+                        else break;
                     }
                 }
                 catch (Exception ex)
@@ -718,14 +479,16 @@ namespace SpaceCG.Extensions.Modbus
                     Thread.Sleep(300);
                 }
             }
-            if (InputRegisters.Count > 0 && ReadInputRegisters != null)
+
+            if (RawInputRegisters?.Count > 0 && Master?.Transport != null)
             {
                 try
                 {
-                    foreach (var kv in InputRegistersAddresses)
+                    foreach (var kv in RawInputRegistersAddresses)
                     {
-                        ushort[] result = ReadInputRegisters(Address, kv.Key, kv.Value);
-                        UpdateRegisterValues(kv.Key, RegisterType.InputRegister, result);
+                        ushort[] result = Master?.ReadInputRegisters(Address, kv.Key, kv.Value);
+                        if (result != null) UpdateRawRegisterValues(kv.Key, RegisterType.InputRegister, result);
+                        else break;
                     }
                 }
                 catch (Exception ex)
@@ -740,15 +503,14 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// 初使化寄存器的 Value, LastValue 为事件处理做准备
         /// </summary>
-        private void InitializeIORegisters()
+        private void InitializeRegistersEvents()
         {
-            for (int i = 0; i < RegistersDescription.Count; i++)
+            foreach(Register register in Registers)
             {
-                Register register = RegistersDescription[i];
                 //CoilsStatus
-                if (register.Type == RegisterType.CoilsStatus && CoilsStatus.Count > 0)
+                if (register.Type == RegisterType.CoilsStatus && RawCoilsStatus.Count > 0)
                 {
-                    ulong value = GetRegisterValue(CoilsStatus, register);
+                    ulong value = GetRegisterValue(RawCoilsStatus, register);
                     if (register.Value == ulong.MaxValue && register.LastValue == ulong.MaxValue)
                     {
                         register.Value = value;
@@ -757,9 +519,9 @@ namespace SpaceCG.Extensions.Modbus
                     }
                 }
                 //DiscreteInput
-                else if (register.Type == RegisterType.DiscreteInput && DiscreteInputs.Count > 0)
+                else if (register.Type == RegisterType.DiscreteInput && RawDiscreteInputs.Count > 0)
                 {
-                    ulong value = GetRegisterValue(DiscreteInputs, register);
+                    ulong value = GetRegisterValue(RawDiscreteInputs, register);
                     if (register.Value == ulong.MaxValue && register.LastValue == ulong.MaxValue)
                     {
                         register.Value = value;
@@ -768,9 +530,9 @@ namespace SpaceCG.Extensions.Modbus
                     }
                 }
                 //HoldingRegisters
-                else if (register.Type == RegisterType.HoldingRegister && HoldingRegisters.Count > 0)
+                else if (register.Type == RegisterType.HoldingRegister && RawHoldingRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(HoldingRegisters, register);
+                    ulong value = GetRegisterValue(RawHoldingRegisters, register);
                     if (register.Value == ulong.MaxValue && register.LastValue == ulong.MaxValue)
                     {
                         register.Value = value;
@@ -779,9 +541,9 @@ namespace SpaceCG.Extensions.Modbus
                     }
                 }
                 //InputRegisters
-                else if (register.Type == RegisterType.InputRegister && InputRegisters.Count > 0)
+                else if (register.Type == RegisterType.InputRegister && RawInputRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(InputRegisters, register);
+                    ulong value = GetRegisterValue(RawInputRegisters, register);
                     if (register.Value == ulong.MaxValue && register.LastValue == ulong.MaxValue)
                     {
                         register.Value = value;
@@ -797,57 +559,54 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         internal void SyncRegisterChangeEvents()
         {
-            for(int i = 0; i < RegistersDescription.Count; i ++)
+            foreach(Register register in Registers)
             {
-                Register register = RegistersDescription[i];
-                if (!register.EnabledChangeEvent) continue;
-
                 //CoilsStatus
-                if (register.Type == RegisterType.CoilsStatus && CoilsStatus.Count > 0)
+                if (register.Type == RegisterType.CoilsStatus && RawCoilsStatus.Count > 0)
                 {
-                    ulong value = GetRegisterValue(CoilsStatus, register);
+                    ulong value = GetRegisterValue(RawCoilsStatus, register);
                     if (register.Value != value)
                     {
                         register.LastValue = register.Value;
                         register.Value = value;
-                        OutputChangeHandler?.Invoke(this, register);
+                        if(register.EnabledChangeEvent) OutputChangeHandler?.Invoke(this, register);
                     }
                     continue;
                 }
                 //DiscreteInput
-                else if(register.Type == RegisterType.DiscreteInput && DiscreteInputs.Count > 0)
+                else if(register.Type == RegisterType.DiscreteInput && RawDiscreteInputs.Count > 0)
                 {
-                    ulong value = GetRegisterValue(DiscreteInputs, register);
+                    ulong value = GetRegisterValue(RawDiscreteInputs, register);
                     if (register.Value != value)
                     {
                         register.LastValue = register.Value;
                         register.Value = value;
-                        InputChangeHandler?.Invoke(this, register);
+                        if (register.EnabledChangeEvent) InputChangeHandler?.Invoke(this, register);
                     }
                     continue;
                 }
                 //HoldingRegisters
-                else if (register.Type == RegisterType.HoldingRegister && HoldingRegisters.Count > 0)
+                else if (register.Type == RegisterType.HoldingRegister && RawHoldingRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(HoldingRegisters, register);
+                    ulong value = GetRegisterValue(RawHoldingRegisters, register);
                     if (register.Value != value)
                     {
                         register.LastValue = register.Value;
                         register.Value = value;
-                        OutputChangeHandler?.Invoke(this, register);
+                        if (register.EnabledChangeEvent) OutputChangeHandler?.Invoke(this, register);
                     }
                     continue;
                 }
                 //InputRegisters
-                else if (register.Type == RegisterType.InputRegister && InputRegisters.Count > 0)
+                else if (register.Type == RegisterType.InputRegister && RawInputRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(InputRegisters, register);
+                    ulong value = GetRegisterValue(RawInputRegisters, register);
 
                     if (register.Value != value)
                     {
                         register.LastValue = register.Value;
                         register.Value = value;
-                        InputChangeHandler?.Invoke(this, register);
+                        if (register.EnabledChangeEvent) InputChangeHandler?.Invoke(this, register);
                     }
                     continue;
                 }                
@@ -857,27 +616,24 @@ namespace SpaceCG.Extensions.Modbus
         /// <inheritdoc/>
         public void Dispose()
         {
-            ClearRegisters();
+            Master = null;
 
-            ReadCoilsStatus = null;
-            ReadHoldingRegisters = null;
-            ReadDiscreteInputs = null;
-            ReadInputRegisters = null;
-
+            ClearRawRegisters();
+            Registers.Clear();
+            Registers = null;
+            
             InputChangeHandler = null;
             OutputChangeHandler = null;
 
-            CoilsStatus = null;
-            DiscreteInputs = null;
-            HoldingRegisters = null;
-            InputRegisters = null;
+            RawCoilsStatus = null;
+            RawDiscreteInputs = null;
+            RawHoldingRegisters = null;
+            RawInputRegisters = null;
 
-            RegistersDescription = null;
-
-            CoilsStatusAddresses = null;
-            DiscreteInputsAddresses = null;
-            HoldingRegistersAddresses = null;
-            InputRegistersAddresses = null;
+            RawCoilsStatusAddresses = null;
+            RawDiscreteInputsAddresses = null;
+            RawHoldingRegistersAddresses = null;
+            RawInputRegistersAddresses = null;
         }
         /// <inheritdoc/>
         public override string ToString()
@@ -937,8 +693,10 @@ namespace SpaceCG.Extensions.Modbus
 
                 for (ushort j = 0; j < count; j++, startAddress++)
                 {
-                    if (!device.AddRegister(startAddress, (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true)))
-                        Logger.Warn($"{device} 添加寄存器失败, {element} 节点属性 {attributes[i]} 值格式错误");
+                    device.Registers.Add(new Register(startAddress, (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true), 1));
+
+                    //if (!device.AddRegister(startAddress, (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true)))
+                    //    Logger.Warn($"{device} 添加寄存器失败, {element} 节点属性 {attributes[i]} 值格式错误");
                 }
             }
 
@@ -948,8 +706,7 @@ namespace SpaceCG.Extensions.Modbus
             IEnumerable<XElement> regElements = element.Elements(nameof(Register));
             foreach(var regElement in regElements)
             {
-                if (!(Register.TryParse(regElement, out Register register) && device.AddRegister(register)))
-                    Logger.Warn($"{device} 解析/添加寄存器失败");
+                if (!Register.TryParse(regElement, out Register register)) device.Registers.Add(register);
             }
 
             return true;
@@ -961,10 +718,10 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         /// <param name="addresses"></param>
         /// <returns>返回 startAddress,numberOfPoints 的值键对</returns>
-        internal static ConcurrentDictionary<ushort, ushort> SpliteAddresses(ushort[] addresses)
+        internal static Dictionary<ushort, ushort> SpliteAddresses(ushort[] addresses)
         {
             //startAddress,numberOfPoints
-            ConcurrentDictionary<ushort, ushort> result = new ConcurrentDictionary<ushort, ushort>();
+            Dictionary<ushort, ushort> result = new Dictionary<ushort, ushort>();
             if (addresses?.Length <= 0) return result;
 
             ushort i = 0;
@@ -985,7 +742,7 @@ namespace SpaceCG.Extensions.Modbus
                 }
                 else
                 {
-                    result.TryAdd(startAddress, numberOfPoints);
+                    result.Add(startAddress, numberOfPoints);
 
                     numberOfPoints = 1;
                     startAddress = addresses[i];
@@ -994,7 +751,7 @@ namespace SpaceCG.Extensions.Modbus
 
                 if (i == addresses.Length - 1)
                 {
-                    result.TryAdd(startAddress, numberOfPoints);
+                    result.Add(startAddress, numberOfPoints);
                     break;
                 }
             }

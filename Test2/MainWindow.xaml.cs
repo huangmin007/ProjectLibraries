@@ -1,24 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using System.Windows.Threading;
+using Modbus.Device;
+using SpaceCG.Extensions.Modbus;
 using SpaceCG.Generic;
-using SpaceCG.Net;
 
 namespace Test2
 {
@@ -45,17 +33,26 @@ namespace Test2
             //LoggerExtensions.Info($"Closed.");
 
             //Logger?.Dispose();
-            
+            modbusTransport?.Dispose();
         }
 
-        private LoggerTrace logger = new LoggerTrace();
+        private LoggerTrace logger1 = new LoggerTrace();
+        private LoggerTrace logger2 = new LoggerTrace("test");
+
+        IModbusMaster master;
+        ModbusTransport modbusTransport;
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            logger.Info("中文测试2");
-            logger.Warn("Eng");
+            ETextWriterTraceListener trace = logger1.TraceSource.Listeners[0] as ETextWriterTraceListener;
+            if(trace != null) trace.WriteEvent += (s, we) => TextBox_Trace.AppendText(we.Message);
+               
+            logger1.Info("中文测试2");
+            logger1.Warn("Eng");
 
-            logger.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
+            logger1.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
+
+            logger2.Info("中文测试2 Chinese test...");
 
             String str = "test.Dispose";
             bool result = Regex.IsMatch(str, @"\*.Dispose", RegexOptions.Singleline);
@@ -63,13 +60,53 @@ namespace Test2
 
             controlInterface = new ControlInterface(2023);
             controlInterface.AccessObjects.Add("window", this);
+
+            System.IO.Ports.SerialPort serialPort = new System.IO.Ports.SerialPort("COM3", 9600);
+            serialPort.Open();
+            master = ModbusSerialMaster.CreateRtu(serialPort);
+
+            //master = SpaceCG.Extensions.NModbus4Extensions.CreateNModbus4Master("SERIAL", "COM3", 9600);
+            modbusTransport = new ModbusTransport(master, "test bus");
+            ModbusIODevice device = new ModbusIODevice(0x01, "LH-IO204");
+            for(ushort i = 0; i < 2; i ++)
+                device.Registers.Add(new Register(i, RegisterType.CoilsStatus));
+            for (ushort i = 0; i < 4; i++)
+                device.Registers.Add(new Register(i, RegisterType.DiscreteInput));
+
+            device.Registers.Add(new Register(0x02, RegisterType.DiscreteInput, 2));
+
+            modbusTransport.ModbusDevices.Add(device);
+            modbusTransport.InputChangeEvent += ModbusTransport_InputChangeEvent;
+            modbusTransport.OutputChangeEvent += ModbusTransport_OutputChangeEvent;
+            modbusTransport.StartTransport();
+
+            int t = 3;
+            Console.WriteLine(  t.ToString("2"));
+        }
+
+        private void ModbusTransport_OutputChangeEvent(ModbusTransport transport, ModbusIODevice device, Register register)
+        {
+            if(register.Count == 1)
+                Console.WriteLine($"Output: {transport} DeviceAddress:{device.Address} RegisterAddress:{register} RegisterValue:{register.Value}");
+            else
+                Console.WriteLine($"Output: {transport} DeviceAddress:{device.Address} RegisterAddress:{register} RegisterValue:{Convert.ToString((int)register.Value, 2)}");
+        }
+
+        private void ModbusTransport_InputChangeEvent(ModbusTransport transport, ModbusIODevice device, Register register)
+        {
+            if (register.Count == 1)
+                Console.WriteLine($"Input: {transport} DeviceAddress:{device.Address} RegisterAddress:{register} RegisterValue:{register.Value}");
+            else
+                Console.WriteLine($"Input: {transport} DeviceAddress:{device.Address} RegisterAddress:{register} RegisterValue:{Convert.ToString((int)register.Value, 2)}");
         }
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)
         {
-            logger.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
-            int r = Add(5, 9);
-            logger.Info($"Result::{r}");
+            logger2.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
+            int r = Add2(5, 9);
+            logger1.Info($"Result::{r}");
+
+            modbusTransport.TurnSingleCoil(0x01, 0x00);
         }
 
         public int Add(int a, int b) 

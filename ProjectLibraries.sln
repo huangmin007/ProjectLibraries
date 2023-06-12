@@ -1,10 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31321.278
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33712.159
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "Test\Test.csproj", "{45B25F03-9765-4AF3-84BC-40A3BD7E5252}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Log4Net.Window", "Log4Net.Window\Log4Net.Window.csproj", "{27B5F1F3-17F2-4210-9179-DD6348FB6F4C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceCG.Win32APIs", "SpaceCG.Win32APIs\SpaceCG.Win32APIs.csproj", "{BF71A004-3614-4E0D-A157-840057337865}"
@@ -20,7 +18,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SpaceCG.Generic", "SpaceCG.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SpaceCG.Extensions.Modbus", "SpaceCG.Extensions.Modbus\SpaceCG.Extensions.Modbus.csproj", "{31EEB8D3-BD76-4DEE-86A1-1CA34FC70B7C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModbusDevicesManagerServices", "ModbusDevicesManagerServices\ModbusDevicesManagerServices.csproj", "{67E0F0D3-DEB6-4A6B-AF46-38C4381485A2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModbusDevicesManagerServices", "ModbusDevicesManagerServices\ModbusDevicesManagerServices.csproj", "{67E0F0D3-DEB6-4A6B-AF46-38C4381485A2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,18 +30,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Debug|x64.Build.0 = Debug|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Debug|x86.Build.0 = Debug|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Release|Any CPU.Build.0 = Release|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Release|x64.ActiveCfg = Release|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Release|x64.Build.0 = Release|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Release|x86.ActiveCfg = Release|Any CPU
-		{45B25F03-9765-4AF3-84BC-40A3BD7E5252}.Release|x86.Build.0 = Release|Any CPU
 		{27B5F1F3-17F2-4210-9179-DD6348FB6F4C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{27B5F1F3-17F2-4210-9179-DD6348FB6F4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{27B5F1F3-17F2-4210-9179-DD6348FB6F4C}.Debug|x64.ActiveCfg = Debug|Any CPU
