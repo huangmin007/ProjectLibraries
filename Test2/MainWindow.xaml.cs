@@ -32,7 +32,7 @@ namespace Test2
             base.OnClosed(e);
             //LoggerExtensions.Info($"Closed.");
 
-            //Logger?.Dispose();
+            logger1?.Dispose();
             modbusTransport?.Dispose();
         }
 
@@ -45,8 +45,11 @@ namespace Test2
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             ETextWriterTraceListener trace = logger1.TraceSource.Listeners[0] as ETextWriterTraceListener;
-            if(trace != null) trace.WriteEvent += (s, we) => TextBox_Trace.AppendText(we.Message);
-               
+            if (trace != null) trace.WriteEvent += (s, we) =>
+            {
+                TextBox_Trace?.Dispatcher.InvokeAsync(() => TextBox_Trace.AppendText(we.Message));
+            };
+            
             logger1.Info("中文测试2");
             logger1.Warn("Eng");
 
@@ -61,11 +64,11 @@ namespace Test2
             controlInterface = new ControlInterface(2023);
             controlInterface.AccessObjects.Add("window", this);
 
-            System.IO.Ports.SerialPort serialPort = new System.IO.Ports.SerialPort("COM3", 9600);
-            serialPort.Open();
-            master = ModbusSerialMaster.CreateRtu(serialPort);
+            //System.IO.Ports.SerialPort serialPort = new System.IO.Ports.SerialPort("COM3", 9600);
+            //serialPort.Open();
+            //master = ModbusSerialMaster.CreateRtu(serialPort);
 
-            //master = SpaceCG.Extensions.NModbus4Extensions.CreateNModbus4Master("SERIAL", "COM3", 9600);
+            master = SpaceCG.Extensions.NModbus4Extensions.CreateNModbus4Master("SERIAL", "COM3", 9600);
             modbusTransport = new ModbusTransport(master, "test bus");
             ModbusIODevice device = new ModbusIODevice(0x01, "LH-IO204");
             for(ushort i = 0; i < 2; i ++)

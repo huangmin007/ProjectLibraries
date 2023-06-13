@@ -27,7 +27,10 @@ private void Initialize()
     
     //输出事件，写入文本框
     ETextWriterTraceListener textWriterTrace = Logger.TraceSource.Listeners[0] as ETextWriterTraceListener;
-    if(textWriterTrace != null) textWriterTrace.WriteEvent += (s, e) => TextBox_Trace.AppendText(e.Message);
+    if (textWriterTrace != null) textWriterTrace.WriteEvent += (s, we) =>
+    {
+        TextBox_Trace?.Dispatcher.InvokeAsync(() => TextBox_Trace.AppendText(we.Message));
+    };
 }
 ```
 

@@ -1,13 +1,10 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Xml.Linq;
 using SpaceCG.Extensions;
 
 namespace SpaceCG.Generic
@@ -414,6 +411,13 @@ namespace SpaceCG.Generic
                 WriteLine(ex.ToString());
                 Flush();
             }
+        }
+
+        /// <inheritdoc/>
+        protected override void Dispose(bool disposing)
+        {
+            WriteEvent = null;
+            base.Dispose(disposing);
         }
     }
 

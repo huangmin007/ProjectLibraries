@@ -178,9 +178,20 @@ namespace SpaceCG.Extensions.Modbus
 
                 if (Master?.Transport == null) break;
 
-                //if(DeviceCount !=  ModbusDevices.Count) 
-                //{
-                //}
+                if(DeviceCount !=  ModbusDevices.Count) 
+                {
+                    foreach (var device in ModbusDevices)
+                    {
+                        device.InputChangeHandler -= ModbusDevice_InputChangeHandler;
+                        device.OutputChangeHandler -= ModbusDevice_OutputChangeHandler;
+
+                        device.InitializeDevice(Master);
+                        device.InputChangeHandler += ModbusDevice_InputChangeHandler;
+                        device.OutputChangeHandler += ModbusDevice_OutputChangeHandler;
+                    }
+
+                    DeviceCount = ModbusDevices.Count;
+                }
 
                 stopwatch.Restart();
                 foreach (ModbusIODevice device in ModbusDevices)
