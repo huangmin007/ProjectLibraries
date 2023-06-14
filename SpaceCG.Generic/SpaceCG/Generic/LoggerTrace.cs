@@ -98,7 +98,7 @@ namespace SpaceCG.Generic
         {
             if(String.IsNullOrWhiteSpace(name))
             {
-                StackFrame frame = new StackFrame(2, true);
+                StackFrame frame = new StackFrame(2, false);
                 MethodBase method = frame.GetMethod();
                 if (method == null) throw new Exception("获取在其中执行帧的方法失败");
 

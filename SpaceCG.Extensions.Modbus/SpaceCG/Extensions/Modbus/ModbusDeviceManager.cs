@@ -37,7 +37,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// Transport Devices 列表
         /// </summary>
-        private List<ModbusTransport> TransportDevices = new List<ModbusTransport>(8);
+        private List<ModbusTransport> TransportDevices { get; set; } = new List<ModbusTransport>(8);
 
         /// <summary>
         /// Modbus 设备管理对象
@@ -52,7 +52,7 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         /// <param name="device"></param>
         /// <returns></returns>
-        protected bool AddTransportDevice(ModbusTransport device)
+        public bool AddTransportDevice(ModbusTransport device)
         {
             foreach (ModbusTransport td in TransportDevices)
                 if (td.Name == device.Name) return false;
@@ -65,7 +65,7 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         /// <param name="name"></param>
         /// <returns></returns>
-        protected ModbusTransport GetTransportDevice(String name)
+        public ModbusTransport GetTransportDevice(String name)
         {
             foreach (ModbusTransport td in TransportDevices)
                 if (td.Name == name) return td;
@@ -268,7 +268,7 @@ namespace SpaceCG.Extensions.Modbus
                     if (!StringExtensions.TryParse(evt.Attribute($"{register.Type}Address")?.Value, out ushort regAddress)) continue;
                     if (regAddress != register.Address) continue;
 
-                    if (StringExtensions.TryParse(evt.Attribute("Value")?.Value, out ulong regValue) && regValue == register.Value)
+                    if (StringExtensions.TryParse(evt.Attribute("Value")?.Value, out long regValue) && regValue == register.Value)
                     {
                         if (Logger.IsInfoEnabled)
                             Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
@@ -277,7 +277,7 @@ namespace SpaceCG.Extensions.Modbus
                         foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
                         continue;
                     }
-                    else if(StringExtensions.TryParse(evt.Attribute("MinValue")?.Value, out ulong minValue) && StringExtensions.TryParse(evt.Attribute("MaxValue")?.Value, out ulong maxValue))
+                    else if(StringExtensions.TryParse(evt.Attribute("MinValue")?.Value, out long minValue) && StringExtensions.TryParse(evt.Attribute("MaxValue")?.Value, out long maxValue))
                     {
                         if (maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && (register.LastValue < minValue || register.LastValue > maxValue))
                         {

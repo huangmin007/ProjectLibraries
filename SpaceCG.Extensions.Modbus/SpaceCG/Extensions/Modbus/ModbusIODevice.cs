@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Xml.Linq;
 using Modbus.Device;
@@ -46,9 +47,6 @@ namespace SpaceCG.Extensions.Modbus
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(Register));
 
-        private string _name;
-        private byte _count = 1;
-
         /// <summary>
         /// 寄存器地址
         /// </summary>
@@ -62,29 +60,17 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// 关联的连续寄存器数量，1~4 bytes
         /// </summary>
-        public byte Count
-        {
-            get { return _count; }
-            internal set { _count = (value <= 0x00) ? (byte)0x01 : value >= 0x04 ? (byte)0x04 : value; }
-        }
+        public byte Count { get; private set; } = 1;       
 
         /// <summary>
         /// 位偏移量，暂时保留
         /// </summary>
-        public byte Offset { get; set; } = 0;
+        public byte Offset { get; private set; } = 0;
 
         /// <summary>
         /// 寄存器名称
         /// </summary>
-        public String Name
-        {
-            get
-            { 
-                if (String.IsNullOrWhiteSpace(_name)) _name = $"Register#0x{Address:X4}";
-                return _name;
-            }
-            internal set { _name = String.IsNullOrWhiteSpace(value) ? $"Register#0x{Address:X4}" : value; }
-        }
+        public String Name { get; set; } = null;
 
         /// <summary>
         /// 寄存器单位描述，暂时保留
@@ -94,7 +80,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// 字节顺序(Endianness)，低地址数据在后，高地址数据在前
         /// </summary>
-        public bool IsLittleEndian { get; set; } = true;
+        public bool IsLittleEndian { get; private set; } = true;
 
         /// <summary>
         /// 允许 IO Change 事件
@@ -104,18 +90,18 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// 64位 寄存器的最新数据
         /// </summary>
-        public ulong Value { get; internal set; } = ulong.MaxValue;
+        public long Value { get; internal set; } = long.MaxValue;
 
         /// <summary>
         /// 64位 寄存器的上一次的数据
         /// </summary>
-        public ulong LastValue { get; internal set; } = ulong.MaxValue;
+        public long LastValue { get; internal set; } = long.MaxValue;
 
 #if false
         /// <summary>
         /// 寄存器的原始数据存储块，待我思考一会儿，用于未来出现 大于64位数据时 在升级吧~~~
         /// </summary>
-        internal ushort[] RawBytes;
+        internal ushort[] RawBytes {get; private set;}
 #endif
 
         /// <summary>
@@ -124,19 +110,29 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="address"></param>
         /// <param name="type"></param>
         /// <param name="count"></param>
-        /// <param name="name"></param>
-        public Register(ushort address, RegisterType type, byte count = 1, string name = null)
+        /// <param name="isLittleEndian"></param>
+        /// <exception cref="ArgumentOutOfRangeException">寄存器类型不支持连接的数量</exception>
+        public Register(ushort address, RegisterType type, byte count = 1, bool isLittleEndian = true)
         {
+            if (type == RegisterType.HoldingRegister || type == RegisterType.InputRegister)
+            {
+                if (count < 1 || count > 4) throw new ArgumentOutOfRangeException(nameof(count), $"寄存器类型 {type} 暂时只支持连续的 1~4 个");
+            }
+            if (type == RegisterType.CoilsStatus || type == RegisterType.DiscreteInput)
+            {
+                if (count < 1 || count > 64) throw new ArgumentOutOfRangeException(nameof(count), $"寄存器类型 {type} 暂时只支持连续的 1~64 个");
+            }
+
             this.Type = type;
             this.Count = count;
             this.Address = address;
-            this.Name = name;
+            this.IsLittleEndian = isLittleEndian;
         }
 
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(Register)}]  Name:{Name}  Address:0x{Address:X4}  Type:{Type}  Count:{Count}  Value:{Value}";
+            return $"{nameof(Register)}#0x{Address:X4}  Type:{Type}  Count:{Count}  Value:{Value}";
         }
 
         /// <summary>
@@ -153,11 +149,10 @@ namespace SpaceCG.Extensions.Modbus
         /// <returns></returns>
         public static Register Create(ushort address, RegisterType type, byte count = 1, bool isLittleEndian = true, byte offset = 0, string name = null, string units = null, bool enabledChangeEvent = true)
         {
-            Register register = new Register(address, type, count);
+            Register register = new Register(address, type, count, isLittleEndian);
             register.Name = name;
             register.Units = units;
             register.Offset = offset;
-            register.IsLittleEndian = isLittleEndian;
             register.EnabledChangeEvent = enabledChangeEvent;
 
             return register;
@@ -407,8 +402,8 @@ namespace SpaceCG.Extensions.Modbus
 
             foreach (var reg in Registers)
             {
-                reg.Value = ulong.MaxValue;
-                reg.LastValue = ulong.MaxValue;
+                reg.Value = long.MaxValue;
+                reg.LastValue = long.MaxValue;
             }
 
             SyncInputRegisters();
@@ -523,8 +518,8 @@ namespace SpaceCG.Extensions.Modbus
                 //CoilsStatus
                 if (register.Type == RegisterType.CoilsStatus && RawCoilsStatus.Count > 0)
                 {
-                    ulong value = GetRegisterValue(RawCoilsStatus, register);
-                    if (register.Value == ulong.MaxValue && register.LastValue == ulong.MaxValue)
+                    long value = GetRegisterValue(RawCoilsStatus, register);
+                    if (register.Value == long.MaxValue && register.LastValue == long.MaxValue)
                     {
                         register.Value = value;
                         register.LastValue = value;
@@ -534,8 +529,8 @@ namespace SpaceCG.Extensions.Modbus
                 //DiscreteInput
                 else if (register.Type == RegisterType.DiscreteInput && RawDiscreteInputs.Count > 0)
                 {
-                    ulong value = GetRegisterValue(RawDiscreteInputs, register);
-                    if (register.Value == ulong.MaxValue && register.LastValue == ulong.MaxValue)
+                    long value = GetRegisterValue(RawDiscreteInputs, register);
+                    if (register.Value == long.MaxValue && register.LastValue == long.MaxValue)
                     {
                         register.Value = value;
                         register.LastValue = value;
@@ -545,8 +540,8 @@ namespace SpaceCG.Extensions.Modbus
                 //HoldingRegisters
                 else if (register.Type == RegisterType.HoldingRegister && RawHoldingRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(RawHoldingRegisters, register);
-                    if (register.Value == ulong.MaxValue && register.LastValue == ulong.MaxValue)
+                    long value = GetRegisterValue(RawHoldingRegisters, register);
+                    if (register.Value == long.MaxValue && register.LastValue == long.MaxValue)
                     {
                         register.Value = value;
                         register.LastValue = value;
@@ -556,8 +551,8 @@ namespace SpaceCG.Extensions.Modbus
                 //InputRegisters
                 else if (register.Type == RegisterType.InputRegister && RawInputRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(RawInputRegisters, register);
-                    if (register.Value == ulong.MaxValue && register.LastValue == ulong.MaxValue)
+                    long value = GetRegisterValue(RawInputRegisters, register);
+                    if (register.Value == long.MaxValue && register.LastValue == long.MaxValue)
                     {
                         register.Value = value;
                         register.LastValue = value;
@@ -577,7 +572,8 @@ namespace SpaceCG.Extensions.Modbus
                 //CoilsStatus
                 if (register.Type == RegisterType.CoilsStatus && RawCoilsStatus.Count > 0)
                 {
-                    ulong value = GetRegisterValue(RawCoilsStatus, register);
+                    long value = GetRegisterValue(RawCoilsStatus, register);
+                    //check new value
                     if (register.Value != value)
                     {
                         register.LastValue = register.Value;
@@ -589,7 +585,7 @@ namespace SpaceCG.Extensions.Modbus
                 //DiscreteInput
                 else if(register.Type == RegisterType.DiscreteInput && RawDiscreteInputs.Count > 0)
                 {
-                    ulong value = GetRegisterValue(RawDiscreteInputs, register);
+                    long value = GetRegisterValue(RawDiscreteInputs, register);
                     if (register.Value != value)
                     {
                         register.LastValue = register.Value;
@@ -601,7 +597,7 @@ namespace SpaceCG.Extensions.Modbus
                 //HoldingRegisters
                 else if (register.Type == RegisterType.HoldingRegister && RawHoldingRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(RawHoldingRegisters, register);
+                    long value = GetRegisterValue(RawHoldingRegisters, register);
                     if (register.Value != value)
                     {
                         register.LastValue = register.Value;
@@ -613,7 +609,7 @@ namespace SpaceCG.Extensions.Modbus
                 //InputRegisters
                 else if (register.Type == RegisterType.InputRegister && RawInputRegisters.Count > 0)
                 {
-                    ulong value = GetRegisterValue(RawInputRegisters, register);
+                    long value = GetRegisterValue(RawInputRegisters, register);
                     if (register.Value != value)
                     {
                         register.LastValue = register.Value;
@@ -707,7 +703,8 @@ namespace SpaceCG.Extensions.Modbus
 
                 for (ushort j = 0; j < count; j++, startAddress++)
                 {
-                    device.Registers.Add(new Register(startAddress, (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true), 1));
+                    RegisterType type = (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true);
+                    device.Registers.Add(new Register(startAddress, type));
 
                     //if (!device.AddRegister(startAddress, (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true)))
                     //    Logger.Warn($"{device} 添加寄存器失败, {element} 节点属性 {attributes[i]} 值格式错误");
@@ -778,22 +775,21 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="rawRegisters"></param>
         /// <param name="description"></param>
         /// <returns></returns>
-        internal static ulong GetRegisterValue(IReadOnlyDictionary<ushort, ushort> rawRegisters, Register description)
+        internal static long GetRegisterValue(IReadOnlyDictionary<ushort, ushort> rawRegisters, Register description)
         {            
-            ulong longValue = (ulong)0;
+            long longValue = (long)0;
             if (description.Count <= 0 || description.Count > 4) return longValue;
 
             int i = 0;
 
             for (ushort address = description.Address; address < description.Address + description.Count; address++, i ++)
             {
-                ulong value = rawRegisters.ContainsKey(address) ? rawRegisters[address] : (ushort)0x0000;
+                long value = rawRegisters.ContainsKey(address) ? rawRegisters[address] : (ushort)0x0000;
                 
                 //BitConverter
                 int bitOffset = description.IsLittleEndian ? i * 16 : (description.Count - 1 - i) * 16;
-                longValue |= (ulong)(value << bitOffset);
+                longValue |= (long)(value << bitOffset);
                 //Console.WriteLine($"{description.IsLittleEndian},{address},,{value},,{bitOffset},,{longValue}");
-
             }
 
             return longValue;
@@ -804,19 +800,19 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="rawRegisters"></param>
         /// <param name="description"></param>
         /// <returns></returns>
-        internal static ulong GetRegisterValue(IReadOnlyDictionary<ushort, bool> rawRegisters, Register description)
+        internal static long GetRegisterValue(IReadOnlyDictionary<ushort, bool> rawRegisters, Register description)
         {
-            ulong longValue = (ulong)0;
+            long longValue = (long)0;
             if (description.Count <= 0 || description.Count > 4) return longValue;
 
             int i = 0;
             for (ushort address = description.Address; address < description.Address + description.Count; address++, i++)
             {
-                ulong value = rawRegisters.ContainsKey(address) && rawRegisters[address] ? (byte)0x01 : (byte)0x00;
+                long value = rawRegisters.ContainsKey(address) && rawRegisters[address] ? (byte)0x01 : (byte)0x00;
 
                 //BitConverter
                 int bitOffset = description.IsLittleEndian ? i * 1 : (description.Count - 1 - i) * 1;
-                longValue |= (ulong)(value << bitOffset);
+                longValue |= (long)(value << bitOffset);
             }
 
             return longValue;

@@ -2,13 +2,36 @@
 
 namespace SpaceCG.Net
 {
+#pragma warning disable CS1591
+    /// <summary>
+    /// 连接类型
+    /// </summary>
+    public enum ConnectionType
+    {
+        Unknow,
+
+        SERIAL,
+
+        SERIAL_RTU,
+
+        TCP_CLIENT,
+
+        UDP_CLIENT,
+
+        TCP_CLIENT_RTU,
+
+        UDP_CLIENT_RTU,
+
+        TCP_SERVER,
+
+        UDP_SERVER,
+    }
+
     /// <summary>
     /// 连接接口
     /// </summary>
     public interface IConnection : IDisposable
     {
-#pragma warning disable CS1591
-
         event EventHandler<EventArgs> ConnectedEvent;
 
         event EventHandler<EventArgs> DisconnectedEvent;
@@ -31,6 +54,6 @@ namespace SpaceCG.Net
 
         String ReceiveMessage(int offset, int length);
 
-#pragma warning restore CA1591
     }
+#pragma warning restore CA1591
 }

@@ -20,6 +20,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SpaceCG.Extensions.Modbus",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModbusDevicesManagerServices", "ModbusDevicesManagerServices\ModbusDevicesManagerServices.csproj", "{67E0F0D3-DEB6-4A6B-AF46-38C4381485A2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceCG.Extensions.NETFramework", "SpaceCG.Extensions.NETFramework\SpaceCG.Extensions.NETFramework.csproj", "{72EAED11-5DEE-4EF6-A93F-6E70204A732B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -98,6 +100,18 @@ Global
 		{67E0F0D3-DEB6-4A6B-AF46-38C4381485A2}.Release|x64.Build.0 = Release|Any CPU
 		{67E0F0D3-DEB6-4A6B-AF46-38C4381485A2}.Release|x86.ActiveCfg = Release|Any CPU
 		{67E0F0D3-DEB6-4A6B-AF46-38C4381485A2}.Release|x86.Build.0 = Release|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Debug|x64.Build.0 = Debug|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Debug|x86.Build.0 = Debug|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Release|x64.ActiveCfg = Release|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Release|x64.Build.0 = Release|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Release|x86.ActiveCfg = Release|Any CPU
+		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

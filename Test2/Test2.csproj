@@ -38,6 +38,9 @@
     <Reference Include="NModbus4.Core, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\NModbus4.Core.1.0.2\lib\netstandard2.0\NModbus4.Core.dll</HintPath>
     </Reference>
+    <Reference Include="SpaceCG.Generic, Version=1.0.11.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SpaceCG.Generic.1.0.11\lib\netstandard2.0\SpaceCG.Generic.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Data" />
@@ -107,10 +110,6 @@
     <ProjectReference Include="..\SpaceCG.Extensions.Modbus\SpaceCG.Extensions.Modbus.csproj">
       <Project>{31EEB8D3-BD76-4DEE-86A1-1CA34FC70B7C}</Project>
       <Name>SpaceCG.Extensions.Modbus</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\SpaceCG.Generic\SpaceCG.Generic.csproj">
-      <Project>{d00bc3ee-2fc1-46fb-92ec-4ed23528bc01}</Project>
-      <Name>SpaceCG.Generic</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

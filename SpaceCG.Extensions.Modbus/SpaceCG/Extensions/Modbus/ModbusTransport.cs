@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -94,20 +93,9 @@ namespace SpaceCG.Extensions.Modbus
                 CancelToken = null;
             }
 
-            while (MethodQueues.TryDequeue(out ModbusMethod result))
-            {
-                ;
-            }
-            foreach (var device in ModbusDevices)
-            {
-                device.InitializeDevice(Master);
-                device.InputChangeHandler += ModbusDevice_InputChangeHandler;
-                device.OutputChangeHandler += ModbusDevice_OutputChangeHandler;
-            }
-
+            DeviceCount = 0;
             IOThreadRunning = true;
             ElapsedMilliseconds = 0;
-            DeviceCount = ModbusDevices.Count;
             CancelToken = new CancellationTokenSource();
 
             var sc_result = EventTimer.Change(100, 5);
@@ -123,6 +111,7 @@ namespace SpaceCG.Extensions.Modbus
         {
             if (!IOThreadRunning) return;
 
+            DeviceCount = 0;
             CancelToken.Cancel();
             IOThreadRunning = false;
             ElapsedMilliseconds = 0;
@@ -132,12 +121,7 @@ namespace SpaceCG.Extensions.Modbus
             {
                 ;
             }
-            foreach (var device in ModbusDevices)
-            {
-                device.InputChangeHandler -= ModbusDevice_InputChangeHandler;
-                device.OutputChangeHandler -= ModbusDevice_OutputChangeHandler;
-            }
-
+            
             Thread.Sleep(32);
             Logger.Info($"传输总线 ({this}) 停止同步传输");
         }
@@ -178,8 +162,14 @@ namespace SpaceCG.Extensions.Modbus
 
                 if (Master?.Transport == null) break;
 
+                //全部重新初使化一次
                 if(DeviceCount !=  ModbusDevices.Count) 
                 {
+                    while (MethodQueues.TryDequeue(out ModbusMethod result))
+                    {
+                        ;
+                    }
+
                     foreach (var device in ModbusDevices)
                     {
                         device.InputChangeHandler -= ModbusDevice_InputChangeHandler;
@@ -205,6 +195,7 @@ namespace SpaceCG.Extensions.Modbus
                 this.ElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
             }
 
+            this.DeviceCount = 0;
             this.ElapsedMilliseconds = 0;
         }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,8 +37,8 @@ namespace Test2
             modbusTransport?.Dispose();
         }
 
-        private LoggerTrace logger1 = new LoggerTrace();
-        private LoggerTrace logger2 = new LoggerTrace("test");
+        private static readonly LoggerTrace logger1 = new LoggerTrace();
+        private static readonly LoggerTrace logger2 = new LoggerTrace("test");
 
         IModbusMaster master;
         ModbusTransport modbusTransport;
@@ -64,6 +65,7 @@ namespace Test2
             controlInterface = new ControlInterface(2023);
             controlInterface.AccessObjects.Add("window", this);
 
+#if false
             //System.IO.Ports.SerialPort serialPort = new System.IO.Ports.SerialPort("COM3", 9600);
             //serialPort.Open();
             //master = ModbusSerialMaster.CreateRtu(serialPort);
@@ -85,6 +87,8 @@ namespace Test2
 
             int t = 3;
             Console.WriteLine(  t.ToString("2"));
+#endif
+            TestLoad();
         }
 
         private void ModbusTransport_OutputChangeEvent(ModbusTransport transport, ModbusIODevice device, Register register)
@@ -124,6 +128,14 @@ namespace Test2
         public int Add2(int a, int b)
         {
             return a + b;
+        }
+
+        private void TestLoad()
+        {
+            Console.WriteLine();
+            MethodInfo method = typeof(Console).GetMethod("WriteLine", new Type[] { typeof(String) } );
+            Console.WriteLine(  method?.Name);
+            method.Invoke(null, new object[] {"{15+16}" });
         }
 
     }
