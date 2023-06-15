@@ -133,9 +133,9 @@ namespace Test2
         private void TestLoad()
         {
             Console.WriteLine();
-            MethodInfo method = typeof(Console).GetMethod("WriteLine", new Type[] { typeof(String) } );
+            MethodInfo method = typeof(Console).GetMethod("WriteLine", new Type[] { typeof(int) } );
             Console.WriteLine(  method?.Name);
-            method.Invoke(null, new object[] {"{15+16}" });
+            method.Invoke(null, new object[] {"15+16" });
         }
 
     }

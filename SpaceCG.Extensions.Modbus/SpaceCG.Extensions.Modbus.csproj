@@ -10,6 +10,7 @@
     <Version>1.0.4</Version>
     <Title>SpaceCG.Extensions.Modbus</Title>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

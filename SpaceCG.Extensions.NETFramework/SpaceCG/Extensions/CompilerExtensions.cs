@@ -18,7 +18,7 @@ namespace SpaceCG.Extensions
 
                 class TempClass
                 {
-                    public static object Compiler()
+                    public static object Evaluate()
                     {
                         return {0};
                     }
@@ -28,6 +28,11 @@ namespace SpaceCG.Extensions
             return code.Replace("{0}", expression);
         }
 
+        /// <summary>
+        /// <para>see: https://learn.microsoft.com/zh-cn/dotnet/api/microsoft.csharp.csharpcodeprovider?view=netframework-4.7 </para>
+        /// <para>see: https://www.cnblogs.com/yidanda/archive/2009/07/20/1526978.html </para>
+        /// </summary>
+        /// <returns></returns>
         public static object Compiler()
         {
             String code = GetCodes("15+16");
@@ -47,7 +52,7 @@ namespace SpaceCG.Extensions
 
                 Assembly assembly = results.CompiledAssembly;
                 object instance = assembly.CreateInstance("TempClass");
-                MethodInfo method = instance.GetType().GetMethod("Compiler");
+                MethodInfo method = instance.GetType().GetMethod("Evaluate");
                 result = method.Invoke(instance, null);
 
                 Console.WriteLine($"Compile::{result}");
@@ -57,5 +62,18 @@ namespace SpaceCG.Extensions
             return result;
         }
 
+        /// <summary>
+        /// Roslyn 编译器
+        /// <para>see: https://www.cnblogs.com/dongweian/p/15773934.html </para>
+        /// </summary>
+        /// <param name="expression"></param>
+        /// <returns></returns>
+        public static object CompilerCSharpScript(string expression)
+        {
+            //string expression = "(1+2)*3/4";
+            //var res = CSharpScript.EvaluateAsync<float>(expression);
+
+            return null;
+        }
     }
 }

@@ -50,7 +50,6 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         private ConcurrentQueue<ModbusMethod> MethodQueues = new ConcurrentQueue<ModbusMethod>();
 
-
         /// <summary>
         /// 翻转单个线圈
         /// </summary>
@@ -354,7 +353,6 @@ namespace SpaceCG.Extensions.Modbus
                 Logger.Error(ex);
                 Thread.Sleep(300);
             }
-
         }
 
         /// <summary>

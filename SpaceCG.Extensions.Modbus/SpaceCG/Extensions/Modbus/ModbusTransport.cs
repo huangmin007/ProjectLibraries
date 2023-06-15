@@ -98,7 +98,7 @@ namespace SpaceCG.Extensions.Modbus
             ElapsedMilliseconds = 0;
             CancelToken = new CancellationTokenSource();
 
-            var sc_result = EventTimer.Change(100, 5);
+            var sc_result = EventTimer.Change(100, 4);
             //var tp_result = ThreadPool.QueueUserWorkItem(new WaitCallback(SyncModbusDevicesStatus), this);
             var tp_result = ThreadPool.QueueUserWorkItem(o => SyncModbusDevicesStatus(CancelToken.Token));
             Logger.Info($"传输总线 ({this}) 同步数据线程入池状态： {tp_result}, 事件线程状态：{sc_result}");
