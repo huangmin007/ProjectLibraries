@@ -13,6 +13,38 @@ using System.Threading;
 namespace SpaceCG.Generic
 {
     /// <summary>
+    /// 事件参数
+    /// </summary>
+    public class ControlEventArgs : EventArgs
+    {
+        /// <summary>
+        /// Message
+        /// </summary>
+        public XElement Message { get; internal set; }
+
+        /// <summary>
+        /// EndPoint
+        /// </summary>
+        public EndPoint EndPoint { get; internal set; }
+
+        /// <summary>
+        /// Handle Reflection, default value is true
+        /// </summary>
+        public bool HandleReflection { get; set; } = true;
+
+        /// <summary>
+        /// 控制事件参数
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="endPoint"></param>
+        public ControlEventArgs(XElement message, EndPoint endPoint)
+        {
+            this.Message = message;
+            this.EndPoint = endPoint;
+        }
+    }
+
+    /// <summary>
     /// 控制器接口对象
     /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Response="False" Async="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
     /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="True" Async="False"/&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
@@ -21,6 +53,11 @@ namespace SpaceCG.Generic
     public sealed class ControlInterface : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ControlInterface));
+
+        /// <summary>
+        /// Control Event Handler
+        /// </summary>
+        public event EventHandler<ControlEventArgs> ControlEvent;
 
         /// <summary>
         /// 网络控制接口服务对象
@@ -150,20 +187,24 @@ namespace SpaceCG.Generic
         private void Client_DataReceived(object sender, AsyncDataEventArgs e)
         {
             String message = Encoding.Default.GetString(e.Bytes);
-            bool result = this.TryParseControlMessage(message, out object returnValue);
-
-            String returnMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\">";
-
-            if (result)
-                Logger.Info($"{e.EndPoint} Call Success! {returnMessage}");
-            else
-                Logger.Info($"{e.EndPoint} Call Failed! {returnMessage}");
-
-            String str = message.ToLower().Trim();
-            if(str.IndexOf("response=\"true\"") != -1 || str.IndexOf("response=\'true\'") != -1)
+            if (!VerifyControlMessage(message, out XElement actionElement))
             {
-                ((IAsyncClient)sender).SendMessage(returnMessage);
+                Logger.Error($"不支持的控制消息：{message}");
+                return;
             }
+
+            ControlEventArgs eventArgs = new ControlEventArgs(actionElement, e.EndPoint);
+            ControlEvent?.Invoke(this, eventArgs);
+            if (!eventArgs.HandleReflection) return;
+
+            bool result = this.TryParseControlMessage(actionElement, out object returnValue);
+            String responseMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\" />";
+
+            Logger.Info($"{e.EndPoint} Call {(result ? "Success!" : "Failed!")}  {responseMessage}");
+            if (bool.TryParse(actionElement.Attribute("Response")?.Value, out bool response) && response)
+            {
+                ((IAsyncClient)sender).SendMessage(responseMessage);
+            }            
         }
         /// <summary>
         /// On Server Receive Event Handler
@@ -173,18 +214,22 @@ namespace SpaceCG.Generic
         private void Server_ClientDataReceived(object sender, AsyncDataEventArgs e)
         {
             String message = Encoding.Default.GetString(e.Bytes);
-            bool result = this.TryParseControlMessage(message, out object returnValue);
-            String returnMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\">";
-
-            if (result)
-                Logger.Info($"{e.EndPoint} Call Success! {returnMessage}");
-            else
-                Logger.Info($"{e.EndPoint} Call Failed! {returnMessage}");
-
-            String str = message.ToLower().Trim();
-            if (str.IndexOf("response=\"true\"") != -1 || str.IndexOf("response=\'true\'") != -1)
+            if (!VerifyControlMessage(message, out XElement actionElement))
             {
-                ((IAsyncServer)sender).SendMessage(returnMessage, e.EndPoint);
+                Logger.Error($"不支持的控制消息：{message}");
+                return;
+            }
+            ControlEventArgs eventArgs = new ControlEventArgs(actionElement, e.EndPoint);
+            ControlEvent?.Invoke(this, eventArgs);
+            if (!eventArgs.HandleReflection) return;
+
+            bool result = this.TryParseControlMessage(actionElement, out object returnValue);
+            String responseMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\" />";
+            
+            Logger.Info($"{e.EndPoint} Call {(result ? "Success!" : "Failed!")}  {responseMessage}");
+            if (bool.TryParse(actionElement.Attribute("Response")?.Value, out bool response) && response)
+            {
+                ((IAsyncServer)sender).SendMessage(responseMessage, e.EndPoint);
             }
         }
 
@@ -230,6 +275,51 @@ namespace SpaceCG.Generic
         }
 
         /// <summary>
+        /// 验证检查控制消息是否符合要求
+        /// </summary>
+        /// <param name="xmlMessage"></param>
+        /// <param name="actionElement"></param>
+        /// <returns></returns>
+        private bool VerifyControlMessage(String xmlMessage, out XElement actionElement)
+        {
+            actionElement = null;
+            if (String.IsNullOrWhiteSpace(xmlMessage) || AccessObjects == null) return false;
+
+            XElement tempElement;
+
+            try
+            {
+                tempElement = XElement.Parse(xmlMessage);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 解析错误：{ex}");
+                return false;
+            }
+
+            if (tempElement.Name?.LocalName != "Action")
+            {
+                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 错误，节点名称应为 Action");
+                return false;
+            }
+
+            if (String.IsNullOrWhiteSpace(tempElement.Attribute("Target")?.Value))
+            {
+                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 错误，节点属性 Target 不能为空");
+                return false;
+            }
+
+            if (tempElement.Attribute("Method") == null && tempElement.Attribute("Property") == null)
+            {
+                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 错误，必须指定节点属性 Method 或 Property 其中之一");
+                return false;
+            }
+
+            actionElement = tempElement;
+            return true;
+        }
+
+        /// <summary>
         /// 试图解析 xml 格式消息，在 Objects 字典中查找实例对象，并调用实例对象的方法或属性
         /// <para>XML 格式："&lt;Action Target='object key name' Method='method name' Params='method params' /&gt;" 跟据调用的 Method 决定 Params 可选属性值</para>
         /// <para>XML 格式："&lt;Action Target='object key name' Property='property name' Value='value' /&gt;" 如果 Value 属性不存在，则表示获取属性的值</para>
@@ -240,31 +330,22 @@ namespace SpaceCG.Generic
         public bool TryParseControlMessage(String xmlMessage, out object returnResult)
         {
             returnResult = null;
-            if (String.IsNullOrWhiteSpace(xmlMessage) || AccessObjects == null) return false;
+            if (!VerifyControlMessage(xmlMessage, out XElement actionElement)) return false;
 
-            XElement actionElement;
-
-            try
-            {
-                actionElement = XElement.Parse(xmlMessage);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"XML 格式数据 {xmlMessage} 解析错误：{ex}");
-                return false;
-            }
-
-            if (actionElement.Name?.LocalName != "Action")
-            {
-                Logger.Error($"XML 格式数据 {xmlMessage} 错误，节点名称应为 Action");
-                return false;
-            }
-
-            if (String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value))
-            {
-                Logger.Error($"XML 格式数据 {xmlMessage} 错误，节点属性 Target 不能为空");
-                return false;
-            }
+            return TryParseControlMessage(actionElement, out returnResult);
+        }
+        /// <summary>
+        /// 试图解析 xml 格式消息，在 Objects 字典中查找实例对象，并调用实例对象的方法或属性
+        /// <para>XML 格式："&lt;Action Target='object key name' Method='method name' Params='method params' /&gt;" 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// <para>XML 格式："&lt;Action Target='object key name' Property='property name' Value='value' /&gt;" 如果 Value 属性不存在，则表示获取属性的值</para>
+        /// </summary>
+        /// <param name="actionElement"></param>
+        /// <param name="returnResult"></param>
+        /// <returns></returns>
+        public bool TryParseControlMessage(XElement actionElement, out object returnResult)
+        {
+            returnResult = null;
+            if (actionElement == null) return false;
 
             if (actionElement.Attribute("Method") != null)
             {
@@ -297,7 +378,7 @@ namespace SpaceCG.Generic
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Method")?.Value))
             {
-                Logger.Error($"XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Method 不能为空");
+                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Method 不能为空");
                 return false;
             }
 
@@ -398,7 +479,7 @@ namespace SpaceCG.Generic
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||
                 String.IsNullOrWhiteSpace(actionElement.Attribute("Property")?.Value))
             {
-                Logger.Error($"XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Property 不能为空");
+                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Property 不能为空");
                 return false;
             }
 
