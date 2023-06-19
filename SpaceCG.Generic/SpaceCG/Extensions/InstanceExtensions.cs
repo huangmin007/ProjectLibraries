@@ -100,13 +100,14 @@ namespace SpaceCG.Extensions
         }
 
         /// <summary>
-        /// 动态的设置实例对象的多个属性值，跟据 XML 配置文件节点名称(实例字段对象)及节点属性(字段对象的属性)来个修改实例属性
+        /// 动态的设置实例对象 (字段或私有字段) 的多个属性值，跟据 XML 配置文件节点名称(实例字段对象)及节点属性(字段对象的属性)来个修改实例属性
         /// <para>例如：&lt;Window Left="100" Width="100"/&gt; </para>
         /// <para> Window 是 instanceObj 中的一个实例对象(或变量对象，非静态对象)，其 Left、Width 为 Window 实例对象的原有属性 </para>
         /// </summary>
         /// <param name="instanceParentObj"></param>
         /// <param name="element"></param>
         /// <exception cref="ArgumentNullException"></exception>
+        [Obsolete("暂时还没有确定 节点名称 是字段还是属性对象, 是 private 还是 public ?", false)]
         public static void SetInstancePropertyValues(Object instanceParentObj, XElement element)
         {
             if (instanceParentObj == null || element == null)
@@ -119,6 +120,7 @@ namespace SpaceCG.Extensions
 
             foreach (XAttribute attribute in attributes)
             {
+                //SetInstanceFieldValue(instanceObj, attribute.Name.LocalName, attribute.Value);
                 SetInstancePropertyValue(instanceObj, attribute.Name.LocalName, attribute.Value);
             }
         }
@@ -194,7 +196,6 @@ namespace SpaceCG.Extensions
 
             return false;
         }
-
 
         /// <summary>
         /// 动态移除实例对象指定的委托事件
