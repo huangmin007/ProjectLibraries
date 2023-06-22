@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using SpaceCG.Extensions;
 
 namespace SpaceCG.Generic
@@ -14,44 +15,94 @@ namespace SpaceCG.Generic
     /// </summary>
     public sealed class LoggerTrace : IDisposable
     {
-        /// <summary>
-        /// 跟踪代码的执行并将跟踪消息的源
-        /// </summary>
-        public TraceSource TraceSource { get; private set; }
-
-        private static int id = 0;
+        private static readonly string mainModuleName = "trace";
         private static readonly TextWriterTraceListener consoleListener;
         private static readonly TextWriterTraceListener textFileListener;
+
         /// <summary>
-        /// IsDebugEnabled
+        /// 全局 <see cref="FTextWriterTraceListener"/> 源开关和事件类型筛选器筛选的跟踪消息的级别
+        /// <para>文本文件(日志)记录的跟踪消息的级别</para>
         /// </summary>
-        public bool IsDebugEnabled => TraceSource?.Switch.Level != SourceLevels.Off && TraceSource?.Switch.Level <= SourceLevels.Verbose;
+        public static SourceLevels FileTraceEventType
+        {
+            get { return ((EventTypeFilter)textFileListener.Filter).EventType; }
+            set { ((EventTypeFilter)textFileListener.Filter).EventType = value; }
+        }
+
         /// <summary>
-        /// IsInfoEnabled
+        /// 当前 <see cref="LoggerTrace"/> 跟踪代码的执行并将跟踪消息的源对象
         /// </summary>
-        public bool IsInfoEnabled => TraceSource?.Switch.Level != SourceLevels.Off && TraceSource?.Switch.Level <= SourceLevels.Information;
+        public TraceSource TraceSource { get; private set; }
+        /// <summary>
+        /// 当前 <see cref="LoggerTrace"/> 源开关和事件类型筛选器筛选的跟踪消息的级别
+        /// </summary>
+        public SourceLevels EventType
+        {
+            get { return TraceSource.Switch.Level; }
+            set { TraceSource.Switch.Level = value; }
+        }
+
+        /// <summary>
+        /// 当前 <see cref="LoggerTrace"/> 源筛选的跟踪消息是大于 <see cref="SourceLevels.Verbose"/> 级别
+        /// </summary>
+        public bool IsDebugEnabled => EventType != SourceLevels.Off && EventType <= SourceLevels.Verbose;
+        /// <summary>
+        /// 当前 <see cref="LoggerTrace"/> 源筛选的跟踪消息是大于 <see cref="SourceLevels.Information"/> 级别
+        /// </summary>
+        public bool IsInfoEnabled => EventType != SourceLevels.Off && EventType <= SourceLevels.Information;
+        /// <summary>
+        /// 当前 <see cref="LoggerTrace"/> 源筛选的跟踪消息是大于 <see cref="SourceLevels.Warning"/> 级别
+        /// </summary>
+        public bool IsWarnEnabled => EventType != SourceLevels.Off && EventType <= SourceLevels.Warning;
+        /// <summary>
+        /// 当前 <see cref="LoggerTrace"/> 源筛选的跟踪消息是大于 <see cref="SourceLevels.Error"/> 级别
+        /// </summary>
+        public bool IsErrorEnabled => EventType != SourceLevels.Off && EventType <= SourceLevels.Error;
+        /// <summary>
+        /// 当前 <see cref="LoggerTrace"/> 源筛选的跟踪消息是大于 <see cref="SourceLevels.Critical"/> 级别
+        /// </summary>
+        public bool IsFatalEnabled => EventType != SourceLevels.Off && EventType <= SourceLevels.Critical;
+
 
         static LoggerTrace()
         {
+            ProcessModule processModule = Process.GetCurrentProcess().MainModule;
+            string moduleFileName = processModule?.FileName;
+            if (!String.IsNullOrEmpty(moduleFileName))
+            {
+                FileInfo info = new FileInfo(moduleFileName);
+                mainModuleName = info.Name.Replace(info.Extension, "");
+            }
+
             string path = "logs";
             if (!Directory.Exists(path)) Directory.CreateDirectory(path);
-            String defaultFileName = $"{path}/trace.{DateTime.Today.ToString("yyyy-MM-dd")}.log";
+            String defaultFileName = $"{path}/{mainModuleName}.{DateTime.Today.ToString("yyyy-MM-dd")}.log";
 
-            textFileListener = new ETextWriterTraceListener(defaultFileName, "FileTrace");
+            textFileListener = new FTextWriterTraceListener(defaultFileName, "FileTrace");
             textFileListener.Filter = new EventTypeFilter(SourceLevels.Information);
 
-            consoleListener = new ETextWriterTraceListener(Console.Out, "ConsoleTrace");
+            consoleListener = new FTextWriterTraceListener(Console.Out, "ConsoleTrace");
             consoleListener.Filter = new EventTypeFilter(SourceLevels.All);
 
             OperatingSystem os = Environment.OSVersion;
-            String message = $"{Environment.NewLine}[{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}] (OS: {os.Platform} {os.Version})";
-            consoleListener.WriteLine(message);
-            textFileListener.WriteLine(message);
+            String systemInfo = $"{Environment.NewLine}[{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}] [{os} ({os.Platform})]({(Environment.Is64BitOperatingSystem ? "64" : "32")} 位操作系统 / 逻辑处理器: {Environment.ProcessorCount})";
+            String moduleInfo = $"[{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}] [{moduleFileName}]({(Environment.Is64BitProcess ? "64" : "32")} 位进程 / 进程 ID: {Process.GetCurrentProcess().Id})";
+            
+            consoleListener.WriteLine(systemInfo);
+            textFileListener.WriteLine(systemInfo);
+
+            consoleListener.WriteLine(moduleInfo);
+            textFileListener.WriteLine(moduleInfo);
+
+            if(processModule != null)
+            {
+                consoleListener.Write(processModule.FileVersionInfo.ToString());
+                textFileListener.Write(processModule.FileVersionInfo.ToString());
+            }
 
             consoleListener.Flush();
             textFileListener.Flush();
-
-            FileExtensions.ReserveFileDays(30, path, "trace.*.log");
+            FileExtensions.ReserveFileDays(30, path, $"{mainModuleName}.*.log");
         }
 
         /// <summary>
@@ -128,70 +179,191 @@ namespace SpaceCG.Generic
                 TraceSource = null;
             }
         }
+
         /// <summary>
-        /// Debug
+        /// 使用指定的事件类型、事件标识符和消息，将跟踪事件消息写入 <see cref="TraceSource.Listeners"/> 集合中的跟踪侦听器中。
         /// </summary>
-        /// <param name="message"></param>
-        public void Debug(object message)
-        {
-            if (TraceSource == null) return;
-            TraceSource.TraceEvent(TraceEventType.Verbose, id++, FormatMessage(message));
-            TraceSource.Flush();
-        }
-        /// <summary>
-        /// Info
-        /// </summary>
-        /// <param name="message"></param>
-        public void Info(object message)
+        /// <param name="eventType"></param>
+        /// <param name="data"></param>
+        public void TraceEvent(TraceEventType eventType, object data)
         {
             if (TraceSource == null) return;
 
-            TraceSource.TraceEvent(TraceEventType.Information, id++, FormatMessage(message));
+            TraceSource.TraceEvent(eventType, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(data));
             TraceSource.Flush();
         }
         /// <summary>
-        /// Warn
+        /// 使用指定的事件类型、事件标识符和消息，将跟踪事件消息写入 <see cref="TraceSource.Listeners"/> 集合中的跟踪侦听器中。
         /// </summary>
-        /// <param name="message"></param>
-        public void Warn(object message)
+        /// <param name="eventType"></param>
+        /// <param name="format"></param>
+        /// <param name="args"></param>
+        public void TraceEvent(TraceEventType eventType, string format, params object[] args)// => TraceEvent(eventType, string.Format(format, args));
         {
             if (TraceSource == null) return;
 
-            TraceSource.TraceEvent(TraceEventType.Warning, id++, FormatMessage(message));
+            TraceSource.TraceEvent(eventType, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
             TraceSource.Flush();
         }
+
         /// <summary>
-        /// Error
+        /// 使用指定的事件类型、事件标识符和跟踪数据，将跟踪数据写入 <see cref="TraceSource.Listeners"/> 集合中的跟踪侦听器中。
         /// </summary>
-        /// <param name="message"></param>
-        public void Error(object message)
-        {
-            TraceSource.TraceEvent(TraceEventType.Error, id++, FormatMessage(message));
-            TraceSource.Flush();
-        }
-        /// <summary>
-        /// Fatal
-        /// </summary>
-        /// <param name="message"></param>
-        public void Fatal(object message)
+        /// <param name="eventType"></param>
+        /// <param name="data"></param>
+        public void TraceData(TraceEventType eventType, object data)
         {
             if (TraceSource == null) return;
 
-            TraceSource.TraceEvent(TraceEventType.Critical, id++, FormatMessage(message));
+            TraceSource.TraceData(eventType, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(data));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 使用指定的事件类型、事件标识符和跟踪数据，将跟踪数据写入 <see cref="TraceSource.Listeners"/> 集合中的跟踪侦听器中。
+        /// </summary>
+        /// <param name="eventType"></param>
+        /// <param name="format"></param>
+        /// <param name="args"></param>
+        public void TraceData(TraceEventType eventType, string format, params object[] args)
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceData(eventType, Thread.CurrentThread.ManagedThreadId, FormatStackMessage((string.Format(format, args))));
             TraceSource.Flush();
         }
 
-        private static string FormatMessage(object message)
+        /// <summary>
+        /// 跟踪调试信息
+        /// </summary>
+        /// <param name="data"></param>
+        public void Debug(object data)
         {
-            StackFrame frame = new StackFrame(2, true);
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Verbose, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(data));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 跟踪调试性消息
+        /// </summary>
+        /// <param name="format"></param>
+        /// <param name="args"></param>
+        public void Debug(string format, params object[] args)// => Debug(string.Format(format, args));
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Verbose, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 跟踪信息性消息
+        /// </summary>
+        /// <param name="data"></param>
+        public void Info(object data)
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Information, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(data));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 跟踪信息性消息
+        /// </summary>
+        /// <param name="format"></param>
+        /// <param name="args"></param>
+        public void Info(string format, params object[] args) // => Info(string.Format(format, args));
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Information, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 跟踪非严重问题消息
+        /// </summary>
+        /// <param name="data"></param>
+        public void Warn(object data)
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Warning, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(data));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 跟踪非严重问题消息
+        /// </summary>
+        /// <param name="format"></param>
+        /// <param name="args"></param>
+        public void Warn(string format, params object[] args)// => Warn(string.Format(format, args));
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Warning, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 跟踪可恢复的错误消息
+        /// </summary>
+        /// <param name="data"></param>
+        public void Error(object data)
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Error, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(data));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 跟踪可恢复的错误消息
+        /// </summary>
+        /// <param name="format"></param>
+        /// <param name="args"></param>
+        public void Error(string format, params object[] args)// => Error(string.Format(format, args));
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Error, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 跟踪致命错误或应用程序崩溃消息
+        /// </summary>
+        /// <param name="data"></param>
+        public void Fatal(object data)
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Critical, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(data));
+            TraceSource.Flush();
+        }
+        /// <summary>
+        /// 跟踪致命错误或应用程序崩溃消息
+        /// </summary>
+        /// <param name="format"></param>
+        /// <param name="args"></param>
+        public void Fatal(string format, params object[] args)// => Fatal(string.Format(format, args));
+        {
+            if (TraceSource == null) return;
+
+            TraceSource.TraceEvent(TraceEventType.Critical, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+            TraceSource.Flush();
+        }
+
+        /// <summary>
+        /// format stack frame message
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        private static string FormatStackMessage(object data)
+        {
+            StackFrame frame = new StackFrame(2, false);
             MethodBase method = frame.GetMethod();
 
-            return method != null ? $"({method.Name}) {message}" : $"{message}";
+            return method != null ? $"({method.Name}) {data}" : $"{data}";
         }
     }
 
     /// <inheritdoc/>
-    public sealed class ETextWriterTraceListener : System.Diagnostics.TextWriterTraceListener
+    public class FTextWriterTraceListener : System.Diagnostics.TextWriterTraceListener
     {
         /// <summary>
         /// Write 事件
@@ -199,27 +371,27 @@ namespace SpaceCG.Generic
         public event EventHandler<WriteEventArgs> WriteEvent;
 
         /// <inheritdoc/>
-        public ETextWriterTraceListener(Stream stream) : base(stream)
+        public FTextWriterTraceListener(Stream stream) : base(stream)
         {
         }
         /// <inheritdoc/>
-        public ETextWriterTraceListener(Stream stream, string name) : base(stream, name)
+        public FTextWriterTraceListener(Stream stream, string name) : base(stream, name)
         {
         }
         /// <inheritdoc/>
-        public ETextWriterTraceListener(TextWriter writer) : base(writer)
+        public FTextWriterTraceListener(TextWriter writer) : base(writer)
         {
         }
         /// <inheritdoc/>
-        public ETextWriterTraceListener(TextWriter writer, string name) : base(writer, name)
+        public FTextWriterTraceListener(TextWriter writer, string name) : base(writer, name)
         {
         }
         /// <inheritdoc/>
-        public ETextWriterTraceListener(string fileName) : base(fileName)
+        public FTextWriterTraceListener(string fileName) : base(fileName)
         {
         }
         /// <inheritdoc/>
-        public ETextWriterTraceListener(string fileName, string name) : base(fileName, name)
+        public FTextWriterTraceListener(string fileName, string name) : base(fileName, name)
         {
         }
 
@@ -313,17 +485,22 @@ namespace SpaceCG.Generic
                 WriteFooter(eventCache);
             }
         }
-
-        private void WriteHeader(string source, TraceEventType eventType, int id)
+        /// <summary>
+        /// Write Header
+        /// </summary>
+        /// <param name="source"></param>
+        /// <param name="eventType"></param>
+        /// <param name="id"></param>
+        protected void WriteHeader(string source, TraceEventType eventType, int id)
         {
-            Write(string.Format(CultureInfo.InvariantCulture, "[{0}] [{1}] [{2}] ({3}) : ",
-                DateTime.Now.ToString("HH:mm:ss.fff"),
-                eventType.ToString().Substring(0, 5).ToUpper(),
-                source,
-                id.ToString(CultureInfo.InvariantCulture)
-            ));
+            Write(string.Format("[{0}] [{1}] [{2}] ({3}) : ", DateTime.Now.ToString("HH:mm:ss.fff"),
+                  eventType.ToString().Substring(0, 5).ToUpper(), source, id.ToString()));
         }
-        private void WriteFooter(TraceEventCache eventCache)
+        /// <summary>
+        /// Write Footer
+        /// </summary>
+        /// <param name="eventCache"></param>
+        protected void WriteFooter(TraceEventCache eventCache)
         {
             if (eventCache == null) return;
 

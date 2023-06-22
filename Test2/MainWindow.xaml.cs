@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -45,7 +46,9 @@ namespace Test2
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            ETextWriterTraceListener trace = logger1.TraceSource.Listeners[0] as ETextWriterTraceListener;
+            LoggerTrace.FileTraceEventType = SourceLevels.Verbose;
+
+            FTextWriterTraceListener trace = logger1.TraceSource.Listeners[0] as FTextWriterTraceListener;
             if (trace != null) trace.WriteEvent += (s, we) =>
             {
                 TextBox_Trace?.Dispatcher.InvokeAsync(() => TextBox_Trace.AppendText(we.Message));
@@ -53,6 +56,8 @@ namespace Test2
             
             logger1.Info("中文测试2");
             logger1.Warn("Eng");
+            logger1.Info("{0},{1}", "中文测试1,,,1", "中文测试2,,,,2");
+
 
             logger1.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
 
@@ -88,7 +93,17 @@ namespace Test2
             int t = 3;
             Console.WriteLine(  t.ToString("2"));
 #endif
-            TestLoad();
+            //TestLoad();
+            Console.WriteLine($"main:{Thread.CurrentThread.ManagedThreadId}");
+
+            Thread thread = new Thread(TTest);
+            thread.Start();
+        }
+
+        private void TTest(object obj)
+        {
+            Console.WriteLine($"thread:{Thread.CurrentThread.ManagedThreadId}");
+            logger1.Info("THread...");
         }
 
         private void ModbusTransport_OutputChangeEvent(ModbusTransport transport, ModbusIODevice device, Register register)
@@ -109,11 +124,20 @@ namespace Test2
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)
         {
-            logger2.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
-            int r = Add2(5, 9);
-            logger1.Info($"Result::{r}");
+            //logger2.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
+            //int r = Add2(5, 9);
+            //logger1.Info($"Result::{r}");
 
-            modbusTransport.TurnSingleCoil(0x01, 0x00);
+            //modbusTransport.TurnSingleCoil(0x01, 0x00);
+            Console.WriteLine($"click:{Thread.CurrentThread.ManagedThreadId}");
+            logger1.Debug("Test ..........");
+            logger1.Debug("{0},{1}", "Test,,,1", "Test,,,,2");
+            Task.Run(()=>
+            {
+                Console.WriteLine($"task:{Thread.CurrentThread.ManagedThreadId}");
+
+                logger1.Info("测试进程");
+            });
         }
 
         public int Add(int a, int b) 
