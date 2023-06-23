@@ -38,27 +38,41 @@ namespace Test2
             modbusTransport?.Dispose();
         }
 
-        private static readonly LoggerTrace logger1 = new LoggerTrace();
-        private static readonly LoggerTrace logger2 = new LoggerTrace("test");
+        private static LoggerTrace logger1 = new LoggerTrace();
+        private LoggerTrace logger2 = new LoggerTrace("test");
 
         IModbusMaster master;
         ModbusTransport modbusTransport;
 
+        int count = 0;
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            LoggerTrace.FileTraceEventType = SourceLevels.Verbose;
-
+            LoggerTrace.ConsoleTraceEvent += LoggerTrace_TraceSourceEvent;
+            /*
             FTextWriterTraceListener trace = logger1.TraceSource.Listeners[0] as FTextWriterTraceListener;
-            if (trace != null) trace.WriteEvent += (s, we) =>
+            if (trace != null) trace.TraceSourceEvent += (s, we) =>
             {
-                TextBox_Trace?.Dispatcher.InvokeAsync(() => TextBox_Trace.AppendText(we.Message));
+                TextBox_Trace?.Dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        TextBox_Trace.AppendText($"{count++}");
+                        TextBox_Trace.AppendText(we.FormatMessage);
+                    });
             };
-            
+            */
+            LoggerTrace logger3 = new LoggerTrace();
+            //LoggerTrace.FileTraceLevels = SourceLevels.Verbose;
+
+            logger3.Info($"logger3...");
+            Trace.TraceInformation("testttttttt,,,Trace..");
+            logger1.TraceSource.TraceEvent(TraceEventType.Stop, 12, "Test Stop");
+
+
             logger1.Info("中文测试2");
             logger1.Warn("Eng");
             logger1.Info("{0},{1}", "中文测试1,,,1", "中文测试2,,,,2");
 
-
+            //logger1.EventType = SourceLevels.Off;
             logger1.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
 
             logger2.Info("中文测试2 Chinese test...");
@@ -100,8 +114,23 @@ namespace Test2
             thread.Start();
         }
 
+        private void LoggerTrace_TraceSourceEvent(object sender, TraceEventArgs e)
+        {
+            TextBox_Trace?.Dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        TextBox_Trace.AppendText($"{count++}");
+                        TextBox_Trace.AppendText(e.FormatMessage);
+                    });
+        }
+
         private void TTest(object obj)
         {
+            using (LoggerTrace logger4 = new LoggerTrace())
+            {
+                logger4.Debug($"logger4...");
+            }
+
             Console.WriteLine($"thread:{Thread.CurrentThread.ManagedThreadId}");
             logger1.Info("THread...");
         }
@@ -128,6 +157,7 @@ namespace Test2
             //int r = Add2(5, 9);
             //logger1.Info($"Result::{r}");
 
+            
             //modbusTransport.TurnSingleCoil(0x01, 0x00);
             Console.WriteLine($"click:{Thread.CurrentThread.ManagedThreadId}");
             logger1.Debug("Test ..........");
