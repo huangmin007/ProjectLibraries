@@ -17,9 +17,80 @@ namespace SpaceCG.Extensions
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(InstanceExtensions));
 
-        static InstanceExtensions()
+        /// <summary>
+        /// 封装一个方法，该方法输出一个指定类型的对象, 该对象的值等效于指定的对象
+        /// </summary>
+        /// <param name="value">需要转换的对象、字符串或是字符串描述</param>
+        /// <param name="conversionType">要返回的对象的类型</param>
+        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
+        /// <returns>输出类型 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        public delegate bool ConvertChangeTypeDelegate(object value, Type conversionType, out object conversionValue);
+
+        /// <summary>
+        /// 扩展类型转换代理函数, 输出一个指定类型的对象, 该对象的值等效于指定的对象。
+        /// <para>当通过调用反射来设置属性值或是调用反射带参的函数时，值类型转换失败或异常时，调用该代理函数进行扩展类型转换，完善动态反射功能</para>
+        /// </summary>
+        public static ConvertChangeTypeDelegate ConvertChangeTypeExtension;
+
+        /// <summary>
+        /// 输出一个指定类型的对象, 该对象的值等效于指定的对象。
+        /// </summary>
+        /// <param name="value">需要转换的对象、字符串或是字符串描述</param>
+        /// <param name="conversionType">要返回的对象的类型</param>
+        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
+        /// <returns>输出类型 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        public static bool ConvertChangeType(object value, Type conversionType, out object conversionValue)
         {
-            //嵌入 dll
+            conversionValue = null;
+            if (value == null) return true; 
+            if (conversionType == null) return false;
+            if (value.GetType() == conversionType)
+            {
+                conversionValue = value;
+                return true;
+            }
+            if (value.GetType() == typeof(string))
+            {
+                string valueString = value.ToString();
+                if (String.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
+            }
+
+            if (conversionType.IsValueType)
+            {
+                bool result = StringExtensions.ConvertChangeTypeToValueType(value, conversionType, out ValueType cValue);
+                if (result) conversionValue = cValue;
+                return result;
+            }
+            else if (conversionType.IsArray && conversionType.GetElementType().IsValueType)
+            {
+                bool result = StringExtensions.ConvertChangeTypeToArrayType((Array)value, conversionType, out Array cValue);
+                if (result) conversionValue = cValue;
+                return result;
+            }
+            else
+            {
+                try
+                {
+                    if (ConvertChangeTypeExtension == null)
+                    {
+                        conversionValue = Convert.ChangeType(value, conversionType);
+                        return true;
+                    }
+                    else
+                    {
+                        //扩展转换
+                        bool result = ConvertChangeTypeExtension.Invoke(value, conversionType, out conversionValue);
+                        return result;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"{(ConvertChangeTypeExtension == null ? "类型" : "扩展类型")}转换失败  Value:{value}  Type:{conversionType}");
+                    Logger.Error(ex);
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -58,9 +129,9 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="instanceObj"></param>
         /// <param name="fieldName"></param>
-        /// <param name="newValue"></param>
+        /// <param name="value"></param>
         /// <returns>设置成功返回 true, 否则返回 false </returns>
-        public static bool SetInstanceFieldValue(object instanceObj, String fieldName, object newValue)
+        public static bool SetInstanceFieldValue(object instanceObj, String fieldName, object value)
         {
             if (instanceObj == null || String.IsNullOrWhiteSpace(fieldName)) return false;
 
@@ -72,28 +143,17 @@ namespace SpaceCG.Extensions
                 return false;
             }
 
-            object convertValue = null;
-            try
+            if(ConvertChangeType(value, fieldInfo.FieldType, out object convertValue))
             {
-                if (newValue == null || newValue.ToString().ToLower().Trim() == "null")
+                try
                 {
                     fieldInfo.SetValue(instanceObj, convertValue);
                     return true;
                 }
-                
-                if (fieldInfo.FieldType.IsValueType)
-                    convertValue = StringExtensions.ConvertParamsToValueType(fieldInfo.FieldType, newValue);
-                else if (fieldInfo.FieldType.IsArray)
-                    convertValue = StringExtensions.ConvertParamsToArrayType(fieldInfo.FieldType, (object[])newValue);
-                else
-                    convertValue = Convert.ChangeType(newValue, fieldInfo.FieldType);
-
-                fieldInfo.SetValue(instanceObj, convertValue);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"设置实例对象 {type} 的字段 {fieldInfo} 值 {(newValue == null ? "null" : newValue)} 失败：{ex}");
+                catch (Exception ex)
+                {
+                    Logger.Error($"设置实例对象 {type} 的字段 {fieldInfo} 值 {(value == null ? "null" : value)} 失败：{ex}");
+                }
             }
 
             return false;
@@ -123,7 +183,7 @@ namespace SpaceCG.Extensions
                 SetInstancePropertyValue(instanceObj, attribute.Name.LocalName, attribute.Value);
             }
         }
-        
+
         /// <summary>
         /// 动态的设置实例对象的属性值, Only Support ValueType And ArrayType
         /// <para>属性是指实现了 get,set 方法的对象</para>
@@ -140,28 +200,17 @@ namespace SpaceCG.Extensions
             PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
             if (property == null || !property.CanWrite || !property.CanRead) return false;
 
-            object convertValue = null;
-            try
+            if (ConvertChangeType(newValue, property.PropertyType, out object convertValue))
             {
-                if (newValue == null || newValue.ToString().ToLower().Trim() == "null")
+                try
                 {
                     property.SetValue(instanceObj, convertValue, null);
                     return true;
                 }
-
-                if (property.PropertyType.IsValueType)
-                    convertValue = StringExtensions.ConvertParamsToValueType(property.PropertyType, newValue);
-                else if (property.PropertyType.IsArray)
-                    convertValue = StringExtensions.ConvertParamsToArrayType(property.PropertyType, (object[])newValue);
-                else
-                    convertValue = Convert.ChangeType(newValue, property.PropertyType);
-
-                property.SetValue(instanceObj, convertValue, null);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"设置实例对象 {type} 的属性 {property} 值 {(newValue == null ? "null" : newValue)} 失败：{ex}");
+                catch (Exception ex)
+                {
+                    Logger.Error($"设置实例对象 {type} 的属性 {property} 值 {(newValue == null ? "null" : newValue)} 失败：{ex}");
+                }
             }
 
             return false;
@@ -316,7 +365,7 @@ namespace SpaceCG.Extensions
             object[] _parameters = null;
             int paramsLength = parameters == null ? 0 : parameters.Length;
 
-            if(instanceObj != null)
+            if (instanceObj != null)
             {
                 //实例方法
                 if (!methodInfo.IsStatic)
@@ -349,42 +398,16 @@ namespace SpaceCG.Extensions
             }
 
             object[] arguments = _parameters == null ? null : new object[_parameters.Length];
+
+            //参数解析、转换
+            for (int i = 0; i < _parameters?.Length; i++)
+            {
+                if (!ConvertChangeType(_parameters[i], parameterInfos[i].ParameterType, out object convertValue)) return false;
+                arguments[i] = convertValue;
+            }
+
             try
             {
-                //参数解析、转换
-                for (int i = 0; i < _parameters?.Length; i++)
-                {
-                    ParameterInfo pInfo = parameterInfos[i];
-                    if (_parameters[i] == null || _parameters[i].ToString().ToLower().Replace(" ", "") == "null")
-                    {
-                        arguments[i] = null;
-                        continue;
-                    }
-#if false
-                    if(Logger.IsDebugEnabled)
-                        Logger.Debug($"Convert Type:: {_parameters[i].GetType()} / {pInfo.ParameterType}  IsValueType:{pInfo.ParameterType.IsValueType}  IsArray:{pInfo.ParameterType.IsArray}");
-#endif
-                    if (pInfo.ParameterType.IsValueType)
-                    {
-                        arguments[i] = StringExtensions.ConvertParamsToValueType(pInfo.ParameterType, _parameters[i]);
-                    }
-                    else if (pInfo.ParameterType.IsArray)
-                    {
-                        arguments[i] = StringExtensions.ConvertParamsToArrayType(pInfo.ParameterType, (object[])_parameters[i]);
-                    }
-                    else
-                    {
-                        arguments[i] = Convert.ChangeType(_parameters[i], pInfo.ParameterType);
-                    }
-                }
-
-#if false
-                if (Logger.IsDebugEnabled)
-                {
-                    foreach (object arg in arguments)
-                        Console.WriteLine($"{arg.GetType()} : {arg}");
-                }
-#endif
                 returnValue = methodInfo.Invoke(instanceObj, arguments);
                 return true;
             }

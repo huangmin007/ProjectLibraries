@@ -1,12 +1,16 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
+using System.Xml.Linq;
 using Modbus.Device;
+using SpaceCG.Extensions;
 using SpaceCG.Extensions.Modbus;
 using SpaceCG.Generic;
 
@@ -47,6 +51,7 @@ namespace Test2
         int count = 0;
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            this.Window = this;
             LoggerTrace.ConsoleTraceEvent += LoggerTrace_TraceSourceEvent;
             /*
             FTextWriterTraceListener trace = logger1.TraceSource.Listeners[0] as FTextWriterTraceListener;
@@ -67,6 +72,8 @@ namespace Test2
             Trace.TraceInformation("testttttttt,,,Trace..");
             logger1.TraceSource.TraceEvent(TraceEventType.Stop, 12, "Test Stop");
 
+            logger1.Info($"IsValueType:: { typeof(ImageBrush).IsValueType}");
+            logger1.Info($"IsValueType:: { this.Background.GetType().IsValueType}");
 
             logger1.Info("中文测试2");
             logger1.Warn("Eng");
@@ -83,6 +90,7 @@ namespace Test2
 
             controlInterface = new ControlInterface(2023);
             controlInterface.AccessObjects.Add("window", this);
+
 
 #if false
             //System.IO.Ports.SerialPort serialPort = new System.IO.Ports.SerialPort("COM3", 9600);
@@ -112,6 +120,37 @@ namespace Test2
 
             Thread thread = new Thread(TTest);
             thread.Start();
+
+            var boo = StringExtensions.ConvertChangeTypeToValueType("45", typeof(UInt32), out ValueType cValue);
+            Console.WriteLine($"Convert::{boo},,{cValue}");
+            //InstanceExtensions.ConvertChangeTypeExtension = ConvertTypeToExtension;
+            StringExtensions.ConvertChangeTypeToArrayType(new object[] { "0x45", "0x46", 0x47 }, typeof(Byte[]), out Array bytes);
+
+            InstanceExtensions.ConvertChangeTypeExtension = ConvertChangeTypeExtension2;
+        }
+
+        private static bool ConvertChangeTypeExtension2(object value, Type conversionType, out object conversionValue)
+        {
+            conversionValue = null;
+            if (value.GetType() == typeof(string) && conversionType == typeof(Brush))
+            {
+                string sValue = value.ToString();
+
+                if (sValue.IndexOf("#") == 0)// && uint.TryParse(sValue.Substring(1), NumberStyles.HexNumber, null, out uint uValue))
+                {
+                    Color color = (Color)ColorConverter.ConvertFromString(sValue);
+                    Console.WriteLine(color);
+                    //Colors
+                    SolidColorBrush colorBrush = new SolidColorBrush(color);
+                    conversionValue = colorBrush;
+                    
+                    return true;
+                }
+
+                
+            }
+            
+            return false;
         }
 
         private void LoggerTrace_TraceSourceEvent(object sender, TraceEventArgs e)
@@ -150,7 +189,7 @@ namespace Test2
             else
                 Console.WriteLine($"Input: {transport} DeviceAddress:{device.Address} RegisterAddress:{register} RegisterValue:{Convert.ToString((int)register.Value, 2)}");
         }
-
+        private MainWindow Window;
         private void Button_btn_Click(object sender, RoutedEventArgs e)
         {
             //logger2.Info("String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);");
@@ -168,6 +207,10 @@ namespace Test2
 
                 logger1.Info("测试进程");
             });
+
+
+            XElement element = XElement.Parse("<Window Width=\"500\" Height=\"400\" Background=\"#550000FF\" />");
+            InstanceExtensions.SetInstancePropertyValues(this, element);
         }
 
         public int Add(int a, int b) 

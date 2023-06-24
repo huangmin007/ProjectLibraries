@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -21,7 +20,7 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="numberString"></param>
         /// <returns></returns>
-        private static object[] GetNumberStringBase(String numberString)
+        internal static object[] GetNumberStringBase(String numberString)
         {
             if (string.IsNullOrWhiteSpace(numberString)) 
                 throw new ArgumentNullException(nameof(numberString), "参数不能为空");
@@ -241,7 +240,7 @@ namespace SpaceCG.Extensions
         public static readonly Regex RegexStringArguments = new Regex(pattern_arguments, RegexOptions.Compiled | RegexOptions.Singleline);
 
         /// <summary>
-        /// 将字符串参数集，分割转换为字符串数组，注意：不支持多级数组与字符串
+        /// 将字符串参数集，分割转换为字符串数组
         /// <para>示例字符串："0x01,True,32,False"，输出数组：["0x01","True","32","False"]</para>
         /// <para>示例字符串："0x01,3,[True,True,False]"，输出数组：["0x01","3",["True","True","False"]]</para>
         /// <para>示例字符串："0x01,[0,3,4,7],[True,True,False,True]"，输出数组：["0x01",["0","3","4","7"],["True","True","False","True"]]</para>
@@ -249,7 +248,7 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="parameters"></param>
         /// <returns></returns>
-        public static object[] SplitParameters(String parameters)
+        public static object[] SplitParameters(string parameters)
         {
             if (String.IsNullOrWhiteSpace(parameters)) return new object[] { }; // null
 
@@ -306,126 +305,164 @@ namespace SpaceCG.Extensions
 
             return args.ToArray();
         }
+
+        /// <summary>
+        /// 数组类型参数转换
+        /// <para>输出一个指定类型的对象, 该对象的值等效于指定的对象</para>
+        /// <para>示例：StringExtensions.ConvertChangeTypeToArrayType(new object[] { "0x45", "0x46", 0x47 }, typeof(Byte[]), out Array bytes);</para>
+        /// </summary>
+        /// <param name="value">需要转换的对象、字符串或字符串描述</param>
+        /// <param name="conversionType">要返回的对象的类型</param>
+        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
+        /// <returns>输出类型 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        /// <exception cref="ArgumentException"/>
+        public static bool ConvertChangeTypeToArrayType(Array value, Type conversionType, out Array conversionValue)
+        {
+            conversionValue = null;
+            if (conversionType == null || !conversionType.IsArray || !conversionType.GetElementType().IsValueType)
+                throw new ArgumentException(nameof(conversionType), "需要转换的类型应为数组类型，且数组元素为值类型");
+
+            Type elementType = conversionType.GetElementType();
+            conversionValue = Array.CreateInstance(elementType, value.Length);
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                if(ConvertChangeTypeToValueType(value.GetValue(i), elementType, out ValueType cValue))
+                {
+                    conversionValue.SetValue(cValue, i);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
         
         /// <summary>
-        /// 数组类型参数转换
-        /// <para>示例：var array = StringExtension.ConvertParamsToArrayType(typeof(Byte[]), new Object[] { "0x45", "0x46", 0x47 });</para>
-        /// </summary>
-        /// <param name="paramType"></param>
-        /// <param name="paramValues"></param>
-        /// <exception cref="ArgumentException"></exception>
-        /// <returns></returns>
-        public static System.Array ConvertParamsToArrayType(Type paramType, Array paramValues)
-        {
-            if (paramType == null || paramValues?.Length <= 0) return null;
-            
-            if (!paramType.IsArray) throw new ArgumentException(nameof(paramType), "参数应为数组或集合类型数据");
-
-            Type elementType = paramType.GetElementType();
-            if(!elementType.IsValueType) throw new ArgumentException(nameof(paramValues), "数组或集合类型元素应为值类型数据");
-
-            Array arguments = Array.CreateInstance(elementType, paramValues.Length);
-
-            for (int i = 0; i < paramValues.Length; i++)
-                arguments.SetValue(ConvertParamsToValueType(elementType, paramValues.GetValue(i)), i);
-
-            return arguments;
-        }
-        /// <summary>
-        /// 数组类型参数转换
-        /// <para>示例：var array = StringExtension.ConvertParamsToArrayType(typeof(Byte[]), new Object[] { "0x45", "0x46", 0x47 });</para>
-        /// </summary>
-        /// <param name="paramType"></param>
-        /// <param name="paramValues"></param>
-        /// <returns></returns>
-        public static System.Array ConvertParamsToArrayType(Type paramType, object[] paramValues) => ConvertParamsToArrayType(paramType, (Array)paramValues);
-        /// <summary>
         /// 值类型参数转换
-        /// <para>示例：UInt32 value = (UInt32)StringExtension.ConvertParamsToValueType(typeof(UInt32), "45");</para>
-        /// <para>示例：var value = StringExtension.ConvertParamsToValueType(typeof(Byte), "0x45"); 或 var value = StringExtension.ConvertParamsToValueType(typeof(Byte), 0x45);</para>
+        /// <para>输出一个指定类型的对象, 该对象的值等效于指定的对象</para>
+        /// <para>示例：StringExtensions.ConvertChangeTypeToValueType("45", typeof(UInt32), out UInt32 cValue);</para>
         /// </summary>
-        /// <param name="paramType">参数类型</param>
-        /// <param name="paramValue">参数值，或值字符串</param>
-        /// <returns></returns>
-        public static System.ValueType ConvertParamsToValueType(Type paramType, object paramValue)
+        /// <param name="value">需要转换的对象、字符串或字符串描述</param>
+        /// <param name="conversionType">要返回的对象的类型</param>
+        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
+        /// <returns>输出类型 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        /// <exception cref="ArgumentException"/>
+        public static bool ConvertChangeTypeToValueType(object value, Type conversionType, out ValueType conversionValue)
         {
-            if (paramType == null || paramValue == null || 
-                String.IsNullOrWhiteSpace(paramValue.ToString()) || paramValue.ToString().ToLower().Trim() == "null") return null;
-            
-            if (!paramType.IsValueType) throw new ArgumentException(nameof(paramType), "参数类型应为值类型参数");
+            conversionValue = null;
+            if (conversionType == null || !conversionType.IsValueType) 
+                throw new ArgumentException(nameof(conversionType), "需要转换的类型应为值类型参数");
 
-            if (paramValue.GetType() == paramType) return (ValueType)paramValue;
-            if (paramValue.GetType() != typeof(String)) return (ValueType)Convert.ChangeType(paramValue, paramType);
+            if (value == null) return true;
+            if (value.GetType() == conversionType)
+            {
+                conversionValue = value as ValueType;
+                return true;
+            }
+            if (value.GetType() == typeof(String))
+            {
+                string valueString = value.ToString();
+                if (String.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
+            }
+            else
+            {
+                conversionValue = Convert.ChangeType(value, conversionType) as ValueType;
+                return true;
+            }
 
             //Enum
-            if (paramType.IsEnum)
+            if (conversionType.IsEnum)
             {
-                return (ValueType)Enum.Parse(paramType, paramValue.ToString(), true);
+                conversionValue = Enum.Parse(conversionType, value.ToString(), true) as ValueType;
+                return true;
             }
             //Boolean
-            else if (paramType == typeof(bool))
+            else if (conversionType == typeof(bool))
             {
-                if (bool.TryParse(paramValue.ToString(), out bool value)) return value;
-                String pv = paramValue.ToString().Replace(" ", "");
-                return pv == "1" || pv == "T";
+                if (bool.TryParse(value.ToString(), out bool result))
+                {
+                    conversionValue = result;
+                    return true;
+                }
+                String pv = value.ToString().Replace(" ", "");
+                conversionValue = pv == "1" || pv == "T";
+                return true;
             }
             //Number
-            else if (paramType == typeof(sbyte) || paramType == typeof(byte) || paramType == typeof(short) || paramType == typeof(ushort) ||
-                paramType == typeof(Int32) || paramType == typeof(UInt32) || paramType == typeof(Int64) || paramType == typeof(UInt64))
+            else if (conversionType == typeof(sbyte) || conversionType == typeof(byte) || conversionType == typeof(short) || conversionType == typeof(ushort) ||
+                conversionType == typeof(Int32) || conversionType == typeof(UInt32) || conversionType == typeof(Int64) || conversionType == typeof(UInt64))
             {
-                String methodName = $"To{paramType.Name}";                
+                String methodName = $"To{conversionType.Name}";                
                 IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                                  where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == paramType
+                                                  where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == conversionType
                                                   let m_params = method.GetParameters()
                                                   where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
                                                   select method;
-                
-                if (methods?.Count() != 1) return (ValueType)paramValue;
+
+                conversionValue = value as ValueType;
+                if (methods?.Count() != 1) return false;
                 
                 MethodInfo ConvertToNumber = methods.First(); 
-                object[] parameters = GetNumberStringBase(paramValue.ToString());
+                object[] parameters = GetNumberStringBase(value.ToString());
 
                 try
                 {
-                    return (ValueType)ConvertToNumber.Invoke(null, parameters);
+                    conversionValue =(ValueType)ConvertToNumber.Invoke(null, parameters);
+                    return true;
                 }
                 catch (Exception ex)
                 {
                     Logger.Error(ex.ToString());
-                    return (ValueType)paramValue;
+                    return false;
                 }
             }
             //Double,Float
-            else if(paramType == typeof(double) || paramType == typeof(float))
+            else if(conversionType == typeof(double) || conversionType == typeof(float))
             {
-                String methodName = $"To{paramType.Name}";
+                String methodName = $"To{conversionType.Name}";
                 IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                                    where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == paramType
+                                                    where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == conversionType
                                                     let m_params = method.GetParameters()
                                                     where m_params[0].ParameterType == typeof(String)
                                                     select method;
 
-                if (methods?.Count() != 1) return (ValueType)paramValue;
+                conversionValue = value as ValueType;
+                if (methods?.Count() != 1) return false;
 
                 MethodInfo ConvertToNumber = methods.First();
-                object[] parameters = new object[] { paramValue.ToString().Replace(" ", "").Replace("_", "") };
+                object[] parameters = new object[] { value.ToString().Replace(" ", "").Replace("_", "") };
 
                 try
                 {
-                    return (ValueType)ConvertToNumber.Invoke(null, parameters);
+                    conversionValue =(ValueType)ConvertToNumber.Invoke(null, parameters);
+                    return true;
                 }
                 catch (Exception ex)
                 {
                     Logger.Error(ex.ToString());
-                    return (ValueType)paramValue;
+                    return false;
                 }
             }
             //Other
             else
             {
-                Logger.Warn($"暂未处理的类型转换 {paramType},{paramValue}");
-                return (ValueType)Convert.ChangeType(paramValue, paramType);
+                try
+                {
+                    conversionValue = (ValueType)Convert.ChangeType(value, conversionType);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"值类型转换失败 Value:{value}  Type:{conversionType}");
+                    Logger.Error(ex);
+                }
+
+                return false;
             }
         }
+
     }
 }
