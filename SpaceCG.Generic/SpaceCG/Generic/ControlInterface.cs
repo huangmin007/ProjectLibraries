@@ -46,8 +46,8 @@ namespace SpaceCG.Generic
 
     /// <summary>
     /// 控制器接口对象
-    /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Response="False" Async="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-    /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="True" Async="False"/&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
+    /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+    /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
     /// <para>网络接口返回(XML)：&lt;Return Result="True/False" Value="value" /&gt; 属性 Result 表示远程执行返回状态(成功/失败)，Value 表示远程执行返回值 (Method 返回值，或是 Property 值)</para>
     /// </summary>
     public sealed class ControlInterface : IDisposable
@@ -90,14 +90,20 @@ namespace SpaceCG.Generic
         public List<String> PropertyFilters { get; } = new List<String>(16) { "*.Name" };
 
         /// <summary>
-        /// 当前线程同步上下文
+        /// 默认情况下, 使用同步执行控制, 默认为 true
+        /// <para>可以跟据控制指令属性 Sync 动态调整当前指令是使用同步执行还是异步执行</para>
         /// </summary>
-        private SynchronizationContext SyncContext = SynchronizationContext.Current;
+        public bool SyncControl { get; set; } = true;
+
+        /// <summary>
+        /// 当前同步上下文
+        /// </summary>
+        private SynchronizationContext SyncContext { get; set; } = SynchronizationContext.Current;
 
         /// <summary>
         /// 反射控制接口对象
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Response="False" Async="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Response="True" Async="False"/&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
+        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 如果 Value 属性不存在，则表示获取属性的值</para>
         /// <param name="localPort">服务端口，小于 1024 则不启动服务接口</param>
         /// </summary>
         public ControlInterface(ushort localPort = 2023)
@@ -198,12 +204,12 @@ namespace SpaceCG.Generic
             if (!eventArgs.HandleReflection) return;
 
             bool result = this.TryParseControlMessage(actionElement, out object returnValue);
-            String responseMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\" />";
+            String returnMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\" />";
 
-            Logger.Info($"{e.EndPoint} Call {(result ? "Success!" : "Failed!")}  {responseMessage}");
-            if (bool.TryParse(actionElement.Attribute("Response")?.Value, out bool response) && response)
+            Logger.Info($"{e.EndPoint} Call {(result ? "Success!" : "Failed!")}  {returnMessage}");
+            if (bool.TryParse(actionElement.Attribute("Return")?.Value, out bool isReturn) && isReturn)
             {
-                ((IAsyncClient)sender).SendMessage(responseMessage);
+                ((IAsyncClient)sender).SendMessage(returnMessage);
             }            
         }
         /// <summary>
@@ -224,12 +230,12 @@ namespace SpaceCG.Generic
             if (!eventArgs.HandleReflection) return;
 
             bool result = this.TryParseControlMessage(actionElement, out object returnValue);
-            String responseMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\" />";
+            String returnMessage = $"<Return Result=\"{result}\" Value=\"{returnValue}\" />";
             
-            Logger.Info($"{e.EndPoint} Call {(result ? "Success!" : "Failed!")}  {responseMessage}");
-            if (bool.TryParse(actionElement.Attribute("Response")?.Value, out bool response) && response)
+            Logger.Info($"{e.EndPoint} Call {(result ? "Success!" : "Failed!")}  {returnMessage}");
+            if (bool.TryParse(actionElement.Attribute("Return")?.Value, out bool isReturn) && isReturn)
             {
-                ((IAsyncServer)sender).SendMessage(responseMessage, e.EndPoint);
+                ((IAsyncServer)sender).SendMessage(returnMessage, e.EndPoint);
             }
         }
 
@@ -372,88 +378,57 @@ namespace SpaceCG.Generic
         public bool TryParseCallMethod(XElement actionElement, out object returnResult)
         {
             returnResult = null;
-            if (actionElement == null || AccessObjects == null || MethodFilters.IndexOf("*.*") != -1) return false;
+            if (actionElement?.Name.LocalName != "Action" || AccessObjects?.Count() <= 0 || MethodFilters.IndexOf("*.*") != -1) return false;
 
-            if (actionElement.Name?.LocalName != "Action" ||
-                String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||
-                String.IsNullOrWhiteSpace(actionElement.Attribute("Method")?.Value))
+            String objectName = actionElement.Attribute("Target")?.Value;
+            String methodName = actionElement.Attribute("Method")?.Value; 
+            if (String.IsNullOrWhiteSpace(objectName) || String.IsNullOrWhiteSpace(methodName))
             {
-                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Method 不能为空");
+                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Method 值不能为空");
                 return false;
             }
-
-            String asyncValue = actionElement.Attribute("Async")?.Value;
-            String objectName = actionElement.Attribute("Target").Value;
-            String methodName = actionElement.Attribute("Method").Value;
-
             if (!AccessObjects.TryGetValue(objectName, out Object targetObject))
             {
                 Logger.Error($"未找到目标实例对象 {objectName} ");
                 return false;
             }
-
             //不可操作的对象类型
             if (targetObject.GetType() == typeof(ControlInterface)) return false;
             //不可操作的对象方法
             if (MethodFilters.IndexOf($"*.{methodName}") != -1 || MethodFilters.IndexOf($"{objectName}.{methodName}") != -1) return false;
 
-            bool Async = true;  //默认使用异步执行函数(非阻塞执行)
-            if (!String.IsNullOrWhiteSpace(asyncValue))
-                Async = asyncValue.ToLower() == "true";
+            bool sync = SyncControl;
+            if (actionElement.Attribute("Sync") != null)
+                sync = bool.TryParse(actionElement.Attribute("Sync").Value, out bool result) && result;
 
             try
             {
                 TaskResult taskResult = new TaskResult(false, null);
                 object[] parameters = StringExtensions.SplitParameters(actionElement.Attribute("Params")?.Value);
 
-                if (Async)  //异步执行
+                if(sync)
                 {
-                    taskResult = Task.Run<TaskResult>(() =>
+                    SyncContext.Send((o) =>
                     {
-                        if (SyncContext != null)
-                        {
-                            TaskResult tResult = new TaskResult(false, null);
-                            //ManualResetEvent manualResetEvent = new ManualResetEvent(false);
-                            //SyncContext.Post((o) =>
-                            SyncContext.Send((o) =>
-                            {
-                                tResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
-                                tResult.ReturnValue = value;
-                                //manualResetEvent.Set();
-                            }, tResult);
-
-                            //bool wait = manualResetEvent.WaitOne(3_000);
-                            //manualResetEvent.Dispose();
-                            return tResult;
-                        }
-                        else
-                        {
-                            bool success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
-                            return new TaskResult(success, value);
-                        }
-                    }).Result;
-                    
-                    if (taskResult.Success) returnResult = taskResult.ReturnValue;
-                    return taskResult.Success;
+                        taskResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
+                        taskResult.ReturnValue = value;
+                    }, taskResult);
                 }
                 else
                 {
-                    if (SyncContext != null)
+                    ManualResetEvent manualResetEvent = new ManualResetEvent(false);
+                    SyncContext.Post((o) =>
                     {
-                        SyncContext.Send((o) =>
-                        {
-                            taskResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
-                            taskResult.ReturnValue = value;
-                        }, taskResult);
-
-                        if (taskResult.Success) returnResult = taskResult.ReturnValue;
-                        return taskResult.Success;
-                    }
-                    else
-                    {
-                        return InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out returnResult);
-                    }
+                        taskResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
+                        taskResult.ReturnValue = value;
+                        manualResetEvent.Set();
+                    }, taskResult);
+                    bool wait = manualResetEvent.WaitOne(1_000);
+                    manualResetEvent.Dispose();
                 }
+
+                if (taskResult.Success) returnResult = taskResult.ReturnValue;
+                return taskResult.Success;
             }
             catch (Exception ex)
             {
@@ -473,97 +448,62 @@ namespace SpaceCG.Generic
         public bool TryParseChangeValue(XElement actionElement, out object returnResult)
         {
             returnResult = null;
-            if (actionElement == null || AccessObjects == null || PropertyFilters.IndexOf("*.*") != -1) return false;
+            if (actionElement?.Name.LocalName != "Action" || AccessObjects?.Count() <= 0 || PropertyFilters.IndexOf("*.*") != -1) return false;
 
-            if (actionElement.Name?.LocalName != "Action" ||
-                String.IsNullOrWhiteSpace(actionElement.Attribute("Target")?.Value) ||
-                String.IsNullOrWhiteSpace(actionElement.Attribute("Property")?.Value))
+            String objectName = actionElement.Attribute("Target")?.Value;
+            String propertyName = actionElement.Attribute("Property")?.Value;
+            if (String.IsNullOrWhiteSpace(objectName) || String.IsNullOrWhiteSpace(propertyName))
             {
-                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Property 不能为空");
+                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Property 值不能为空");
                 return false;
             }
-
-            String asyncValue = actionElement.Attribute("Async")?.Value;
-            String objectName = actionElement.Attribute("Target").Value;
-            String propertyName = actionElement.Attribute("Property").Value;
-
             if (!AccessObjects.TryGetValue(objectName, out Object targetObject))
             {
                 Logger.Error($"未找到目标实例对象 {objectName} ");
                 return false;
             }
-
             //不可操作的对象类型
             if (targetObject.GetType() == typeof(ControlInterface)) return false;
             //不可操作的对象属性
             if (PropertyFilters.IndexOf($"*.{propertyName}") != -1 || PropertyFilters.IndexOf($"{objectName}.{propertyName}") != -1) return false;
 
-            bool Async = true;
-            if (!String.IsNullOrWhiteSpace(asyncValue))
-                Async = asyncValue.ToLower() == "true";
+            bool sync = SyncControl;
+            if (actionElement.Attribute("Sync") != null)
+                sync = bool.TryParse(actionElement.Attribute("Sync").Value, out bool result) && result;
 
             try
             {
                 TaskResult taskResult = new TaskResult(false, null);
+                //object[] parameters = StringExtensions.SplitParameters(actionElement.Attribute("Value")?.Value);
 
-                if (Async)
+                if(sync)
                 {
-                    taskResult = Task.Run<TaskResult>(() =>
-                    {
-                        if (SyncContext != null)
-                        {
-                            TaskResult tResult = new TaskResult(false, null);
-                            ManualResetEvent manualResetEvent = new ManualResetEvent(false);
-                            SyncContext.Post((o) =>
-                            {
-                                if (actionElement.Attribute("Value") != null)
-                                    InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
-
-                                tResult.Success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
-                                tResult.ReturnValue = value;
-                                manualResetEvent.Set();
-                            }, tResult);
-
-                            bool wait = manualResetEvent.WaitOne(3_000);
-                            manualResetEvent.Dispose();
-                            return tResult;
-                        }
-                        else
-                        {
-                            if (actionElement.Attribute("Value") != null)
-                                InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
-
-                            bool success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
-                            return new TaskResult(success, value);
-                        }
-                    }).Result;
-
-                    if (taskResult.Success) returnResult = taskResult.ReturnValue;
-                    return taskResult.Success;
-                }
-                else
-                {
-                    if (SyncContext != null)
-                    {
-                        SyncContext.Send((o) =>
-                        {
-                            if (actionElement.Attribute("Value") != null)
-                                InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
-
-                            taskResult.Success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
-                            taskResult.ReturnValue = value;
-                        }, taskResult);
-
-                        if (taskResult.Success) returnResult = taskResult.ReturnValue;
-                        return taskResult.Success;
-                    }
-                    else
+                    SyncContext.Send((o) =>
                     {
                         if (actionElement.Attribute("Value") != null)
                             InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
-                        return InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out returnResult);
-                    }
+
+                        taskResult.Success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
+                        taskResult.ReturnValue = value;
+                    }, taskResult);
                 }
+                else
+                {
+                    ManualResetEvent manualResetEvent = new ManualResetEvent(false);
+                    SyncContext.Post((o) =>
+                    {
+                        if (actionElement.Attribute("Value") != null)
+                            InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
+
+                        taskResult.Success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
+                        taskResult.ReturnValue = value;
+                        manualResetEvent.Set();
+                    }, taskResult);
+                    bool wait = manualResetEvent.WaitOne(1_000);
+                    manualResetEvent.Dispose();
+                }
+                if (taskResult.Success) returnResult = taskResult.ReturnValue;
+                return taskResult.Success;
             }
             catch (Exception ex)
             {
@@ -597,20 +537,20 @@ namespace SpaceCG.Generic
         /// <param name="targetName"></param>
         /// <param name="methodName"></param>
         /// <param name="methodParams"></param>
-        /// <param name="async"></param>
-        /// <param name="response"></param>
+        /// <param name="sync"></param>
+        /// <param name="isReturn"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentNullException"></exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static string CreateMessage4Method(string targetName, string methodName, string methodParams, bool async = true, bool response = true)
+        public static string CreateMessage4Method(string targetName, string methodName, string methodParams, bool sync = true, bool isReturn = true)
         {
             if (String.IsNullOrWhiteSpace(targetName) || String.IsNullOrWhiteSpace(methodName))
                 throw new ArgumentNullException($"{nameof(targetName)},{nameof(methodName)}", "关键参数不能为空");
 
             if(methodParams == null)
-                return $"<Action Target=\"{targetName}\" Method=\"{methodName}\" Async=\"{async}\" Response=\"{response}\" />";
+                return $"<Action Target=\"{targetName}\" Method=\"{methodName}\" Sync=\"{sync}\" Return=\"{isReturn}\" />";
             else
-                return $"<Action Target=\"{targetName}\" Method=\"{methodName}\" Params=\"{methodParams}\" Async=\"{async}\" Response=\"{response}\" />";
+                return $"<Action Target=\"{targetName}\" Method=\"{methodName}\" Params=\"{methodParams}\" Sync=\"{sync}\" Return=\"{isReturn}\" />";
         }
         /// <summary>
         /// 创建控制消息
@@ -618,17 +558,17 @@ namespace SpaceCG.Generic
         /// <param name="targetName"></param>
         /// <param name="propertyName"></param>
         /// <param name="propertyValue"></param>
-        /// <param name="async"></param>
-        /// <param name="response"></param>
+        /// <param name="sync"></param>
+        /// <param name="isReturn"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentNullException"></exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static string CreateMessage4Property(string targetName, string propertyName, string propertyValue, bool async = true, bool response = true)
+        public static string CreateMessage4Property(string targetName, string propertyName, string propertyValue, bool sync = false, bool isReturn = true)
         {
             if (String.IsNullOrWhiteSpace(targetName) || String.IsNullOrWhiteSpace(propertyName))
                 throw new ArgumentNullException($"{nameof(targetName)},{nameof(propertyName)}", "关键参数不能为空");
 
-            return $"<Action Target=\"{targetName}\" Property=\"{propertyName}\" Value=\"{(propertyValue == null ? "null" : propertyValue)}\" Async=\"{async}\" Response=\"{response}\" />";
+            return $"<Action Target=\"{targetName}\" Property=\"{propertyName}\" Value=\"{(propertyValue == null ? "null" : propertyValue)}\" Sync=\"{sync}\" Return=\"{isReturn}\" />";
         }
     }
 

@@ -197,7 +197,7 @@ namespace SpaceCG.Net
             int count = 0;
             try
             {
-                count = tcpClient.GetStream().EndRead(ar);
+                count = (int)(tcpClient?.GetStream().EndRead(ar));
                 if (count > 0) Logger.Info($"接收客户端 {endPoint} 数据 {count} Bytes");
             }
             catch (Exception ex)
@@ -222,7 +222,8 @@ namespace SpaceCG.Net
             Buffer.BlockCopy(_Buffers[endPoint], 0, buff, 0, count);
             ClientDataReceived?.Invoke(this, new AsyncDataEventArgs(endPoint, buff));
 
-            tcpClient.GetStream().BeginRead(_Buffers[endPoint], 0, _Buffers[endPoint].Length, ReadCallback, tcpClient);
+            if(tcpClient?.GetStream() != null)
+                tcpClient.GetStream().BeginRead(_Buffers[endPoint], 0, _Buffers[endPoint].Length, ReadCallback, tcpClient);
         }
 
         /// <inheritdoc/>

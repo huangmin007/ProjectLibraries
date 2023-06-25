@@ -23,7 +23,7 @@ namespace SpaceCG.Extensions
         /// <param name="value">需要转换的对象、字符串或是字符串描述</param>
         /// <param name="conversionType">要返回的对象的类型</param>
         /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
-        /// <returns>输出类型 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
         public delegate bool ConvertChangeTypeDelegate(object value, Type conversionType, out object conversionValue);
 
         /// <summary>
@@ -38,7 +38,7 @@ namespace SpaceCG.Extensions
         /// <param name="value">需要转换的对象、字符串或是字符串描述</param>
         /// <param name="conversionType">要返回的对象的类型</param>
         /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
-        /// <returns>输出类型 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
         public static bool ConvertChangeType(object value, Type conversionType, out object conversionValue)
         {
             conversionValue = null;
@@ -63,7 +63,7 @@ namespace SpaceCG.Extensions
             }
             else if (conversionType.IsArray && conversionType.GetElementType().IsValueType)
             {
-                bool result = StringExtensions.ConvertChangeTypeToArrayType((Array)value, conversionType, out Array cValue);
+                bool result = StringExtensions.ConvertChangeTypeToArrayType(value as Array, conversionType, out Array cValue);
                 if (result) conversionValue = cValue;
                 return result;
             }

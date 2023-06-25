@@ -138,6 +138,8 @@ namespace Test2
 
                 if (sValue.IndexOf("#") == 0)// && uint.TryParse(sValue.Substring(1), NumberStyles.HexNumber, null, out uint uValue))
                 {
+                    //BrushConverter
+                    //var b= Brushes.Aqua;
                     Color color = (Color)ColorConverter.ConvertFromString(sValue);
                     Console.WriteLine(color);
                     //Colors

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -11,7 +10,7 @@ using SpaceCG.Extensions;
 namespace SpaceCG.Generic
 {
     /// <summary>
-    /// 轻量的日志跟踪记录对象，支持跨平台
+    /// 轻量日志跟踪记录对象，支持跨平台
     /// </summary>
     public sealed class LoggerTrace : IDisposable
     {
@@ -326,7 +325,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 跟踪事件 <see cref="TRACE_TARGET_COUNT"/> 次数后检测一次文件，减少频繁的检查文件大小
         /// </summary>
-        protected int TRACE_TARGET_COUNT = 32;
+        protected int TRACE_TARGET_COUNT = 16;
 
         /// <summary>
         /// 当前跟踪次数
@@ -564,11 +563,15 @@ namespace SpaceCG.Generic
             try
             {
                 FileInfo curLogFile = new FileInfo(fileStream.Name);
-                String fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1);
+                string headName = curLogFile.Name.Substring(0, curLogFile.Name.IndexOf('.'));
+                string fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1); //fileName.(0).log
                 int count = (int)(curLogFile.Directory.GetFiles($"{fileName}*", SearchOption.TopDirectoryOnly)?.Length) - 1;
 
+                //Console.WriteLine(curLogFile.Name);                             //Test2.2023-06-24.log
+                //Console.WriteLine($"HeadName:{headName}  FileName:{fileName}"); //HeadName:Test2  FileName:Test2.2023-06-24.
+
                 String sourceFileName = curLogFile.FullName;
-                string destFileName = $"{curLogFile.Directory.FullName}\\{fileName}{count}{curLogFile.Extension}";
+                string destFileName = $"{curLogFile.Directory.FullName}\\{fileName}({count}){curLogFile.Extension}";
 
                 Writer.Flush();
                 Writer.Close();
@@ -576,6 +579,16 @@ namespace SpaceCG.Generic
                 Writer = null;
 
                 File.Move(sourceFileName, destFileName);
+                FileExtensions.ReserveFileDays(30, curLogFile.DirectoryName, $"{headName}*{curLogFile.Extension}");
+
+#if false
+                //解决过 24点 后文件名上的日期问题，但无法彻底解决，因为父类的属性 fileName 是私有的, 得继承 TraceListener 重写才可行
+                Encoding encoding = new UTF8Encoding(false);
+                encoding.EncoderFallback = EncoderFallback.ReplacementFallback;
+                encoding.DecoderFallback = DecoderFallback.ReplacementFallback;
+                string path = $"{curLogFile.Directory.FullName}\\{headName}.{DateTime.Today.ToString("yyyy-MM-dd")}{curLogFile.Extension}";
+                Writer = new StreamWriter(path, true, encoding, 4096);
+#endif
             }
             catch (Exception ex)
             {

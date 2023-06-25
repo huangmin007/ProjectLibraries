@@ -314,13 +314,15 @@ namespace SpaceCG.Extensions
         /// <param name="value">需要转换的对象、字符串或字符串描述</param>
         /// <param name="conversionType">要返回的对象的类型</param>
         /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
-        /// <returns>输出类型 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
         /// <exception cref="ArgumentException"/>
         public static bool ConvertChangeTypeToArrayType(Array value, Type conversionType, out Array conversionValue)
         {
             conversionValue = null;
+            if (value == null) return true;
             if (conversionType == null || !conversionType.IsArray || !conversionType.GetElementType().IsValueType)
                 throw new ArgumentException(nameof(conversionType), "需要转换的类型应为数组类型，且数组元素为值类型");
+            if (!value.GetType().IsArray) throw new ArgumentException(nameof(value), "需要转换的值对象也应该为数组类型");
 
             Type elementType = conversionType.GetElementType();
             conversionValue = Array.CreateInstance(elementType, value.Length);
@@ -339,7 +341,7 @@ namespace SpaceCG.Extensions
 
             return true;
         }
-        
+
         /// <summary>
         /// 值类型参数转换
         /// <para>输出一个指定类型的对象, 该对象的值等效于指定的对象</para>
@@ -348,7 +350,7 @@ namespace SpaceCG.Extensions
         /// <param name="value">需要转换的对象、字符串或字符串描述</param>
         /// <param name="conversionType">要返回的对象的类型</param>
         /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
-        /// <returns>输出类型 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
         /// <exception cref="ArgumentException"/>
         public static bool ConvertChangeTypeToValueType(object value, Type conversionType, out ValueType conversionValue)
         {

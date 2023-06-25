@@ -148,7 +148,7 @@ namespace SpaceCG.Net
                 RemoteEndPoint = _TcpClient.Client.RemoteEndPoint as IPEndPoint;
 
                 Connected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
-                _TcpClient.GetStream().BeginRead(_Buffer, 0, _Buffer.Length, ReadCallback, _TcpClient);
+                _TcpClient.GetStream()?.BeginRead(_Buffer, 0, _Buffer.Length, ReadCallback, _TcpClient);
             }
             else
             {
@@ -160,10 +160,13 @@ namespace SpaceCG.Net
         {
             if (_TcpClient == null || !_TcpClient.Connected) return;
 
-            int count = 0;
+            int count = -1;
             try
             {
-                count = _TcpClient.GetStream().EndRead(ar);
+                if (_TcpClient?.GetStream() != null)
+                    count = _TcpClient.GetStream().EndRead(ar);
+                else
+                    return;
             }
             catch (Exception ex)
             {
@@ -171,18 +174,20 @@ namespace SpaceCG.Net
                 Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
             }
 
+            if (count <= -1) return;
             if (count == 0)
             {
                 Close();
                 Disconnected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
                 return;
-            }
+            }            
 
             byte[] buffer = new byte[count];
             Buffer.BlockCopy(_Buffer, 0, buffer, 0, count);
             DataReceived?.Invoke(this, new AsyncDataEventArgs(_ConnectEP, buffer));
 
-            _TcpClient.GetStream().BeginRead(_Buffer, 0, _Buffer.Length, ReadCallback, _TcpClient);
+            if(_TcpClient?.GetStream() != null)
+                _TcpClient.GetStream().BeginRead(_Buffer, 0, _Buffer.Length, ReadCallback, _TcpClient);
         }
 
         /// <inheritdoc/>
