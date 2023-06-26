@@ -127,6 +127,7 @@ namespace Test2
             StringExtensions.ConvertChangeTypeToArrayType(new object[] { "0x45", "0x46", 0x47 }, typeof(Byte[]), out Array bytes);
 
             InstanceExtensions.ConvertChangeTypeExtension = ConvertChangeTypeExtension2;
+
         }
 
         private static bool ConvertChangeTypeExtension2(object value, Type conversionType, out object conversionValue)

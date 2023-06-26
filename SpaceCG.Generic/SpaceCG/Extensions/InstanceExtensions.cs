@@ -1,6 +1,4 @@
-﻿#define RETURN
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -15,6 +13,9 @@ namespace SpaceCG.Extensions
     /// </summary>
     public static partial class InstanceExtensions
     {
+        /// <summary>
+        /// Logger Trace
+        /// </summary>
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(InstanceExtensions));
 
         /// <summary>
@@ -42,26 +43,28 @@ namespace SpaceCG.Extensions
         public static bool ConvertChangeType(object value, Type conversionType, out object conversionValue)
         {
             conversionValue = null;
-            if (value == null) return true; 
             if (conversionType == null) return false;
+
+            if (value == null) return true;
+            if (value.GetType() == typeof(string))
+            {
+                string valueString = value.ToString();
+                if (string.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
+            }
+
             if (value.GetType() == conversionType)
             {
                 conversionValue = value;
                 return true;
             }
-            if (value.GetType() == typeof(string))
-            {
-                string valueString = value.ToString();
-                if (String.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
-            }
-
-            if (conversionType.IsValueType)
+            
+            if (conversionType.IsValueType || conversionType.IsEnum)
             {
                 bool result = StringExtensions.ConvertChangeTypeToValueType(value, conversionType, out ValueType cValue);
                 if (result) conversionValue = cValue;
                 return result;
             }
-            else if (conversionType.IsArray && conversionType.GetElementType().IsValueType)
+            else if (conversionType.IsArray && conversionType.HasElementType && conversionType.GetElementType().IsValueType)
             {
                 bool result = StringExtensions.ConvertChangeTypeToArrayType(value as Array, conversionType, out Array cValue);
                 if (result) conversionValue = cValue;
@@ -71,14 +74,14 @@ namespace SpaceCG.Extensions
             {
                 try
                 {
-                    if (ConvertChangeTypeExtension == null)
+                    if (typeof(IConvertible).IsAssignableFrom(value.GetType()))
                     {
                         conversionValue = Convert.ChangeType(value, conversionType);
                         return true;
                     }
-                    else
+                    //扩展转换
+                    if (ConvertChangeTypeExtension != null)
                     {
-                        //扩展转换
                         bool result = ConvertChangeTypeExtension.Invoke(value, conversionType, out conversionValue);
                         return result;
                     }

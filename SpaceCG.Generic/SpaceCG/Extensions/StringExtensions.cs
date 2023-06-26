@@ -319,9 +319,16 @@ namespace SpaceCG.Extensions
         public static bool ConvertChangeTypeToArrayType(Array value, Type conversionType, out Array conversionValue)
         {
             conversionValue = null;
-            if (value == null) return true;
             if (conversionType == null || !conversionType.IsArray || !conversionType.GetElementType().IsValueType)
                 throw new ArgumentException(nameof(conversionType), "需要转换的类型应为数组类型，且数组元素为值类型");
+
+            if (value == null) return true;
+            if (value.GetType() == typeof(string))
+            {
+                string valueString = value.ToString();
+                if (string.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
+            }
+
             if (!value.GetType().IsArray) throw new ArgumentException(nameof(value), "需要转换的值对象也应该为数组类型");
 
             Type elementType = conversionType.GetElementType();
@@ -359,22 +366,18 @@ namespace SpaceCG.Extensions
                 throw new ArgumentException(nameof(conversionType), "需要转换的类型应为值类型参数");
 
             if (value == null) return true;
+            if (value.GetType() == typeof(string))
+            {
+                string valueString = value.ToString();
+                if (string.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
+            }
+
             if (value.GetType() == conversionType)
             {
                 conversionValue = value as ValueType;
                 return true;
             }
-            if (value.GetType() == typeof(String))
-            {
-                string valueString = value.ToString();
-                if (String.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
-            }
-            else
-            {
-                conversionValue = Convert.ChangeType(value, conversionType) as ValueType;
-                return true;
-            }
-
+            
             //Enum
             if (conversionType.IsEnum)
             {
@@ -389,7 +392,7 @@ namespace SpaceCG.Extensions
                     conversionValue = result;
                     return true;
                 }
-                String pv = value.ToString().Replace(" ", "");
+                string pv = value.ToString().Replace(" ", "");
                 conversionValue = pv == "1" || pv == "T";
                 return true;
             }
@@ -397,11 +400,11 @@ namespace SpaceCG.Extensions
             else if (conversionType == typeof(sbyte) || conversionType == typeof(byte) || conversionType == typeof(short) || conversionType == typeof(ushort) ||
                 conversionType == typeof(Int32) || conversionType == typeof(UInt32) || conversionType == typeof(Int64) || conversionType == typeof(UInt64))
             {
-                String methodName = $"To{conversionType.Name}";                
+                string methodName = $"To{conversionType.Name}";                
                 IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                                   where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == conversionType
                                                   let m_params = method.GetParameters()
-                                                  where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
+                                                  where m_params[0].ParameterType == typeof(string) && m_params[1].ParameterType == typeof(int)
                                                   select method;
 
                 conversionValue = value as ValueType;
@@ -424,11 +427,11 @@ namespace SpaceCG.Extensions
             //Double,Float
             else if(conversionType == typeof(double) || conversionType == typeof(float))
             {
-                String methodName = $"To{conversionType.Name}";
+                string methodName = $"To{conversionType.Name}";
                 IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                                     where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == conversionType
                                                     let m_params = method.GetParameters()
-                                                    where m_params[0].ParameterType == typeof(String)
+                                                    where m_params[0].ParameterType == typeof(string)
                                                     select method;
 
                 conversionValue = value as ValueType;
@@ -453,8 +456,11 @@ namespace SpaceCG.Extensions
             {
                 try
                 {
-                    conversionValue = (ValueType)Convert.ChangeType(value, conversionType);
-                    return true;
+                    if (typeof(IConvertible).IsAssignableFrom(value.GetType()))
+                    {
+                        conversionValue = Convert.ChangeType(value, conversionType) as ValueType;
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
