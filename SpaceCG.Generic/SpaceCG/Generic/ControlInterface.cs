@@ -13,9 +13,9 @@ using System.Threading;
 namespace SpaceCG.Generic
 {
     /// <summary>
-    /// 事件参数
+    /// 网络消息事件参数
     /// </summary>
-    public class ControlEventArgs : EventArgs
+    public class MessageEventArgs : EventArgs
     {
         /// <summary>
         /// Message
@@ -28,16 +28,16 @@ namespace SpaceCG.Generic
         public EndPoint EndPoint { get; internal set; }
 
         /// <summary>
-        /// Handle Reflection, default value is true
+        /// Handle Reflection Control, Default Value is true
         /// </summary>
         public bool HandleReflection { get; set; } = true;
 
         /// <summary>
-        /// 控制事件参数
+        /// 网络消息事件参数
         /// </summary>
         /// <param name="message"></param>
         /// <param name="endPoint"></param>
-        public ControlEventArgs(XElement message, EndPoint endPoint)
+        public MessageEventArgs(XElement message, EndPoint endPoint)
         {
             this.Message = message;
             this.EndPoint = endPoint;
@@ -55,9 +55,9 @@ namespace SpaceCG.Generic
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ControlInterface));
 
         /// <summary>
-        /// Control Event Handler
+        /// Network Control Message Event Handler
         /// </summary>
-        public event EventHandler<ControlEventArgs> ControlEvent;
+        public event EventHandler<MessageEventArgs> NetworkMessageEvent;
 
         /// <summary>
         /// 网络控制接口服务对象
@@ -199,8 +199,8 @@ namespace SpaceCG.Generic
                 return;
             }
 
-            ControlEventArgs eventArgs = new ControlEventArgs(actionElement, e.EndPoint);
-            ControlEvent?.Invoke(this, eventArgs);
+            MessageEventArgs eventArgs = new MessageEventArgs(actionElement, e.EndPoint);
+            NetworkMessageEvent?.Invoke(this, eventArgs);
             if (!eventArgs.HandleReflection) return;
 
             bool result = this.TryParseControlMessage(actionElement, out object returnValue);
@@ -225,8 +225,8 @@ namespace SpaceCG.Generic
                 Logger.Error($"不支持的控制消息：{message}");
                 return;
             }
-            ControlEventArgs eventArgs = new ControlEventArgs(actionElement, e.EndPoint);
-            ControlEvent?.Invoke(this, eventArgs);
+            MessageEventArgs eventArgs = new MessageEventArgs(actionElement, e.EndPoint);
+            NetworkMessageEvent?.Invoke(this, eventArgs);
             if (!eventArgs.HandleReflection) return;
 
             bool result = this.TryParseControlMessage(actionElement, out object returnValue);
