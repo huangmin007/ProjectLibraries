@@ -326,7 +326,7 @@ namespace SpaceCG.Extensions
             if (value.GetType() == typeof(string))
             {
                 string valueString = value.ToString();
-                if (string.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
+                if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
             }
 
             if (!value.GetType().IsArray) throw new ArgumentException(nameof(value), "需要转换的值对象也应该为数组类型");
@@ -369,7 +369,7 @@ namespace SpaceCG.Extensions
             if (value.GetType() == typeof(string))
             {
                 string valueString = value.ToString();
-                if (string.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
+                if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
             }
 
             if (value.GetType() == conversionType)
@@ -415,7 +415,7 @@ namespace SpaceCG.Extensions
 
                 try
                 {
-                    conversionValue =(ValueType)ConvertToNumber.Invoke(null, parameters);
+                    conversionValue = ConvertToNumber.Invoke(null, parameters) as ValueType;
                     return true;
                 }
                 catch (Exception ex)
@@ -442,7 +442,7 @@ namespace SpaceCG.Extensions
 
                 try
                 {
-                    conversionValue =(ValueType)ConvertToNumber.Invoke(null, parameters);
+                    conversionValue = ConvertToNumber.Invoke(null, parameters) as ValueType;
                     return true;
                 }
                 catch (Exception ex)
@@ -464,7 +464,7 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"值类型转换失败 Value:{value}  Type:{conversionType}");
+                    Logger.Error($"值类型转换失败  Value:{value}  Type:{conversionType}");
                     Logger.Error(ex);
                 }
 

@@ -49,7 +49,7 @@ namespace SpaceCG.Extensions
             if (value.GetType() == typeof(string))
             {
                 string valueString = value.ToString();
-                if (string.IsNullOrWhiteSpace(valueString) || valueString.Replace(" ", "").ToLower() == "null") return true;
+                if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
             }
 
             if (value.GetType() == conversionType)
@@ -57,7 +57,7 @@ namespace SpaceCG.Extensions
                 conversionValue = value;
                 return true;
             }
-            
+
             if (conversionType.IsValueType || conversionType.IsEnum)
             {
                 bool result = StringExtensions.ConvertChangeTypeToValueType(value, conversionType, out ValueType cValue);
@@ -72,6 +72,7 @@ namespace SpaceCG.Extensions
             }
             else
             {
+#if false
                 try
                 {
                     if (typeof(IConvertible).IsAssignableFrom(value.GetType()))
@@ -79,7 +80,20 @@ namespace SpaceCG.Extensions
                         conversionValue = Convert.ChangeType(value, conversionType);
                         return true;
                     }
-                    //扩展转换
+                }
+                catch (Exception ex)
+                {
+                    if (ConvertChangeTypeExtension == null)
+                    {
+                        Logger.Error($"类型转换失败  Value:{value}  Type:{conversionType}");
+                        Logger.Error(ex);
+                        return false;
+                    }
+                }
+#endif
+                //使用扩展函数，进行转换
+                try
+                {
                     if (ConvertChangeTypeExtension != null)
                     {
                         bool result = ConvertChangeTypeExtension.Invoke(value, conversionType, out conversionValue);
@@ -88,7 +102,7 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"{(ConvertChangeTypeExtension == null ? "类型" : "扩展类型")}转换失败  Value:{value}  Type:{conversionType}");
+                    Logger.Error($"扩展函数 {ConvertChangeTypeExtension.Method.Name} 类型转换失败  Value:{value}  Type:{conversionType}");
                     Logger.Error(ex);
                 }
             }
