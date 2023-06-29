@@ -43,7 +43,7 @@ namespace SpaceCG.Net
 
         int WriteTimeout { get; set; }
 
-        void Connect(string hostOrComm, uint portOrRate);
+        void Connect(string hostOrComm, uint portOrRate, params object[] args);
 
         void Close();
 

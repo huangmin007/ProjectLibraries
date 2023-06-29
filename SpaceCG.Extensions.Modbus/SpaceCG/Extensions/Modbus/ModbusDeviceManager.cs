@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Threading;
+using System.Xml;
 using System.Xml.Linq;
 using SpaceCG.Generic;
 using SpaceCG.Net;
@@ -44,6 +45,7 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         private XElement Configuration { get; set; } = null;
         private IEnumerable<XElement> ModbusElements { get; set; } = null;
+        private IEnumerable<XElement> ConnectionElements { get; set; } = null;
 
         /// <summary>
         /// 控制接口对象
@@ -103,16 +105,15 @@ namespace SpaceCG.Extensions.Modbus
 
             ResetAndClear();
 
-            Configuration = XElement.Load(configFile);
-            ModbusElements = Configuration.Elements("Modbus");
+            XmlReaderSettings settings = new XmlReaderSettings();
+            settings.IgnoreComments = true;
+            settings.IgnoreWhitespace = true;
+            XmlReader reader = XmlReader.Create(configFile, settings);
+            Configuration = XElement.Load(reader, LoadOptions.None);
 
             ParseRootAttributes();
-            ParseConnectionsConfig(Configuration.Descendants("Connection"));            
+            ParseConnectionsConfig(Configuration.Element("Connections")?.Descendants("Connection"));            
             ParseModbusDevicesConfig(Configuration.Elements("Modbus"));
-
-            //XInitialized
-            CallEventType(XInitialized, null);
-            Thread.Sleep(100);
         }
 
         /// <summary>
@@ -127,7 +128,7 @@ namespace SpaceCG.Extensions.Modbus
             {
                 ControlInterface.InstallNetworkService(localPort, "0.0.0.0");
 
-                this.Name = Configuration.Attribute("Name").Value;
+                this.Name = Configuration.Attribute("Name")?.Value;
                 if (!String.IsNullOrWhiteSpace(Name)) ControlInterface.AccessObjects.Add(Name, this);
             }
         }
@@ -135,9 +136,11 @@ namespace SpaceCG.Extensions.Modbus
         /// 解析 Connections 节点配置
         /// </summary>
         /// <param name="connectionsElement"></param>
-        private void ParseConnectionsConfig(IEnumerable<XElement> connectionsElement)
+        public void ParseConnectionsConfig(IEnumerable<XElement> connectionsElement)
         {
             if (connectionsElement?.Count() <= 0) return;
+
+            this.ConnectionElements = connectionsElement;
             foreach(XElement connection in connectionsElement)
             {
                 String name = connection.Attribute(ControlInterface.XName)?.Value;
@@ -210,25 +213,30 @@ namespace SpaceCG.Extensions.Modbus
         /// 解析 Modbus 节点配置
         /// </summary>
         /// <param name="modbusElements"></param>
-        private void ParseModbusDevicesConfig(IEnumerable<XElement> modbusElements)
+        public void ParseModbusDevicesConfig(IEnumerable<XElement> modbusElements)
         {
             if (modbusElements?.Count() <= 0) return;
 
-            foreach(XElement modbusElement in modbusElements)
+            this.ModbusElements = modbusElements;
+            foreach (XElement modbusElement in modbusElements)
             {
                 if (ModbusTransport.TryParse(modbusElement, out ModbusTransport transport) && AddTransportDevice(transport))
                 {
-                    transport.StartTransport();
                     transport.InputChangeEvent += Transport_InputChangeEvent;
                     transport.OutputChangeEvent += Transport_OutputChangeEvent;
+                    transport.StartTransport();
 
                     ControlInterface.AccessObjects.Add(transport.Name, transport);
                 }
                 else
                 {
-                    Logger.Warn($"解析/添加 传输总线 设备失败");
+                    Logger.Warn($"解析/添加 传输总线 设备失败: {modbusElement}");
                 }
             }
+
+            //XInitialized
+            CallEventType(XInitialized, null);
+            Thread.Sleep(100);
         }
 
         /// <summary>
@@ -372,41 +380,81 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// Reset And Clear
         /// </summary>
-        private void ResetAndClear()
+        protected void ResetAndClear()
         {
             CallEventType(XDisposed, null);
             Thread.Sleep(100);
-
             foreach (ModbusTransport transport in TransportDevices)
             {
                 transport.StopTransport();
             }
 
             Type DisposableType = typeof(IDisposable);
-            foreach (KeyValuePair<String, Object> obj in ControlInterface.AccessObjects)
+            if (ModbusElements?.Count() > 0)
             {
-                if (obj.Key == this.Name || obj.Value == this) continue;
-
-                try
+                foreach (XElement modbus in ModbusElements)
                 {
-                    if (obj.Value != null && DisposableType.IsAssignableFrom(obj.Value.GetType()))
+                    string name = modbus.Attribute(ControlInterface.XName)?.Value;
+                    if (string.IsNullOrWhiteSpace(name) || name == this.Name) continue;
+
+                    if (ControlInterface.AccessObjects.ContainsKey(name))
                     {
-                        ((IDisposable)(obj.Value))?.Dispose();
+                        object obj = ControlInterface.AccessObjects[name];
+                        if (obj == null)
+                        {
+                            ControlInterface.AccessObjects.Remove(name);
+                            continue;
+                        }
+
+                        try
+                        {
+                            if (DisposableType.IsAssignableFrom(obj.GetType())) (obj as IDisposable)?.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Warn(ex);
+                        }
+                        finally
+                        {
+                            ControlInterface.AccessObjects.Remove(name);
+                        }
                     }
                 }
-                catch (Exception ex)
+            }
+            if (ConnectionElements?.Count() > 0)
+            {
+                foreach (XElement connection in ConnectionElements)
                 {
-                    Logger.Warn(ex);
-                    continue;
+                    string name = connection.Attribute(ControlInterface.XName)?.Value;
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    if (ControlInterface.AccessObjects.ContainsKey(name))
+                    {
+                        object obj = ControlInterface.AccessObjects[name];
+                        if (obj == null)
+                        {
+                            ControlInterface.AccessObjects.Remove(name);
+                            continue;
+                        }
+                        try
+                        {
+                            if (DisposableType.IsAssignableFrom(obj.GetType())) (obj as IDisposable)?.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Warn(ex);
+                        }
+                        finally
+                        {
+                            ControlInterface.AccessObjects.Remove(name);
+                        }
+                    }
                 }
             }
 
-            TransportDevices.Clear();
-            ControlInterface.AccessObjects.Clear();
-            ControlInterface.UninstallNetworkServices();
-
+            TransportDevices.Clear();            
             Configuration = null;
             ModbusElements = null;
+            ConnectionElements = null;
         }
 
         /// <inheritdoc/>

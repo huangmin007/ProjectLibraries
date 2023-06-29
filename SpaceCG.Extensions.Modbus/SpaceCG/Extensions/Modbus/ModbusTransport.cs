@@ -31,6 +31,11 @@ namespace SpaceCG.Extensions.Modbus
         private CancellationTokenSource CancelToken;
 
         /// <summary>
+        /// 是否在正运行同步
+        /// </summary>
+        public bool Running => IOThreadRunning;
+
+        /// <summary>
         /// Read Only 寄存器数据 Change 处理
         /// <para>(ModbusTransportDevice transport, ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
@@ -196,6 +201,7 @@ namespace SpaceCG.Extensions.Modbus
             }
 
             this.DeviceCount = 0;
+            this.IOThreadRunning = false;
             this.ElapsedMilliseconds = 0;
         }
 
