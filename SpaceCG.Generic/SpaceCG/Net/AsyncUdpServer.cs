@@ -145,10 +145,8 @@ namespace SpaceCG.Net
                 Logger.Error(ex.ToString());
                 ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
             }
-            finally
-            {
-                _Server.BeginReceive(ReceiveCallback, remote);
-            }
+
+            if (remote != null) _Server.BeginReceive(ReceiveCallback, remote);
         }
 
         /// <inheritdoc/>

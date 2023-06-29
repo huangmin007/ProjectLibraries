@@ -11,12 +11,28 @@ using SpaceCG.Net;
 namespace SpaceCG.Extensions.Modbus
 {
     /// <summary>
-    /// Modbus Device Manager 
+    /// Modbus Device Manager CallEventName
     /// <para>遵循自定义的 XML 模型，参考 ModbusDevices.Config</para>
     /// </summary>
     public class ModbusDeviceManager : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusDeviceManager));
+
+        /// <summary> <see cref="XDisposed"/> Name </summary>
+        public const string XDisposed = "Disposed";
+        /// <summary> <see cref="XInitialized"/> Name </summary>
+        public const string XInitialized = "Initialized";
+        /// <summary> <see cref="XInputChange"/> Name </summary>
+        public const string XInputChange = "InputChange";
+        /// <summary> <see cref="XOutputChange"/> Name </summary>
+        public const string XOutputChange = "OutputChange";
+
+        /// <summary> <see cref="XMinValue"/> Name </summary>
+        public const string XMinValue = "MinValue";
+        /// <summary> <see cref="XMaxValue"/> Name </summary>
+        public const string XMaxValue = "MaxValue";
+        /// <summary> <see cref="XDeviceAddress"/> Name </summary>
+        public const string XDeviceAddress = "DeviceAddress";
 
         /// <summary>
         /// Name
@@ -94,12 +110,9 @@ namespace SpaceCG.Extensions.Modbus
             ParseConnectionsConfig(Configuration.Descendants("Connection"));            
             ParseModbusDevicesConfig(Configuration.Elements("Modbus"));
 
-            //Initialize
-            foreach (ModbusTransport transport in TransportDevices)
-            {
-                CallEventName(transport.Name, "Initialize");
-                Thread.Sleep(128);
-            }
+            //XInitialized
+            CallEventType(XInitialized, null);
+            Thread.Sleep(100);
         }
 
         /// <summary>
@@ -127,8 +140,8 @@ namespace SpaceCG.Extensions.Modbus
             if (connectionsElement?.Count() <= 0) return;
             foreach(XElement connection in connectionsElement)
             {
-                String name = connection.Attribute("Name")?.Value;
-                String type = connection.Attribute("Type")?.Value;
+                String name = connection.Attribute(ControlInterface.XName)?.Value;
+                String type = connection.Attribute(ControlInterface.XType)?.Value;
                 String parameters = connection.Attribute("Parameters")?.Value;
 
                 if (String.IsNullOrWhiteSpace(name) ||
@@ -226,7 +239,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="register"></param>
         private void Transport_OutputChangeEvent(ModbusTransport transportDevice, ModbusIODevice ioDevice, Register register)
         {
-            InputOutputEventHandler("OutputChange", transportDevice.Name, ioDevice.Address, register);
+            CallEventType(XOutputChange, transportDevice.Name, ioDevice.Address, register);
         }
         /// <summary>
         /// 总线 Output 事件处理
@@ -236,7 +249,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="register"></param>
         private void Transport_InputChangeEvent(ModbusTransport transportDevice, ModbusIODevice ioDevice, Register register)
         {
-            InputOutputEventHandler("InputChange", transportDevice.Name, ioDevice.Address, register);
+            CallEventType(XInputChange, transportDevice.Name, ioDevice.Address, register);
         }
 
         /// <summary>
@@ -246,72 +259,113 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="transportName"></param>
         /// <param name="slaveAddress"></param>
         /// <param name="register"></param>
-        internal void InputOutputEventHandler(string eventType, String transportName, byte slaveAddress, Register register)
+        protected void CallEventType(string eventType, string transportName, byte slaveAddress, Register register)
         {
-            if (ModbusElements?.Count() <= 0) return;
-
             if(Logger.IsDebugEnabled)
                 Logger.Debug($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
             foreach (XElement modbus in ModbusElements)
             {
-                if (modbus.Attribute("Name")?.Value != transportName) continue;
+                if (modbus.Attribute(ControlInterface.XName)?.Value != transportName) continue;
 
-                IEnumerable<XElement> events = modbus.Descendants("Event");
+                IEnumerable<XElement> events = modbus.Descendants(ControlInterface.XEvent);
                 foreach (XElement evt in events)
                 {
-                    if (evt.Attribute("Type")?.Value != eventType) continue;
+                    if (evt.Attribute(ControlInterface.XType)?.Value != eventType) continue;
                     
-                    if (!StringExtensions.TryParse(evt.Attribute("DeviceAddress")?.Value, out byte deviceAddress)) continue;
+                    if (!StringExtensions.TryParse(evt.Attribute(XDeviceAddress)?.Value, out byte deviceAddress)) continue;
                     if (deviceAddress != slaveAddress) continue;
                     
                     if (!StringExtensions.TryParse(evt.Attribute($"{register.Type}Address")?.Value, out ushort regAddress)) continue;
                     if (regAddress != register.Address) continue;
 
-                    if (StringExtensions.TryParse(evt.Attribute("Value")?.Value, out long regValue) && regValue == register.Value)
+                    if (StringExtensions.TryParse(evt.Attribute(ControlInterface.XValue)?.Value, out long regValue) && regValue == register.Value)
                     {
                         if (Logger.IsInfoEnabled)
                             Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
-                        IEnumerable<XElement> actions = evt.Elements("Action");
+                        IEnumerable<XElement> actions = evt.Elements(ControlInterface.XAction);
                         foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
                         continue;
                     }
-                    else if(StringExtensions.TryParse(evt.Attribute("MinValue")?.Value, out long minValue) && StringExtensions.TryParse(evt.Attribute("MaxValue")?.Value, out long maxValue))
+                    else if(StringExtensions.TryParse(evt.Attribute(XMinValue)?.Value, out long minValue) && StringExtensions.TryParse(evt.Attribute(XMaxValue)?.Value, out long maxValue))
                     {
                         if (maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && (register.LastValue < minValue || register.LastValue > maxValue))
                         {
                             if (Logger.IsInfoEnabled)
                                 Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
-                            IEnumerable<XElement> actions = evt.Elements("Action");
+                            IEnumerable<XElement> actions = evt.Elements(ControlInterface.XAction);
                             foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
                         }
                     }
-                }
+                }//End for                
+            }//End for
+        }
+
+        /// <summary>
+        /// Call Event Type
+        /// </summary>
+        /// <param name="eventType"></param>
+        /// <param name="transportName"></param>
+        public void CallEventType(string eventType, string transportName)
+        {
+            IEnumerable<XElement> events;
+            if (string.IsNullOrWhiteSpace(transportName))
+            {
+                events = from evt in ModbusElements.Descendants(ControlInterface.XEvent)
+                         where evt.Attribute(ControlInterface.XType)?.Value == eventType
+                         select evt;
+            }
+            else
+            {
+                events = from modbus in ModbusElements
+                         where modbus.Attribute(ControlInterface.XName)?.Value == transportName
+                         from evt in modbus.Descendants(ControlInterface.XEvent)
+                         where evt.Attribute(ControlInterface.XType)?.Value == eventType
+                         select evt;
+            }
+
+            if (events?.Count() <= 0) return;
+            foreach (XElement evt in events)
+            {
+                ControlInterface.TryParseControlMessage(evt, out object returnResult);                
             }
         }
 
         /// <summary>
-        /// 调用配置事件，外部调用
+        /// 跟据事件名称，modbus名称，调用配置事件
         /// </summary>
-        /// <param name="transportName"></param>
         /// <param name="eventName"></param>
-        public void CallEventName(String transportName, String eventName)
+        /// <param name="transportName"></param>
+        public void CallEventName(string eventName, string transportName)
         {
-            foreach (XElement modbus in ModbusElements)
-            {
-                if (modbus.Attribute("Name")?.Value != transportName) continue;
+            IEnumerable<XElement> events = from modbus in ModbusElements
+                                           where modbus.Attribute(ControlInterface.XName)?.Value == transportName
+                                           from evt in modbus.Descendants(ControlInterface.XEvent)
+                                           where evt.Attribute(ControlInterface.XName)?.Value == eventName
+                                           select evt;
 
-                IEnumerable<XElement> events = modbus.Descendants("Event");
-                foreach (XElement evt in events)
-                {
-                    if (evt.Attribute("Name")?.Value == eventName)
-                    {
-                        IEnumerable<XElement> actions = evt.Elements("Action");
-                        foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
-                    }
-                }
+            foreach (XElement element in events.Elements())
+            {
+                if (element.Name.LocalName == ControlInterface.XAction)
+                    ControlInterface.TryParseControlMessage(element, out object result);
+            }
+        }
+        /// <summary>
+        /// 跟据事件名称，调用事件
+        /// </summary>
+        /// <param name="eventName"></param>
+        public void CallEventName(string eventName)
+        {
+            IEnumerable<XElement> events = from evt in ModbusElements.Descendants(ControlInterface.XEvent)
+                                           where evt.Attribute(ControlInterface.XName)?.Value == eventName
+                                           select evt;
+
+            foreach (XElement element in events.Elements())
+            {
+                if(element.Name.LocalName == ControlInterface.XAction)
+                    ControlInterface.TryParseControlMessage(element, out object result);
             }
         }
 
@@ -320,11 +374,11 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         private void ResetAndClear()
         {
+            CallEventType(XDisposed, null);
+            Thread.Sleep(100);
+
             foreach (ModbusTransport transport in TransportDevices)
             {
-                CallEventName(transport.Name, "Dispose");
-                Thread.Sleep(128);
-
                 transport.StopTransport();
             }
 
@@ -367,7 +421,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(ModbusDeviceManager)}] Name:{Name}";
+            return $"[{nameof(ModbusDeviceManager)}] {nameof(Name)}:{Name}";
         }
     }
 }

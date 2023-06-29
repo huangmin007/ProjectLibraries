@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using SpaceCG.Extensions;
 using SpaceCG.Net;
 using System.Net;
@@ -53,6 +52,29 @@ namespace SpaceCG.Generic
     public sealed class ControlInterface : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ControlInterface));
+
+        /// <summary> <see cref="XEvent"/> Name </summary>
+        public const string XEvent = "Event";
+        /// <summary> <see cref="XType"/> Name </summary>
+        public const string XType = "Type";
+        /// <summary> <see cref="XName"/> Name </summary>
+        public const string XName = "Name";
+
+        /// <summary> <see cref="XAction"/> Name </summary>
+        public const string XAction = "Action";
+        /// <summary> <see cref="XMethod"/> Name </summary>
+        public const string XMethod = "Method";
+        /// <summary> <see cref="XTarget"/> Name </summary>
+        public const string XTarget = "Target";
+        /// <summary> <see cref="XParams"/> Name </summary>
+        public const string XParams = "Params";
+
+        /// <summary> <see cref="XProperty"/> Name </summary>
+        public const string XProperty = "Property";
+        /// <summary> <see cref="XValue"/> Name </summary>
+        public const string XValue = "Value";
+        /// <summary> <see cref="XSync"/> Name </summary>
+        public const string XSync = "Sync";
 
         /// <summary>
         /// Network Control Message Event Handler
@@ -303,21 +325,21 @@ namespace SpaceCG.Generic
                 return false;
             }
 
-            if (tempElement.Name?.LocalName != "Action")
+            if (tempElement.Name?.LocalName != XAction)
             {
-                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 错误，节点名称应为 Action");
+                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 错误，节点名称应为 {XAction}");
                 return false;
             }
 
-            if (String.IsNullOrWhiteSpace(tempElement.Attribute("Target")?.Value))
+            if (String.IsNullOrWhiteSpace(tempElement.Attribute(XTarget)?.Value))
             {
-                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 错误，节点属性 Target 不能为空");
+                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 错误，节点属性 {XTarget} 不能为空");
                 return false;
             }
 
-            if (tempElement.Attribute("Method") == null && tempElement.Attribute("Property") == null)
+            if (tempElement.Attribute(XMethod) == null && tempElement.Attribute(XProperty) == null)
             {
-                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 错误，必须指定节点属性 Method 或 Property 其中之一");
+                Logger.Warn($"控制消息 XML 格式数据 {xmlMessage} 错误，必须指定节点属性 {XMethod} 或 {XProperty} 其中之一");
                 return false;
             }
 
@@ -351,13 +373,13 @@ namespace SpaceCG.Generic
         public bool TryParseControlMessage(XElement actionElement, out object returnResult)
         {
             returnResult = null;
-            if (actionElement == null) return false;
+            if (actionElement == null || actionElement.Name.LocalName != XAction) return false;
 
-            if (actionElement.Attribute("Method") != null)
+            if (actionElement.Attribute(XMethod) != null)
             {
                 return TryParseCallMethod(actionElement, out returnResult);
             }
-            else if (actionElement.Attribute("Property") != null)
+            else if (actionElement.Attribute(XProperty) != null)
             {
                 return TryParseChangeValue(actionElement, out returnResult);
             }
@@ -378,13 +400,13 @@ namespace SpaceCG.Generic
         public bool TryParseCallMethod(XElement actionElement, out object returnResult)
         {
             returnResult = null;
-            if (actionElement?.Name.LocalName != "Action" || AccessObjects?.Count() <= 0 || MethodFilters.IndexOf("*.*") != -1) return false;
+            if (actionElement?.Name.LocalName != XAction || AccessObjects?.Count() <= 0 || MethodFilters.IndexOf("*.*") != -1) return false;
 
-            String objectName = actionElement.Attribute("Target")?.Value;
-            String methodName = actionElement.Attribute("Method")?.Value; 
+            String objectName = actionElement.Attribute(XTarget)?.Value;
+            String methodName = actionElement.Attribute(XMethod)?.Value; 
             if (String.IsNullOrWhiteSpace(objectName) || String.IsNullOrWhiteSpace(methodName))
             {
-                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Method 值不能为空");
+                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 {XAction}, 且属性 {XTarget}, {XMethod} 值不能为空");
                 return false;
             }
             if (!AccessObjects.TryGetValue(objectName, out Object targetObject))
@@ -398,13 +420,13 @@ namespace SpaceCG.Generic
             if (MethodFilters.IndexOf($"*.{methodName}") != -1 || MethodFilters.IndexOf($"{objectName}.{methodName}") != -1) return false;
 
             bool sync = SyncControl;
-            if (actionElement.Attribute("Sync") != null)
-                sync = bool.TryParse(actionElement.Attribute("Sync").Value, out bool result) && result;
+            if (actionElement.Attribute(XSync) != null)
+                sync = bool.TryParse(actionElement.Attribute(XSync).Value, out bool result) && result;
 
             try
             {
                 TaskResult taskResult = new TaskResult(false, null);
-                object[] parameters = StringExtensions.SplitParameters(actionElement.Attribute("Params")?.Value);
+                object[] parameters = StringExtensions.SplitParameters(actionElement.Attribute(XParams)?.Value);
 
                 if(sync)
                 {
@@ -448,13 +470,13 @@ namespace SpaceCG.Generic
         public bool TryParseChangeValue(XElement actionElement, out object returnResult)
         {
             returnResult = null;
-            if (actionElement?.Name.LocalName != "Action" || AccessObjects?.Count() <= 0 || PropertyFilters.IndexOf("*.*") != -1) return false;
+            if (actionElement?.Name.LocalName != XAction || AccessObjects?.Count() <= 0 || PropertyFilters.IndexOf("*.*") != -1) return false;
 
-            String objectName = actionElement.Attribute("Target")?.Value;
-            String propertyName = actionElement.Attribute("Property")?.Value;
+            String objectName = actionElement.Attribute(XTarget)?.Value;
+            String propertyName = actionElement.Attribute(XProperty)?.Value;
             if (String.IsNullOrWhiteSpace(objectName) || String.IsNullOrWhiteSpace(propertyName))
             {
-                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 Action, 且属性 Target, Property 值不能为空");
+                Logger.Error($"控制消息 XML 格式数数据错误，节点名称应为 {XAction}, 且属性 {XTarget}, {XProperty} 值不能为空");
                 return false;
             }
             if (!AccessObjects.TryGetValue(objectName, out Object targetObject))
@@ -468,8 +490,8 @@ namespace SpaceCG.Generic
             if (PropertyFilters.IndexOf($"*.{propertyName}") != -1 || PropertyFilters.IndexOf($"{objectName}.{propertyName}") != -1) return false;
 
             bool sync = SyncControl;
-            if (actionElement.Attribute("Sync") != null)
-                sync = bool.TryParse(actionElement.Attribute("Sync").Value, out bool result) && result;
+            if (actionElement.Attribute(XSync) != null)
+                sync = bool.TryParse(actionElement.Attribute(XSync).Value, out bool result) && result;
 
             try
             {
@@ -480,8 +502,8 @@ namespace SpaceCG.Generic
                 {
                     SyncContext.Send((o) =>
                     {
-                        if (actionElement.Attribute("Value") != null)
-                            InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
+                        if (actionElement.Attribute(XValue) != null)
+                            InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute(XValue).Value);
 
                         taskResult.Success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
                         taskResult.ReturnValue = value;
@@ -492,8 +514,8 @@ namespace SpaceCG.Generic
                     ManualResetEvent manualResetEvent = new ManualResetEvent(false);
                     SyncContext.Post((o) =>
                     {
-                        if (actionElement.Attribute("Value") != null)
-                            InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute("Value").Value);
+                        if (actionElement.Attribute(XValue) != null)
+                            InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute(XValue).Value);
 
                         taskResult.Success = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
                         taskResult.ReturnValue = value;
@@ -548,9 +570,9 @@ namespace SpaceCG.Generic
                 throw new ArgumentNullException($"{nameof(targetName)},{nameof(methodName)}", "关键参数不能为空");
 
             if(methodParams == null)
-                return $"<Action Target=\"{targetName}\" Method=\"{methodName}\" Sync=\"{sync}\" Return=\"{isReturn}\" />";
+                return $"<{XAction} {XTarget}=\"{targetName}\" {XMethod}=\"{methodName}\" {XSync}=\"{sync}\" Return=\"{isReturn}\" />";
             else
-                return $"<Action Target=\"{targetName}\" Method=\"{methodName}\" Params=\"{methodParams}\" Sync=\"{sync}\" Return=\"{isReturn}\" />";
+                return $"<{XAction} {XTarget}=\"{targetName}\" {XMethod}=\"{methodName}\" {XParams}=\"{methodParams}\" {XSync}=\"{sync}\" Return=\"{isReturn}\" />";
         }
         /// <summary>
         /// 创建控制消息
@@ -568,7 +590,7 @@ namespace SpaceCG.Generic
             if (String.IsNullOrWhiteSpace(targetName) || String.IsNullOrWhiteSpace(propertyName))
                 throw new ArgumentNullException($"{nameof(targetName)},{nameof(propertyName)}", "关键参数不能为空");
 
-            return $"<Action Target=\"{targetName}\" Property=\"{propertyName}\" Value=\"{(propertyValue == null ? "null" : propertyValue)}\" Sync=\"{sync}\" Return=\"{isReturn}\" />";
+            return $"<{XAction} {XTarget}=\"{targetName}\" {XProperty}=\"{propertyName}\" {XValue}=\"{(propertyValue == null ? "null" : propertyValue)}\" {XSync}=\"{sync}\" Return=\"{isReturn}\" />";
         }
     }
 

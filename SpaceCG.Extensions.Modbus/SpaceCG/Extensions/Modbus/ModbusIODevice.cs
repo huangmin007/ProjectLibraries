@@ -39,6 +39,7 @@ namespace SpaceCG.Extensions.Modbus
         InputRegister,
     }
 
+
     /// <summary>
     /// 寄存器描述对象
     /// </summary>
@@ -131,7 +132,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"{nameof(Register)}#0x{Address:X4}  Type:{Type}  Count:{Count}  Value:{Value}";
+            return $"{nameof(Register)}#0x{Address:X4}  {nameof(Type)}:{Type}  {nameof(Count)}:{Count}  {nameof(Value)}:{Value}";
         }
 
         /// <summary>
@@ -173,10 +174,10 @@ namespace SpaceCG.Extensions.Modbus
                 return false;
             }
 
-            if (StringExtensions.TryParse<ushort>(element.Attribute("Address")?.Value, out ushort address) &&
-                Enum.TryParse<RegisterType>(element.Attribute("Type")?.Value, true, out RegisterType type) && type != RegisterType.Unknown)
+            if (StringExtensions.TryParse<ushort>(element.Attribute(nameof(Address))?.Value, out ushort address) &&
+                Enum.TryParse<RegisterType>(element.Attribute(nameof(Type))?.Value, true, out RegisterType type) && type != RegisterType.Unknown)
             {
-                bool result = byte.TryParse(element.Attribute("Count")?.Value, out byte count);
+                bool result = byte.TryParse(element.Attribute(nameof(Count))?.Value, out byte count);
                 register = new Register(address, type, result ? count : (byte)0x01);
             }
             else
@@ -185,11 +186,11 @@ namespace SpaceCG.Extensions.Modbus
                 return false;
             }
 
-            register.Name = element.Attribute("Name")?.Value;
-            register.Units = element.Attribute("Units")?.Value;
-            register.Offset = byte.TryParse(element.Attribute("Offset")?.Value, out byte offset) ? offset : (byte)0x00;
-            register.IsLittleEndian = bool.TryParse(element.Attribute("IsLittleEndian")?.Value, out bool isLittleEndian) ? isLittleEndian : true;
-            register.EnabledChangeEvent = bool.TryParse(element.Attribute("EnabledChangeEvent")?.Value, out bool enabledChangeEvent) ? enabledChangeEvent : true;
+            register.Name = element.Attribute(nameof(Name))?.Value;
+            register.Units = element.Attribute(nameof(Units))?.Value;
+            register.Offset = byte.TryParse(element.Attribute(nameof(Offset))?.Value, out byte offset) ? offset : (byte)0x00;
+            register.IsLittleEndian = bool.TryParse(element.Attribute(nameof(IsLittleEndian))?.Value, out bool isLittleEndian) ? isLittleEndian : true;
+            register.EnabledChangeEvent = bool.TryParse(element.Attribute(nameof(EnabledChangeEvent))?.Value, out bool enabledChangeEvent) ? enabledChangeEvent : true;
 
             return true;
         }
@@ -647,7 +648,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(ModbusIODevice)}] Name:{Name} Address:0x{Address:X2}";
+            return $"[{nameof(ModbusIODevice)}] {nameof(Name)}:{Name} {nameof(Address)}:0x{Address:X2}";
         }
 
         /// <summary>
@@ -660,19 +661,19 @@ namespace SpaceCG.Extensions.Modbus
         {
             device = null;
             if (element == null) return false;
-            if (element.Name != "Device" || String.IsNullOrWhiteSpace(element.Attribute("Address").Value))
+            if (element.Name != "Device" || String.IsNullOrWhiteSpace(element.Attribute(nameof(Address)).Value))
             {
                 Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element}");
                 return false;
             }
-            if (!StringExtensions.TryParse<byte>(element.Attribute("Address").Value, out byte address))
+            if (!StringExtensions.TryParse<byte>(element.Attribute(nameof(Address)).Value, out byte address))
             {
                 Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element} 节点属性 Address 值错误");
                 return false;
             }
 
-            device = new ModbusIODevice(address, element.Attribute("Name")?.Value);
-            String[] attributes = new String[] { "Unknown", "CoilsStatusCount", "DiscreteInputCount", "HoldingRegisterCount", "InputRegisterCount" };
+            device = new ModbusIODevice(address, element.Attribute(nameof(Name))?.Value);
+            String[] attributes = new String[] { nameof(RegisterType.Unknown), $"{nameof(RegisterType.CoilsStatus)}Count", $"{nameof(RegisterType.DiscreteInput)}Count", $"{nameof(RegisterType.HoldingRegister)}Count", $"{nameof(RegisterType.InputRegister)}Count" };
             for (int i = 1; i < attributes.Length; i++)
             {
                 if (String.IsNullOrWhiteSpace(element.Attribute(attributes[i])?.Value)) continue;

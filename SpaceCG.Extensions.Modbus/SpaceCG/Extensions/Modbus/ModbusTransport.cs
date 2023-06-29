@@ -211,7 +211,7 @@ namespace SpaceCG.Extensions.Modbus
             if (element == null) return false;
 
             if (element.Name != "Modbus" || !element.HasElements ||
-                String.IsNullOrWhiteSpace(element.Attribute("Name").Value) ||
+                String.IsNullOrWhiteSpace(element.Attribute(nameof(Name)).Value) ||
                 String.IsNullOrWhiteSpace(element.Attribute("Parameters")?.Value))
             {
                 Logger.Warn($"({nameof(ModbusTransport)}) 配置格式存在错误, {element}");
@@ -238,12 +238,12 @@ namespace SpaceCG.Extensions.Modbus
                 return false;
             }
 
-            if (int.TryParse(element.Attribute("ReadTimeout")?.Value, out int readTimeout))
+            if (int.TryParse(element.Attribute(nameof(ReadTimeout))?.Value, out int readTimeout))
                 master.Transport.ReadTimeout = readTimeout;
-            if (int.TryParse(element.Attribute("WriteTimeout")?.Value, out int writeTimeout))
+            if (int.TryParse(element.Attribute(nameof(WriteTimeout))?.Value, out int writeTimeout))
                 master.Transport.WriteTimeout = writeTimeout;
 
-            transport = new ModbusTransport(master, element.Attribute("Name").Value);
+            transport = new ModbusTransport(master, element.Attribute(nameof(Name)).Value);
 
             //Devices
             IEnumerable<XElement> deviceElements = element.Element("Devices") != null ?
@@ -286,7 +286,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(ModbusTransport)}] Name:{Name}";
+            return $"[{nameof(ModbusTransport)}] {nameof(Name)}:{Name}";
         }
 
 

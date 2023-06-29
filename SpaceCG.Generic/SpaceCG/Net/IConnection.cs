@@ -36,6 +36,7 @@ namespace SpaceCG.Net
 
         event EventHandler<EventArgs> DisconnectedEvent;
 
+        string Name { get; set; }
         bool IsConnected { get; }
 
         int ReadTimeout { get; set; }
@@ -50,9 +51,9 @@ namespace SpaceCG.Net
 
         void SendMessage(String message);
 
-        int ReceiveBytes(byte[] data, int offset, int length);
+        //int ReceiveBytes(byte[] data, int offset, int length);
 
-        String ReceiveMessage(int offset, int length);
+        //String ReceiveMessage(int offset, int length);
 
     }
 #pragma warning restore CA1591
