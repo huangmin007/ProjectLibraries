@@ -3,9 +3,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using Modbus.IO;
-using SpaceCG.Generic;
 
-namespace SpaceCG.Extensions
+namespace SpaceCG.Generic
 {
     /// <summary>
     /// NModbus4 TcpClient Reconnection Adapter
@@ -38,7 +37,7 @@ namespace SpaceCG.Extensions
                 throw new ArgumentNullException(nameof(tcpClient), "参数不能为空");
 
             this.tcpClient = tcpClient;
-            this.remoteEP = tcpClient.Client?.RemoteEndPoint as IPEndPoint;
+            remoteEP = tcpClient.Client?.RemoteEndPoint as IPEndPoint;
 
             thread = new Thread(CheckConnectStatus);
             thread.IsBackground = true;
@@ -51,11 +50,11 @@ namespace SpaceCG.Extensions
         /// <param name="remoteEP"></param>
         public NModbus4TcpClientAdapter(IPEndPoint remoteEP)
         {
-            if (remoteEP == null) 
+            if (remoteEP == null)
                 throw new ArgumentNullException(nameof(remoteEP), "参数不能为空");
 
             this.remoteEP = remoteEP;
-            this.tcpClient = new TcpClient(remoteEP);
+            tcpClient = new TcpClient(remoteEP);
 
             thread = new Thread(CheckConnectStatus);
             thread.IsBackground = true;
@@ -98,15 +97,15 @@ namespace SpaceCG.Extensions
 
                     try
                     {
-                        this.tcpClient?.Dispose();
+                        tcpClient?.Dispose();
 
-                        this.tcpClient = new TcpClient();
-                        this.tcpClient.Connect(remoteEP.Address, remoteEP.Port);//同步连接
+                        tcpClient = new TcpClient();
+                        tcpClient.Connect(remoteEP.Address, remoteEP.Port);//同步连接
 
                         if (IsOnline(tcpClient))
                         {
-                            this.ReadTimeout = readTimeout;
-                            this.WriteTimeout = writeTimeout;
+                            ReadTimeout = readTimeout;
+                            WriteTimeout = writeTimeout;
                             Logger.Info($"NModbus4 TcpClient Adapter Reconnect Success! {tcpClient.Client.LocalEndPoint} => {remoteEP}");
                             //Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] NModbus4 TcpClient Adapter Reconnect Success! {tcpClient.Client.LocalEndPoint} => {remoteEP}");
                         }
@@ -126,13 +125,13 @@ namespace SpaceCG.Extensions
         {
             get
             {
-                try { return this.tcpClient.GetStream().ReadTimeout; }
+                try { return tcpClient.GetStream().ReadTimeout; }
                 catch { return -1; }
             }
             set
             {
                 readTimeout = value;
-                try { this.tcpClient.GetStream().ReadTimeout = value; }
+                try { tcpClient.GetStream().ReadTimeout = value; }
                 catch { }
             }
         }
@@ -142,13 +141,13 @@ namespace SpaceCG.Extensions
         {
             get
             {
-                try { return this.tcpClient.GetStream().WriteTimeout; }
+                try { return tcpClient.GetStream().WriteTimeout; }
                 catch { return -1; }
             }
             set
             {
                 writeTimeout = value;
-                try { this.tcpClient.GetStream().WriteTimeout = value; }
+                try { tcpClient.GetStream().WriteTimeout = value; }
                 catch { }
             }
         }
@@ -156,28 +155,28 @@ namespace SpaceCG.Extensions
         /// <inheritdoc/>
         public void Write(byte[] buffer, int offset, int size)
         {
-            try { this.tcpClient.GetStream().Write(buffer, offset, size); }
+            try { tcpClient.GetStream().Write(buffer, offset, size); }
             catch (Exception) { }
         }
 
         /// <inheritdoc/>
         public int Read(byte[] buffer, int offset, int size)
         {
-            try { return this.tcpClient.GetStream().Read(buffer, offset, size); }
+            try { return tcpClient.GetStream().Read(buffer, offset, size); }
             catch (Exception) { return size; }
         }
 
         /// <inheritdoc/>
         public void DiscardInBuffer()
         {
-            try { this.tcpClient.GetStream().Flush(); }
+            try { tcpClient.GetStream().Flush(); }
             catch (Exception) { }
         }
 
         /// <inheritdoc/>
         public void Dispose()
         {
-            this.Dispose(true);
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
 
@@ -192,20 +191,20 @@ namespace SpaceCG.Extensions
                 thread?.Abort();
                 thread = null;
 
-                this.tcpClient?.Dispose();
-                this.tcpClient = null;
+                tcpClient?.Dispose();
+                tcpClient = null;
             }
         }
 
         /// <summary>
         /// <see cref="TcpClient"/> 连接状态
         /// </summary>
-        /// <param name="client"></param>
+        /// <param name="tcpClient"></param>
         /// <returns></returns>
-        public static bool IsOnline(TcpClient client)
+        public static bool IsOnline(TcpClient tcpClient)
         {
-            if (client == null) return false;
-            return !((client.Client.Poll(1000, SelectMode.SelectRead) && (client.Client.Available == 0)) || !client.Client.Connected);
+            if (tcpClient == null || tcpClient.Client == null) return false;
+            return !(tcpClient.Client.Poll(1000, SelectMode.SelectRead) && tcpClient.Client.Available == 0 || !tcpClient.Client.Connected);
         }
 
     }

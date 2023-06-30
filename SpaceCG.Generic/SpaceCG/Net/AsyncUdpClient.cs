@@ -93,7 +93,7 @@ namespace SpaceCG.Net
         public bool Connect(IPAddress remoteAddress, ushort remotePort)
         {
             if (IsConnected) return true;
-
+            
             udpClient?.Dispose();
             remoteEndPoint = new IPEndPoint(remoteAddress, remotePort);
 

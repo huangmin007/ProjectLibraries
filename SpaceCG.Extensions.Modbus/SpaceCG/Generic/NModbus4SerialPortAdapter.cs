@@ -2,9 +2,8 @@
 using System.IO.Ports;
 using System.Threading;
 using Modbus.IO;
-using SpaceCG.Generic;
 
-namespace SpaceCG.Extensions
+namespace SpaceCG.Generic
 {
     /// <summary>
     /// NModbus4 SerialPort Reconnection Adapter

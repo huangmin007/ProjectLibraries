@@ -238,5 +238,16 @@ namespace SpaceCG.Net
         {
             return $"[{nameof(AsyncTcpClient)}] {nameof(Name)}:{Name} {nameof(IsConnected)}:{IsConnected} {LocalEndPoint} => {RemoteEndPoint}";
         }
+
+        /// <summary>
+        /// <see cref="TcpClient"/> 连接状态
+        /// </summary>
+        /// <param name="tcpClient"></param>
+        /// <returns></returns>
+        public static bool IsOnline(ref TcpClient tcpClient)
+        {
+            if (tcpClient == null || tcpClient.Client == null) return false;
+            return !((tcpClient.Client.Poll(1000, SelectMode.SelectRead) && (tcpClient.Client.Available == 0)) || !tcpClient.Client.Connected);
+        }
     }
 }

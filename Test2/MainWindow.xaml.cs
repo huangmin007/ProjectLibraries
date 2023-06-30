@@ -55,8 +55,8 @@ namespace Test2
             logger1.Info(client);
 
             //server = new AsyncTcpServer(3000);
-            //server = new AsyncUdpServer(3000);
-            //server.ClientDataReceived += Server_ClientDataReceived;
+            server = new AsyncUdpServer(3000);
+            server.ClientDataReceived += Server_ClientDataReceived;
         }
 
         private void Server_ClientDataReceived(object sender, AsyncDataEventArgs e)
@@ -132,23 +132,23 @@ namespace Test2
             Button button = (Button)sender;
             if (button == Button_Test)
             {
-                logger1.Info(client);
-                //logger1.Info(server);
+                //logger1.Info(client);
+                logger1.Info(server);
             }
             else if(button == Button_Close)
             {
-                client.Close();
-                //server.Stop();
+                //client.Close();
+                server.Stop();
             }
             else if(button == Button_Connect)
             {
-                client.Connect();
-                //server.Start();
+                //client.Connect();
+                server.Start();
             }
             else if(button == Button_Send)
             {
-                client.SendMessage("hello");
-                //server.SendMessage("hello");
+                //client.SendMessage("hello");
+                server.SendMessage("hello");
             }
         }
 

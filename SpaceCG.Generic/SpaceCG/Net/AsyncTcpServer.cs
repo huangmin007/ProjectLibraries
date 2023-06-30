@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using SpaceCG.Generic;
@@ -26,14 +25,15 @@ namespace SpaceCG.Net
         public bool IsConnected => IsListening && ClientCount > 0;
 
         /// <inheritdoc/>
-        public int ClientCount => clients?.Count ?? 0;
-        /// <inheritdoc/>
         public bool IsListening { get; private set; }
         /// <inheritdoc/>
         public IPEndPoint LocalEndPoint => tcpListener.LocalEndpoint as IPEndPoint;
 
         /// <inheritdoc/>
-        public ICollection<EndPoint> Clients => clients?.Keys;
+        public int ClientCount => clients?.Count ?? 0;
+        /// <inheritdoc/>
+        public IReadOnlyCollection<EndPoint> Clients => clients?.Keys as IReadOnlyCollection<EndPoint>;
+
         /// <inheritdoc/>
         public event EventHandler<AsyncEventArgs> ClientConnected;
         /// <inheritdoc/>
@@ -212,7 +212,7 @@ namespace SpaceCG.Net
             TcpClient tcpClient = (TcpClient)ar.AsyncState;
             EndPoint endPoint = tcpClient.Client?.RemoteEndPoint;
 
-            if(!IsOnline(ref tcpClient))
+            if(!AsyncTcpClient.IsOnline(ref tcpClient))
             {
                 RemoveClient(ref tcpClient, endPoint);
                 return;
@@ -241,7 +241,7 @@ namespace SpaceCG.Net
             Buffer.BlockCopy(buffers[endPoint], 0, buff, 0, count);
             ClientDataReceived?.Invoke(this, new AsyncDataEventArgs(endPoint, buff));
 
-            if (IsOnline(ref tcpClient))
+            if (AsyncTcpClient.IsOnline(ref tcpClient))
                 tcpClient.GetStream().BeginRead(buffers[endPoint], 0, buffers[endPoint].Length, ReadCallback, tcpClient);
         }
 
@@ -254,7 +254,7 @@ namespace SpaceCG.Net
 
             if (clients.TryGetValue(remote, out TcpClient tcpClient))
             {
-                if(!IsOnline(ref tcpClient))
+                if(!AsyncTcpClient.IsOnline(ref tcpClient))
                 {
                     RemoveClient(ref tcpClient, remote);
                     return false;
@@ -312,7 +312,7 @@ namespace SpaceCG.Net
             {
                 TcpClient tcpClient = kv.Value;
                 EndPoint remote = tcpClient.Client.RemoteEndPoint;
-                if (!IsOnline(ref tcpClient))
+                if (!AsyncTcpClient.IsOnline(ref tcpClient))
                 {
                     RemoveClient(ref tcpClient, remote);
                     continue;
@@ -354,16 +354,5 @@ namespace SpaceCG.Net
             return $"[{nameof(AsyncTcpServer)}] {nameof(IsListening)}:{IsListening}  {nameof(LocalEndPoint)}:{LocalEndPoint}";
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="tcpClient"></param>
-        /// <returns></returns>
-        private static bool IsOnline(ref TcpClient tcpClient)
-        {
-            if (tcpClient == null || tcpClient.Client == null) return false;
-            return tcpClient?.Client != null && !((tcpClient.Client.Poll(1000, SelectMode.SelectRead) && (tcpClient.Client.Available == 0)) || !tcpClient.Client.Connected);
-        }
     }
-
 }

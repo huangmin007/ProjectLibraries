@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Xml;
 using System.Xml.Linq;
+using Modbus.Device;
 using SpaceCG.Generic;
 using SpaceCG.Net;
 
@@ -15,9 +16,15 @@ namespace SpaceCG.Extensions.Modbus
     /// Modbus Device Manager CallEventName
     /// <para>遵循自定义的 XML 模型，参考 ModbusDevices.Config</para>
     /// </summary>
-    public class ModbusDeviceManager : IDisposable
+    public class ModbusDeviceManager
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusDeviceManager));
+
+        /// <summary> <see cref="XModbus"/> Name </summary>
+        public const string XModbus = "Modbus";
+        /// <summary> <see cref="XDevices"/> Name </summary>
+        public const string XDevices = "Devices";
+
 
         /// <summary> <see cref="XDisposed"/> Name </summary>
         public const string XDisposed = "Disposed";
@@ -39,194 +46,60 @@ namespace SpaceCG.Extensions.Modbus
         /// Name
         /// </summary>
         public String Name { get; private set; } = null;
-
-        /// <summary>
-        /// Root Config Items 
-        /// </summary>
-        private XElement Configuration { get; set; } = null;
-        private IEnumerable<XElement> ModbusElements { get; set; } = null;
-        private IEnumerable<XElement> ConnectionElements { get; set; } = null;
-
-        /// <summary>
-        /// 控制接口对象
-        /// </summary>
-        public ControlInterface ControlInterface { get; private set; } = new ControlInterface(0);
-
-        /// <summary>
-        /// Transport Devices 列表
-        /// </summary>
-        private List<ModbusTransport> TransportDevices { get; set; } = new List<ModbusTransport>(8);
+        private ControlInterface ControlInterface;
+        private IEnumerable<XElement> ModbusElements;
 
         /// <summary>
         /// Modbus 设备管理对象
         /// </summary>
-        public ModbusDeviceManager()
-        {
-        }
-
-#if true
-        /// <summary>
-        /// 添加传输总线设备
-        /// </summary>
-        /// <param name="device"></param>
-        /// <returns></returns>
-        public bool AddTransportDevice(ModbusTransport device)
-        {
-            foreach (ModbusTransport td in TransportDevices)
-                if (td.Name == device.Name) return false;
-
-            TransportDevices.Add(device);
-            return true;
-        }
-        /// <summary>
-        /// 移除传输总线设备
-        /// </summary>
+        /// <param name="controlInterface"></param>
         /// <param name="name"></param>
-        /// <returns></returns>
-        public ModbusTransport GetTransportDevice(String name)
+        public ModbusDeviceManager(ControlInterface controlInterface, string name)
         {
-            foreach (ModbusTransport td in TransportDevices)
-                if (td.Name == name) return td;
+            if (controlInterface == null || string.IsNullOrWhiteSpace(name))  
+                throw new ArgumentNullException("参数错误，不能为空");
 
-            return null;
+            this.Name = name;
+            this.ControlInterface = controlInterface;
+            this.ControlInterface.AccessObjects.Add(name, this);
         }
-#endif
+       
         /// <summary>
-        /// 加载设备配置文件，配置文件参考 ModbusDevices.Config
-        /// </summary>
-        /// <param name="configFile"></param>
-        public void LoadDeviceConfig(String configFile)
-        {
-            if (!File.Exists(configFile))
-            {
-                Logger.Error($"指定的配置文件不存在 {configFile}, 禁用 Modbus Device Manager 模块.");
-                return;
-            }
-
-            ResetAndClear();
-
-            XmlReaderSettings settings = new XmlReaderSettings();
-            settings.IgnoreComments = true;
-            settings.IgnoreWhitespace = true;
-            XmlReader reader = XmlReader.Create(configFile, settings);
-            Configuration = XElement.Load(reader, LoadOptions.None);
-
-            ParseRootAttributes();
-            ParseConnectionsConfig(Configuration.Element("Connections")?.Descendants("Connection"));            
-            ParseModbusDevicesConfig(Configuration.Elements("Modbus"));
-        }
-
-        /// <summary>
-        /// 解析配置的 Root 节点的属性值
-        /// </summary>
-        private void ParseRootAttributes()
-        {
-            if (String.IsNullOrWhiteSpace(Configuration?.Attribute("Name")?.Value) || 
-                String.IsNullOrWhiteSpace(Configuration?.Attribute("LocalPort")?.Value)) return;
-
-            if (ushort.TryParse(Configuration?.Attribute("LocalPort")?.Value, out ushort localPort) && localPort >= 1024)
-            {
-                ControlInterface.InstallNetworkService(localPort, "0.0.0.0");
-
-                this.Name = Configuration.Attribute("Name")?.Value;
-                if (!String.IsNullOrWhiteSpace(Name)) ControlInterface.AccessObjects.Add(Name, this);
-            }
-        }
-        /// <summary>
-        /// 解析 Connections 节点配置
-        /// </summary>
-        /// <param name="connectionsElement"></param>
-        public void ParseConnectionsConfig(IEnumerable<XElement> connectionsElement)
-        {
-            if (connectionsElement?.Count() <= 0) return;
-
-            this.ConnectionElements = connectionsElement;
-            foreach(XElement connection in connectionsElement)
-            {
-                String name = connection.Attribute(ControlInterface.XName)?.Value;
-                String type = connection.Attribute(ControlInterface.XType)?.Value;
-                String parameters = connection.Attribute("Parameters")?.Value;
-
-                if (String.IsNullOrWhiteSpace(name) ||
-                    String.IsNullOrWhiteSpace(type) ||
-                    String.IsNullOrWhiteSpace(parameters)) continue;
-
-                String[] args = parameters.Split(',');
-                if (args.Length != 3 || !int.TryParse(args[2], out int port)) continue;
-
-                switch(type.ToUpper().Replace(" ", ""))
-                {
-                    case "SERIAL":
-                        ControlInterface.AccessObjects.Add(name, new SerialPort(args[1], port));
-                        break;
-
-                    case "MODBUS":
-                        ControlInterface.AccessObjects.Add(name, NModbus4Extensions.CreateNModbus4Master(args[0], args[1], port));
-                        break;
-
-                    case "SERVER":
-                        try
-                        {
-                            IAsyncServer Server = null;
-                            if (args[0].ToUpper() == "TCP")
-                                Server = new AsyncTcpServer((ushort)port);
-                            else if (args[0].ToUpper() == "UDP")
-                                Server = new AsyncUdpServer((ushort)port);
-                            else
-                                Logger.Warn($"连接参数错误：{name},{type},{parameters}");
-
-                            if (Server != null && Server.Start())
-                                ControlInterface.AccessObjects.Add(name, Server);
-                        }
-                        catch(Exception ex)
-                        {
-                            Logger.Error($"创建服务端 {args} 错误：{ex}");
-                        }
-                        break;
-
-                    case "CLIENT":
-                        try
-                        {
-                            IAsyncClient Client = null;
-                            if (args[0].ToUpper() == "TCP")
-                            {
-                                Client = new AsyncTcpClient();
-                                Client.Disconnected += (s, e) => Client.Connect(args[1], (ushort)port);
-                            }
-                            else if (args[0].ToUpper() == "UDP")
-                                Client = new AsyncUdpClient();
-                            else
-                                Logger.Warn($"连接参数错误：{name},{type},{parameters}");
-
-                            if (Client != null && Client.Connect(args[1], (ushort)port))
-                                ControlInterface.AccessObjects.Add(name, Client);
-                        }
-                        catch(Exception ex)
-                        {
-                            Logger.Error($"创建客户端 {args} 错误：{ex}");
-                        }
-                        break;
-                }
-            }
-        }
-        /// <summary>
-        /// 解析 Modbus 节点配置
+        /// 解析 Modbus 节点元素
         /// </summary>
         /// <param name="modbusElements"></param>
-        public void ParseModbusDevicesConfig(IEnumerable<XElement> modbusElements)
+        public void TryParseModbusElements(IEnumerable<XElement> modbusElements)
         {
             if (modbusElements?.Count() <= 0) return;
 
+            RemoveAll();
             this.ModbusElements = modbusElements;
+
             foreach (XElement modbusElement in modbusElements)
             {
-                if (ModbusTransport.TryParse(modbusElement, out ModbusTransport transport) && AddTransportDevice(transport))
+                String name = modbusElement.Attribute(ControlInterface.XName)?.Value;
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                if (this.ControlInterface.AccessObjects.ContainsKey(name))
+                {
+                    Logger.Warn($"对象名称 {name} 已存在, {modbusElement}");
+                    continue;
+                }
+
+                if (ModbusTransport.TryParse(modbusElement, out ModbusTransport transport))
                 {
                     transport.InputChangeEvent += Transport_InputChangeEvent;
                     transport.OutputChangeEvent += Transport_OutputChangeEvent;
-                    transport.StartTransport();
-
                     ControlInterface.AccessObjects.Add(transport.Name, transport);
+
+                    string connectionName = modbusElement.Attribute("RefConnection")?.Value;
+                    if (!string.IsNullOrWhiteSpace(connectionName))
+                    {
+                        var master = this.ControlInterface.AccessObjects[connectionName];
+                        if (typeof(IModbusMaster).IsAssignableFrom(master.GetType()))
+                        {
+                            transport.StartTransport(master as IModbusMaster);
+                        }
+                    }
                 }
                 else
                 {
@@ -271,7 +144,8 @@ namespace SpaceCG.Extensions.Modbus
         {
             if(Logger.IsDebugEnabled)
                 Logger.Debug($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
-
+            
+            if (ModbusElements?.Count() <= 0) return;
             foreach (XElement modbus in ModbusElements)
             {
                 if (modbus.Attribute(ControlInterface.XName)?.Value != transportName) continue;
@@ -310,7 +184,6 @@ namespace SpaceCG.Extensions.Modbus
                 }//End for                
             }//End for
         }
-
         /// <summary>
         /// Call Event Type
         /// </summary>
@@ -318,26 +191,18 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="transportName"></param>
         public void CallEventType(string eventType, string transportName)
         {
-            IEnumerable<XElement> events;
-            if (string.IsNullOrWhiteSpace(transportName))
-            {
-                events = from evt in ModbusElements.Descendants(ControlInterface.XEvent)
-                         where evt.Attribute(ControlInterface.XType)?.Value == eventType
-                         select evt;
-            }
-            else
-            {
-                events = from modbus in ModbusElements
-                         where modbus.Attribute(ControlInterface.XName)?.Value == transportName
-                         from evt in modbus.Descendants(ControlInterface.XEvent)
-                         where evt.Attribute(ControlInterface.XType)?.Value == eventType
-                         select evt;
-            }
+            if (ModbusElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventType) || string.IsNullOrWhiteSpace(transportName)) return;
+
+            IEnumerable<XElement> events = from modbus in ModbusElements
+                                           where modbus.Attribute(ControlInterface.XName)?.Value == transportName
+                                           from evt in modbus.Descendants(ControlInterface.XEvent)
+                                           where evt.Attribute(ControlInterface.XType)?.Value == eventType
+                                           select evt;
 
             if (events?.Count() <= 0) return;
             foreach (XElement evt in events)
             {
-                ControlInterface.TryParseControlMessage(evt, out object returnResult);                
+                ControlInterface.TryParseControlMessage(evt, out object returnResult);
             }
         }
 
@@ -348,6 +213,8 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="transportName"></param>
         public void CallEventName(string eventName, string transportName)
         {
+            if (ModbusElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventName) || string.IsNullOrWhiteSpace(transportName)) return;
+
             IEnumerable<XElement> events = from modbus in ModbusElements
                                            where modbus.Attribute(ControlInterface.XName)?.Value == transportName
                                            from evt in modbus.Descendants(ControlInterface.XEvent)
@@ -366,6 +233,8 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="eventName"></param>
         public void CallEventName(string eventName)
         {
+            if (ModbusElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventName)) return;
+
             IEnumerable<XElement> events = from evt in ModbusElements.Descendants(ControlInterface.XEvent)
                                            where evt.Attribute(ControlInterface.XName)?.Value == eventName
                                            select evt;
@@ -377,95 +246,49 @@ namespace SpaceCG.Extensions.Modbus
             }
         }
 
+
         /// <summary>
-        /// Reset And Clear
+        /// Clear Devices
         /// </summary>
-        protected void ResetAndClear()
+        public void RemoveAll()
         {
             CallEventType(XDisposed, null);
             Thread.Sleep(100);
-            foreach (ModbusTransport transport in TransportDevices)
-            {
-                transport.StopTransport();
-            }
+            if (ModbusElements?.Count() <= 0) return;
 
             Type DisposableType = typeof(IDisposable);
-            if (ModbusElements?.Count() > 0)
+            foreach (XElement modbus in ModbusElements)
             {
-                foreach (XElement modbus in ModbusElements)
+                string name = modbus.Attribute(ControlInterface.XName)?.Value;
+
+                if (string.IsNullOrWhiteSpace(name) || name == this.Name) continue;
+                if (!ControlInterface.AccessObjects.ContainsKey(name)) continue;
+
+                ModbusTransport transport = ControlInterface.AccessObjects[name] as ModbusTransport;
+                if (transport == null)
                 {
-                    string name = modbus.Attribute(ControlInterface.XName)?.Value;
-                    if (string.IsNullOrWhiteSpace(name) || name == this.Name) continue;
-
-                    if (ControlInterface.AccessObjects.ContainsKey(name))
-                    {
-                        object obj = ControlInterface.AccessObjects[name];
-                        if (obj == null)
-                        {
-                            ControlInterface.AccessObjects.Remove(name);
-                            continue;
-                        }
-
-                        try
-                        {
-                            if (DisposableType.IsAssignableFrom(obj.GetType())) (obj as IDisposable)?.Dispose();
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Warn(ex);
-                        }
-                        finally
-                        {
-                            ControlInterface.AccessObjects.Remove(name);
-                        }
-                    }
+                    ControlInterface.AccessObjects.Remove(name);
+                    continue;
                 }
-            }
-            if (ConnectionElements?.Count() > 0)
-            {
-                foreach (XElement connection in ConnectionElements)
+
+                try
                 {
-                    string name = connection.Attribute(ControlInterface.XName)?.Value;
-                    if (string.IsNullOrWhiteSpace(name)) continue;
-                    if (ControlInterface.AccessObjects.ContainsKey(name))
-                    {
-                        object obj = ControlInterface.AccessObjects[name];
-                        if (obj == null)
-                        {
-                            ControlInterface.AccessObjects.Remove(name);
-                            continue;
-                        }
-                        try
-                        {
-                            if (DisposableType.IsAssignableFrom(obj.GetType())) (obj as IDisposable)?.Dispose();
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Warn(ex);
-                        }
-                        finally
-                        {
-                            ControlInterface.AccessObjects.Remove(name);
-                        }
-                    }
+                    transport.StopTransport();
+                    transport.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex);
+                }
+                finally
+                {
+                    ControlInterface.AccessObjects.Remove(name);
                 }
             }
 
-            TransportDevices.Clear();            
-            Configuration = null;
             ModbusElements = null;
-            ConnectionElements = null;
         }
-
-        /// <inheritdoc/>
-        public void Dispose()
-        {
-            ResetAndClear();
-
-            ControlInterface?.Dispose();
-            ControlInterface = null;
-            TransportDevices = null;
-        }
+        
         /// <inheritdoc/>
         public override string ToString()
         {

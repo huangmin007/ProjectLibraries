@@ -29,7 +29,7 @@ namespace SpaceCG.Net
         /// <summary>
         /// 客户端对象集合
         /// </summary>
-        ICollection<EndPoint> Clients { get; }
+        IReadOnlyCollection<EndPoint> Clients { get; }
         /// <summary>
         /// 客户端的连接数量
         /// </summary>

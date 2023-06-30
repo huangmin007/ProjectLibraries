@@ -28,6 +28,8 @@ namespace SpaceCG.Extensions.Modbus
         /// 传输对象协议封装对象
         /// </summary>
         public IModbusMaster Master { get; private set; }
+
+#if false
         /// <summary>
         /// Read Timeout
         /// </summary>
@@ -44,7 +46,7 @@ namespace SpaceCG.Extensions.Modbus
             get { return Master != null && Master.Transport != null ? Master.Transport.WriteTimeout : 0; }
             set { if (Master != null && Master.Transport != null) Master.Transport.WriteTimeout = value; }
         }
-
+#endif
         /// <summary>
         /// Modbus Write 方法参数队列
         /// </summary>

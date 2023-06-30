@@ -227,8 +227,6 @@ namespace SpaceCG.Extensions.Modbus
         /// 当前设备上的寄存器集合，用于描述寄存器及数据
         /// </summary>
         public List<Register> Registers { get; private set; } = new List<Register>(32);
-        //public ConcurrentBag<Register> Registers { get; private set; } = new ConcurrentBag<Register>();
-
         /// <summary>
         /// 寄存器数量
         /// </summary>
@@ -253,7 +251,12 @@ namespace SpaceCG.Extensions.Modbus
         private Dictionary<ushort, ushort> RawInputRegistersAddresses = new Dictionary<ushort, ushort>();
 
         private IModbusMaster Master;
-
+#if false
+        /// <summary>
+        /// 允许输入同步寄存器
+        /// </summary>
+        public bool EnabledInputSync { get; set; } = true;
+#endif
         /// <summary>
         /// Modbus Input/Output Device 构造函数
         /// </summary>
@@ -435,7 +438,7 @@ namespace SpaceCG.Extensions.Modbus
                 {
                     Logger.Error($"{this}");
                     Logger.Error(ex);
-                    Thread.Sleep(300);
+                    Thread.Sleep(100);
                 }
             }
 
@@ -455,7 +458,7 @@ namespace SpaceCG.Extensions.Modbus
                 {
                     Logger.Error($"{this}");
                     Logger.Error(ex);
-                    Thread.Sleep(300);
+                    Thread.Sleep(100);
                 }
             }
         }
@@ -483,7 +486,7 @@ namespace SpaceCG.Extensions.Modbus
                 {
                     Logger.Error($"{this}");
                     Logger.Error(ex);
-                    Thread.Sleep(300);
+                    Thread.Sleep(100);
                 }
             }
 
@@ -503,7 +506,7 @@ namespace SpaceCG.Extensions.Modbus
                 {
                     Logger.Error($"{this}");
                     Logger.Error(ex);
-                    Thread.Sleep(300);
+                    Thread.Sleep(100);
                 }
             }
         }
@@ -661,7 +664,7 @@ namespace SpaceCG.Extensions.Modbus
         {
             device = null;
             if (element == null) return false;
-            if (element.Name != "Device" || String.IsNullOrWhiteSpace(element.Attribute(nameof(Address)).Value))
+            if (element.Name != "Device" || String.IsNullOrWhiteSpace(element.Attribute(nameof(Address))?.Value))
             {
                 Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element}");
                 return false;
@@ -678,7 +681,7 @@ namespace SpaceCG.Extensions.Modbus
             {
                 if (String.IsNullOrWhiteSpace(element.Attribute(attributes[i])?.Value)) continue;
 
-                ushort[] args = null; // = new ushort[2] { 0, 0 }; //count|startAddress
+                ushort[] args = null; //= new ushort[2] { 0, 0 }; //count|startAddress
                 StringExtensions.TryParse<ushort>(element.Attribute(attributes[i]).Value, ref args, ',');
 
                 if (args?.Length == 0) continue;
@@ -720,7 +723,7 @@ namespace SpaceCG.Extensions.Modbus
                 if (!Register.TryParse(regElement, out Register register)) device.Registers.Add(register);
             }
 
-            return true;
+            return device.Registers.Count > 0;
         }
 
         /// <summary>

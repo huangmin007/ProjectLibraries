@@ -14,6 +14,10 @@ namespace SpaceCG.Extensions.Modbus
     public partial class ModbusTransport : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusTransport));
+        /// <summary> <see cref="XModbus"/> Name </summary>
+        public const string XModbus = "Modbus";
+        /// <summary> <see cref="XDevice"/> Name </summary>
+        public const string XDevice = "Device";
 
         /// <summary>
         /// 传输对象名称
@@ -50,24 +54,17 @@ namespace SpaceCG.Extensions.Modbus
         /// 当前总线上的 Modbus IO 设备集合
         /// </summary>
         public List<ModbusIODevice> ModbusDevices { get; private set; } = new List<ModbusIODevice>(8);
-        //public ConcurrentBag<ModbusIODevice> ModbusDevices { get; private set; } = new ConcurrentBag<ModbusIODevice>();
 
         /// <summary>
         /// Modbus Transport 总线对象
         /// </summary>
-        /// <param name="master"></param>
         /// <param name="name"></param>
-        public ModbusTransport(IModbusMaster master, String name = null)
+        public ModbusTransport(string name)
         {
-            if (master?.Transport == null)
-                throw new ArgumentNullException(nameof(master), "参数不能为空");
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentNullException(nameof(name), "参数不能为空");
 
             this.Name = name;
-            this.Master = master;
-
-            if (String.IsNullOrWhiteSpace(Name))
-                this.Name = $"Transport#{this.Master}";
-
             EventTimer = new Timer(SyncRegisterChangeEvents, this, Timeout.Infinite, Timeout.Infinite);
         }
 
@@ -89,8 +86,12 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// 启动同步传输
         /// </summary>
-        public void StartTransport()
+        /// <param name="master"></param>
+        public void StartTransport(IModbusMaster master)
         {
+            if (master == null || master.Transport == null)
+                throw new ArgumentNullException(nameof(master), "参数不能为空");
+
             if (IOThreadRunning) return;
             if(CancelToken != null)
             {
@@ -98,6 +99,7 @@ namespace SpaceCG.Extensions.Modbus
                 CancelToken = null;
             }
 
+            Master = master;
             DeviceCount = 0;
             IOThreadRunning = true;
             ElapsedMilliseconds = 0;
@@ -195,7 +197,7 @@ namespace SpaceCG.Extensions.Modbus
 
                     device.SyncInputRegisters();
                     this.SyncOutputMethodQueues();
-                }                
+                }
 
                 this.ElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
             }
@@ -214,46 +216,17 @@ namespace SpaceCG.Extensions.Modbus
         public static bool TryParse(XElement element, out ModbusTransport transport)
         {
             transport = null;
-            if (element == null) return false;
+            if (element == null || element.Name != XModbus || !element.HasElements) return false;
 
-            if (element.Name != "Modbus" || !element.HasElements ||
-                String.IsNullOrWhiteSpace(element.Attribute(nameof(Name)).Value) ||
-                String.IsNullOrWhiteSpace(element.Attribute("Parameters")?.Value))
+            string name = element.Attribute(nameof(Name))?.Value;
+            if (String.IsNullOrWhiteSpace(name))
             {
                 Logger.Warn($"({nameof(ModbusTransport)}) 配置格式存在错误, {element}");
                 return false;
             }
 
-            int portORbaudRate = 0;
-            IModbusMaster master;
-            String[] connectArgs = element.Attribute("Parameters").Value.Split(',');
-            
-            if (connectArgs.Length == 3 && int.TryParse(connectArgs[2], out portORbaudRate))
-            {
-                master = NModbus4Extensions.CreateNModbus4Master(connectArgs[0], connectArgs[1], portORbaudRate);
-            }
-            else
-            {
-                Logger.Warn($"({nameof(ModbusTransport)}) 配置格式存在错误, {element} 节点属性 Parameters 值错误");
-                return false;
-            }
-
-            if (master == null)
-            {
-                Logger.Warn($"({nameof(ModbusTransport)}) 创建 Modbus 对象失败");
-                return false;
-            }
-
-            if (int.TryParse(element.Attribute(nameof(ReadTimeout))?.Value, out int readTimeout))
-                master.Transport.ReadTimeout = readTimeout;
-            if (int.TryParse(element.Attribute(nameof(WriteTimeout))?.Value, out int writeTimeout))
-                master.Transport.WriteTimeout = writeTimeout;
-
-            transport = new ModbusTransport(master, element.Attribute(nameof(Name)).Value);
-
-            //Devices
-            IEnumerable<XElement> deviceElements = element.Element("Devices") != null ?
-                element.Element("Devices").Elements("Device") : element.Elements("Device");
+            transport = new ModbusTransport(name);
+            IEnumerable<XElement> deviceElements = element.Descendants(XDevice);
 
             foreach (XElement deviceElement in deviceElements)
             {
@@ -264,7 +237,7 @@ namespace SpaceCG.Extensions.Modbus
                 }
             }
 
-            return true;
+            return transport.ModbusDevices.Count > 0;
         }
 
         /// <inheritdoc/>
@@ -292,7 +265,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(ModbusTransport)}] {nameof(Name)}:{Name}";
+            return $"[{nameof(ModbusTransport)}] {nameof(Name)}:{Name} {nameof(ModbusDevices)}:{ModbusDevices.Count}";
         }
 
 

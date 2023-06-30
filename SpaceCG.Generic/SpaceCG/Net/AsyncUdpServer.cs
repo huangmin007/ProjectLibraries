@@ -17,20 +17,22 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public string Name { get; set; }
         /// <inheritdoc/>
-        public ConnectionType Type => ConnectionType.UdpServer;
+        public ConnectionType Type => ConnectionType.TcpServer;
         /// <summary>
         /// 与客户端的连接状态，服务端已启动且客户端连接大于 0
         /// </summary>
         public bool IsConnected => IsListening && ClientCount > 0;
 
         /// <inheritdoc/>
-        public int ClientCount => clients != null ? clients.Count : 0;
+        public bool IsListening { get; private set; }
         /// <inheritdoc/>
-        public bool IsListening => udpClient?.Client != null && udpClient.Client.IsBound;
+        public IPEndPoint LocalEndPoint => udpClient.Client?.LocalEndPoint as IPEndPoint;
+
         /// <inheritdoc/>
-        public IPEndPoint LocalEndPoint => udpClient.Client.LocalEndPoint as IPEndPoint;
+        public int ClientCount => clients?.Count ?? 0;
         /// <inheritdoc/>
-        public ICollection<EndPoint> Clients => clients?.ToArray();
+        public IReadOnlyCollection<EndPoint> Clients => clients?.ToArray();
+
         /// <inheritdoc/>
         public event EventHandler<AsyncEventArgs> ClientConnected;
         /// <inheritdoc/>
@@ -67,7 +69,6 @@ namespace SpaceCG.Net
         {
             clients = new List<IPEndPoint>();
             localEndPoint = new IPEndPoint(localIPAddress, listenPort);
-            
         }
         /// <summary>
         /// 异步 UDP 服务
@@ -84,15 +85,16 @@ namespace SpaceCG.Net
             if (IsListening) return true;
 
             udpClient?.Dispose();
-
-            udpClient = new UdpClient(localEndPoint);
+            udpClient = new UdpClient();
             udpClient.EnableBroadcast = true;
+
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
                 try { udpClient.AllowNatTraversal(true); }
                 catch { }
             }
 
+            IsListening = true;
             udpClient.BeginReceive(ReceiveCallback, null);
 
             return IsListening;
@@ -101,21 +103,23 @@ namespace SpaceCG.Net
         public bool Stop()
         {
             if (!IsListening) return true;
-            clients.Clear();
+
+            clients.Clear(); 
+            IsListening = false;
 
             try
             {
                 udpClient?.Close();
-                udpClient?.Dispose();
             }
             catch (Exception ex)
             {
+                IsListening = false;
                 ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
             }
 
             return !IsListening;
         }
-        
+
         /// <summary>
         /// 接收数据的方法
         /// </summary>
@@ -204,24 +208,16 @@ namespace SpaceCG.Net
                 ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs((IPEndPoint)ar.AsyncState, ex));
             }
         }
-        /// <summary>
-        /// 异步发送数据到所有远程客户端
-        /// </summary>
-        /// <param name="datagram">要发送的数据</param>
-        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
+        /// <inheritdoc/>
         public bool SendBytes(byte[] datagram)
         {
-            foreach(var client in clients)
+            foreach (var client in clients)
             {
                 SendBytes(datagram, client);
             }
             return true;
         }
-        /// <summary>
-        /// 异步发送数据到所有远程客户端
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
+        /// <inheritdoc/>
         public bool SendMessage(String message) => SendBytes(Encoding.Default.GetBytes(message));
 
         /// <inheritdoc/>
@@ -234,7 +230,6 @@ namespace SpaceCG.Net
 
             udpClient?.Dispose();
             udpClient = null;
-
         }
         /// <inheritdoc/>
         public override string ToString()
