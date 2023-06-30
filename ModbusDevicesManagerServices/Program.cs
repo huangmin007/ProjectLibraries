@@ -28,7 +28,7 @@ namespace ModbusDevicesManagerServices
         {
             Console.Title = Title;
             Console.WriteLine($"{Title}");
-
+            Console.WriteLine(Thread.CurrentThread.ExecutionContext.ToString());
             string[] names = SerialPort.GetPortNames();
             if(names.Length > 0 ) 
             {
@@ -58,7 +58,7 @@ namespace ModbusDevicesManagerServices
             {
                 Logger.Error($"指定的配置文件不存在 {configFile}");
                 return;
-            }
+            }            
 
             XmlReaderSettings settings = new XmlReaderSettings();
             settings.IgnoreComments = true;
@@ -72,7 +72,7 @@ namespace ModbusDevicesManagerServices
                 Logger.Error($"需要配置 {nameof(ConnectionManager)} 名称");
                 return;
             }
-            XElement Connections = Configuration.Element("Connectins");
+            XElement Connections = Configuration.Element("Connections");
             if (Connections == null)
             {
                 Logger.Error($"连接配置不存在");

@@ -89,16 +89,26 @@ namespace SpaceCG.Extensions.Modbus
                 {
                     transport.InputChangeEvent += Transport_InputChangeEvent;
                     transport.OutputChangeEvent += Transport_OutputChangeEvent;
-                    ControlInterface.AccessObjects.Add(transport.Name, transport);
+                    string connectionName = modbusElement.Attribute("ConnectionName")?.Value;
 
-                    string connectionName = modbusElement.Attribute("RefConnection")?.Value;
                     if (!string.IsNullOrWhiteSpace(connectionName))
                     {
                         var master = this.ControlInterface.AccessObjects[connectionName];
                         if (typeof(IModbusMaster).IsAssignableFrom(master.GetType()))
                         {
                             transport.StartTransport(master as IModbusMaster);
+                            ControlInterface.AccessObjects.Add(transport.Name, transport);
                         }
+                        else
+                        {
+                            transport.Dispose();
+                            Logger.Error($"错误：连接对象 {master} 未实现 IModbusMaster 接口");
+                        }
+                    }
+                    else
+                    {
+                        transport.Dispose();
+                        Logger.Warn($"Modbus 对象未指定连接 ConnectionName 对象");
                     }
                 }
                 else
@@ -254,7 +264,7 @@ namespace SpaceCG.Extensions.Modbus
         {
             CallEventType(XDisposed, null);
             Thread.Sleep(100);
-            if (ModbusElements?.Count() <= 0) return;
+            if (ModbusElements == null || ModbusElements.Count() <= 0) return;
 
             Type DisposableType = typeof(IDisposable);
             foreach (XElement modbus in ModbusElements)

@@ -8,6 +8,7 @@ using SpaceCG.Net;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SpaceCG.Generic
 {
@@ -430,23 +431,44 @@ namespace SpaceCG.Generic
 
                 if(sync)
                 {
-                    SyncContext.Send((o) =>
+                    if (SyncContext != null)
+                    {
+                        SyncContext.Send((o) =>
+                        {
+                            taskResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
+                            taskResult.ReturnValue = value;
+                        }, taskResult);
+                    }
+                    else
                     {
                         taskResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
                         taskResult.ReturnValue = value;
-                    }, taskResult);
+                    }
                 }
                 else
                 {
-                    ManualResetEvent manualResetEvent = new ManualResetEvent(false);
-                    SyncContext.Post((o) =>
+                    if (SyncContext != null)
                     {
-                        taskResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
-                        taskResult.ReturnValue = value;
-                        manualResetEvent.Set();
-                    }, taskResult);
-                    bool wait = manualResetEvent.WaitOne(1_000);
-                    manualResetEvent.Dispose();
+                        ManualResetEvent manualResetEvent = new ManualResetEvent(false);
+                        SyncContext.Post((o) =>
+                        {
+                            taskResult.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
+                            taskResult.ReturnValue = value;
+                            manualResetEvent.Set();
+                        }, taskResult);
+                        bool wait = manualResetEvent.WaitOne(1_000);
+                        manualResetEvent.Dispose();
+                    }
+                    else
+                    {
+                        taskResult = Task.Run(() =>
+                        {
+                            TaskResult tr = new TaskResult(false, null);
+                            tr.Success = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
+                            tr.ReturnValue = value;
+                            return tr;
+                        }).Result;
+                    }
                 }
 
                 if (taskResult.Success) returnResult = taskResult.ReturnValue;

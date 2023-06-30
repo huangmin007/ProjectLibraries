@@ -66,7 +66,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="hostname"></param>
         /// <param name="port"></param>
-        public NModbus4TcpClientAdapter(string hostname, int port) : this(new IPEndPoint(IPAddress.Parse(hostname), port))
+        public NModbus4TcpClientAdapter(string hostname, ushort port) : this(new IPEndPoint(IPAddress.Parse(hostname), port))
         {
         }
 
@@ -75,7 +75,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="address"></param>
         /// <param name="port"></param>
-        public NModbus4TcpClientAdapter(IPAddress address, int port) : this(new IPEndPoint(address, port))
+        public NModbus4TcpClientAdapter(IPAddress address, ushort port) : this(new IPEndPoint(address, port))
         {
         }
 

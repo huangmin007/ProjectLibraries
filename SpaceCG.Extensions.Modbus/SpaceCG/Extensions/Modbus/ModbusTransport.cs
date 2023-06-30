@@ -216,7 +216,7 @@ namespace SpaceCG.Extensions.Modbus
         public static bool TryParse(XElement element, out ModbusTransport transport)
         {
             transport = null;
-            if (element == null || element.Name != XModbus || !element.HasElements) return false;
+            if (element?.Name != XModbus || !element.HasElements) return false;
 
             string name = element.Attribute(nameof(Name))?.Value;
             if (String.IsNullOrWhiteSpace(name))
@@ -230,10 +230,9 @@ namespace SpaceCG.Extensions.Modbus
 
             foreach (XElement deviceElement in deviceElements)
             {
-                if(!ModbusIODevice.TryParse(deviceElement, out ModbusIODevice device))
+                if(ModbusIODevice.TryParse(deviceElement, out ModbusIODevice device))
                 {
                     transport.ModbusDevices.Add(device);
-                    //Logger.Warn($"{transport} 解析/添加 IO 设备失败");
                 }
             }
 

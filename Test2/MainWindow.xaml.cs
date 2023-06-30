@@ -49,14 +49,16 @@ namespace Test2
             InstanceExtensions.ConvertChangeTypeExtension = ConvertChangeTypeExtension2;
 
             //client = new AsyncTcpClient();
-            client = new AsyncUdpClient();
-            client.Connect("127.0.0.1", 5334);
+            //client = new AsyncUdpClient();
+            //client.Connect("127.0.0.1", 5334);
 
             logger1.Info(client);
 
             //server = new AsyncTcpServer(3000);
-            server = new AsyncUdpServer(3000);
-            server.ClientDataReceived += Server_ClientDataReceived;
+            //server = new AsyncUdpServer(3000);
+            //server.ClientDataReceived += Server_ClientDataReceived;
+
+            Console.WriteLine($"test::{WindowState.Normal}");
         }
 
         private void Server_ClientDataReceived(object sender, AsyncDataEventArgs e)

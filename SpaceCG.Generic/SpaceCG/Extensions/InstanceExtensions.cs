@@ -177,9 +177,9 @@ namespace SpaceCG.Extensions
         }
 
         /// <summary>
-        /// 动态的设置实例对象 (字段或私有字段) 的多个属性值，跟据 XML 配置文件节点名称(实例字段对象)及节点属性(字段对象的属性)来个修改实例属性
+        /// 动态的设置实例对象的字段 (公有字段或私有字段) 的多个属性 (公有) 值，跟据 XML 配置文件节点名称 (实例的公有字段或私有字段) 及节点属性 (字段对象的属性) 来个修改实例的字段属性
         /// <para>例如：&lt;Window Left="100" Width="100"/&gt; </para>
-        /// <para> Window 是 instanceObj 中的一个实例字段对象(非静态)，其 Left、Width 为 Window 实例字段对象的原有属性 </para>
+        /// <para> Window 是 instanceParentObj 中的一个实例字段对象 (非静态的公有字段或私有字段)，其 Left、Width 为 Window 实例字段对象的原有属性 (公有属性) </para>
         /// </summary>
         /// <param name="instanceParentObj"></param>
         /// <param name="element"></param>
@@ -191,18 +191,47 @@ namespace SpaceCG.Extensions
 
             if(!GetInstanceFieldValue(instanceParentObj, element.Name.LocalName, out object instanceObj)) return;
 
-            IEnumerable<XAttribute> attributes = element.Attributes();
+            SetInstancePropertyValues(instanceObj, element.Attributes());
+        }
+        /// <summary>
+        /// 动态的设置实例对象的多个属性值，跟据 <see cref="XAttribute"/> 来个修改实例的对应属性值
+        /// </summary>
+        /// <param name="instanceObj"></param>
+        /// <param name="attributes"></param>
+        /// <exception cref="ArgumentNullException"></exception>
+        public static void SetInstancePropertyValues(object instanceObj, IEnumerable<XAttribute> attributes)
+        {
+            if (instanceObj == null || attributes == null)
+                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(attributes)}", "参数不能为空");
+
             if (attributes.Count() == 0) return;
 
             foreach (XAttribute attribute in attributes)
             {
-                //SetInstanceFieldValue(instanceObj, attribute.Name.LocalName, attribute.Value);
                 SetInstancePropertyValue(instanceObj, attribute.Name.LocalName, attribute.Value);
+            }
+        }
+        /// <summary>
+        /// 动态的设置实例对象的多个属性值，跟据 <see cref="IReadOnlyDictionary{TKey, TValue}"/> 来个修改实例的对应属性值
+        /// </summary>
+        /// <param name="instanceObj"></param>
+        /// <param name="attributes"></param>
+        /// <exception cref="ArgumentNullException"></exception>
+        public static void SetInstancePropertyValues(object instanceObj, IReadOnlyDictionary<string, object> attributes)
+        {
+            if (instanceObj == null || attributes == null)
+                throw new ArgumentNullException($"{nameof(instanceObj)},{nameof(attributes)}", "参数不能为空");
+
+            if (attributes.Count() == 0) return;
+
+            foreach (KeyValuePair<string, object> kv in attributes)
+            {
+                SetInstancePropertyValue(instanceObj, kv.Key, kv.Value);
             }
         }
 
         /// <summary>
-        /// 动态的设置实例对象的属性值, Only Support ValueType And ArrayType
+        /// 动态的设置实例对象的属性值, Only Support <see cref="ValueType"/> And <see cref="Array"/>Type
         /// <para>属性是指实现了 get,set 方法的对象</para>
         /// </summary>
         /// <param name="instanceObj"></param>
