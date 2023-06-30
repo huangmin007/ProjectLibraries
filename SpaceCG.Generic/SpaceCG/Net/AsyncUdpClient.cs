@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using SpaceCG.Generic;
@@ -14,32 +15,32 @@ namespace SpaceCG.Net
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(AsyncUdpClient));
 
         /// <inheritdoc/>
-        public bool IsConnected => _UdpClient?.Client != null && _UdpClient.Client.Connected;
+        public string Name { get; set; }
         /// <inheritdoc/>
-        public IPEndPoint LocalEndPoint { get; private set; }
+        public ConnectionType Type => ConnectionType.UdpClient;
+        /// <summary>
+        /// 与服务端的连接状态
+        /// </summary>
+        public bool IsConnected => udpClient?.Client != null && !((udpClient.Client.Poll(1000, SelectMode.SelectRead) && (udpClient.Client.Available == 0)) || !udpClient.Client.Connected);
+
         /// <inheritdoc/>
-        public IPEndPoint RemoteEndPoint { get; private set; }
+        public IPEndPoint LocalEndPoint => udpClient.Client?.LocalEndPoint as IPEndPoint;
+        /// <inheritdoc/>
+        public IPEndPoint RemoteEndPoint => udpClient.Client?.RemoteEndPoint as IPEndPoint;
 
         /// <inheritdoc/>
         public int ReadTimeout
         {
-            get => (int)(_UdpClient?.Client.ReceiveTimeout); 
-            set
-            {
-                if(_UdpClient?.Client != null) 
-                    _UdpClient.Client.ReceiveTimeout = value;
-            }
+            get => udpClient.Client?.ReceiveTimeout ?? -1;
+            set => udpClient.Client.ReceiveTimeout = value;
         }
         /// <inheritdoc/>
         public int WriteTimeout
         {
-            get => (int)(_UdpClient?.Client.SendTimeout);
-            set
-            {
-                if (_UdpClient?.Client != null)
-                    _UdpClient.Client.SendTimeout = value;
-            }
+            get => udpClient.Client?.SendTimeout ?? -1;
+            set => udpClient.Client.SendTimeout = value;
         }
+
         /// <inheritdoc/>
         public event EventHandler<AsyncEventArgs> Connected;
         /// <inheritdoc/>
@@ -47,36 +48,43 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public event EventHandler<AsyncDataEventArgs> DataReceived;
         /// <inheritdoc/>
-        public event EventHandler<AsyncExceptionEventArgs> Exception;
+        public event EventHandler<AsyncExceptionEventArgs> ExceptionEvent;
 
-        private bool first_io;
-        private UdpClient _UdpClient;
-        /// <summary>
-        /// 连接参数
-        /// </summary>
-        private IPEndPoint _ConnectEP;
+        private UdpClient udpClient;
+        private IPEndPoint remoteEndPoint;
 
         /// <summary>
         /// AsyncUdpClient
         /// </summary>
         public AsyncUdpClient()
         {
-            LocalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
-            RemoteEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
+        }
+        /// <summary>
+        /// 异步 Udp 客户端对象
+        /// </summary>
+        public AsyncUdpClient(UdpClient udpClient) : this()
+        {
+            if (udpClient == null) throw new ArgumentNullException(nameof(udpClient), "参数不能为空");
+
+            this.udpClient = udpClient;
+            remoteEndPoint = udpClient.Client?.RemoteEndPoint as IPEndPoint;
         }
         /// <inheritdoc/>
         public bool Close()
         {
-            first_io = false;
-            if (_UdpClient != null)
+            try
             {
-                _UdpClient.Close();
-                _UdpClient = null;
-                _ConnectEP = null;
+                if (IsConnected) udpClient?.Close();
+                return true;
             }
-
-            return true;
+            catch (Exception ex)
+            {
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
+                return false;
+            }
         }
+        /// <inheritdoc/>
+        public bool Connect() => remoteEndPoint != null ? Connect(remoteEndPoint) : false;
         /// <inheritdoc/>
         public bool Connect(IPEndPoint remoteEP) => Connect(remoteEP.Address, (ushort)remoteEP.Port);
         /// <inheritdoc/>
@@ -84,139 +92,102 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public bool Connect(IPAddress remoteAddress, ushort remotePort)
         {
-            if (_UdpClient == null)
+            if (IsConnected) return true;
+
+            udpClient?.Dispose();
+            remoteEndPoint = new IPEndPoint(remoteAddress, remotePort);
+
+            try
             {
-                _ConnectEP = new IPEndPoint(remoteAddress, remotePort);
+                udpClient = new UdpClient();
+                udpClient.EnableBroadcast = true;
+                udpClient.ExclusiveAddressUse = true;
+                udpClient.Connect(remoteAddress, remotePort);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
+                return false;
+            }
 
-                try
-                {
-                    _UdpClient = new UdpClient();
-                    _UdpClient.EnableBroadcast = true;
-                    _UdpClient.ExclusiveAddressUse = true;
-                    _UdpClient.Connect(remoteAddress, remotePort);
-                }
-                catch (Exception ex)
-                {
-                    _UdpClient?.Close();
-                    _UdpClient = null;
-                    Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
-                }
-                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-                {
-                    try
-                    {
-                        _UdpClient.AllowNatTraversal(true);
-                    }
-                    catch { }
-                }
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                try { udpClient.AllowNatTraversal(true); }
+                catch { }
+            }
 
-                if (_UdpClient.Client.Connected)
-                {
-                    first_io = true;
-                    Connected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
-                    _UdpClient.BeginReceive(ReceiveCallback, _UdpClient);
-
-                    LocalEndPoint = _UdpClient.Client.LocalEndPoint as IPEndPoint;
-                    RemoteEndPoint = _UdpClient.Client.RemoteEndPoint as IPEndPoint;
-                }
-                else
-                {
-                    Disconnected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
-                }
+            if (IsConnected)
+            {
+                Connected?.Invoke(this, new AsyncEventArgs(remoteEndPoint));
+                udpClient.BeginReceive(ReceiveCallback, udpClient);
+            }
+            else
+            {
+                Disconnected?.Invoke(this, new AsyncEventArgs(remoteEndPoint));
+                return false;
             }
 
             return true;
         }
         private void ReceiveCallback(IAsyncResult ar)
         {
-            if (_UdpClient == null) return;
+            if (!IsConnected)
+            {
+                Disconnected?.Invoke(this, new AsyncEventArgs(remoteEndPoint));
+                return;
+            }
 
             byte[] data;
-            IPEndPoint remoteEP = _ConnectEP;
+            IPEndPoint remoteEP = remoteEndPoint;
 
             try
             {
-                data = _UdpClient.EndReceive(ar, ref remoteEP);
-                RemoteEndPoint = remoteEP;
+                data = udpClient.EndReceive(ar, ref remoteEP);
             }
             catch (Exception ex)
             {
                 Disconnected?.Invoke(this, new AsyncEventArgs(remoteEP));
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(remoteEP, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEP, ex));
                 return;
             }
             
-            if (!first_io)
-            {
-                first_io = true;
-                Connected?.Invoke(this, new AsyncEventArgs(remoteEP));
-            }
             DataReceived?.Invoke(this, new AsyncDataEventArgs(remoteEP, data));
-
-            _UdpClient.BeginReceive(ReceiveCallback, _UdpClient);
+            if(IsConnected) udpClient.BeginReceive(ReceiveCallback, udpClient);
         }
         
         /// <inheritdoc/>
         public bool SendBytes(byte[] data)
         {
-            if (_UdpClient == null || data?.Length <= 0) return false;
+            if (!IsConnected || data?.Length <= 0) return false;
 
             try
             {
-                _UdpClient.BeginSend(data, data.Length, SendCallback, _UdpClient);
+                udpClient.SendAsync(data, data.Length);
                 return true;
             }
             catch(Exception ex)
             {
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
                 return false;
             }
         }
         /// <inheritdoc/>
         public bool SendMessage(string message) => SendBytes(Encoding.Default.GetBytes(message));
-        private void SendCallback(IAsyncResult ar)
-        {
-            if (_UdpClient == null) return;
-            int count;
-            try
-            {
-                count = _UdpClient.EndSend(ar);
-            }
-            catch (Exception ex)
-            {
-                count = 0;
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
-            }
-
-            if (count > 0 && !first_io)
-            {
-                first_io = true;
-                Connected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
-            }
-
-            if (count == 0)
-            {
-                Close();
-                Disconnected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
-            }
-        }
-
+        
         /// <inheritdoc/>
         public void Dispose()
         {
             Close();
 
-            _ConnectEP = null;
-            _UdpClient = null;
-
-            LocalEndPoint = null;
-            RemoteEndPoint = null;
+            remoteEndPoint = null;
+            udpClient = null;
         }
 
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(AsyncUdpClient)}] {LocalEndPoint} => {RemoteEndPoint}";
+            return $"[{nameof(AsyncUdpClient)}] {nameof(Name)}:{Name} {nameof(IsConnected)}:{IsConnected} {LocalEndPoint} => {RemoteEndPoint}";
         }
     }
 }

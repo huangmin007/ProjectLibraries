@@ -14,32 +14,30 @@ namespace SpaceCG.Net
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(AsyncTcpClient));
 
         /// <inheritdoc/>
-        public bool IsConnected => _TcpClient != null && _TcpClient.Connected;
+        public string Name { get; set; }
+        /// <inheritdoc/>
+        public ConnectionType Type => ConnectionType.TcpClient;
+        /// <summary>
+        /// 与服务端的连接状态
+        /// </summary>
+        public bool IsConnected => tcpClient?.Client != null && !((tcpClient.Client.Poll(1000, SelectMode.SelectRead) && (tcpClient.Client.Available == 0)) || !tcpClient.Client.Connected);
 
         /// <inheritdoc/>
-        public IPEndPoint LocalEndPoint { get; private set; }
+        public IPEndPoint LocalEndPoint => tcpClient.Client?.LocalEndPoint as IPEndPoint;
         /// <inheritdoc/>
-        public IPEndPoint RemoteEndPoint { get; private set; }       
+        public IPEndPoint RemoteEndPoint => tcpClient.Client?.RemoteEndPoint as IPEndPoint;
         
         /// <inheritdoc/>
         public int ReadTimeout
         {
-            get => (int)(_TcpClient?.Client.ReceiveTimeout);
-            set
-            {
-                if (_TcpClient?.Client != null)
-                    _TcpClient.Client.ReceiveTimeout = value;
-            }
+            get => tcpClient.Client?.ReceiveTimeout ?? -1;
+            set => tcpClient.Client.ReceiveTimeout = value;
         }
         /// <inheritdoc/>
         public int WriteTimeout
         {
-            get => (int)(_TcpClient?.Client.SendTimeout);
-            set
-            {
-                if (_TcpClient?.Client != null)
-                    _TcpClient.Client.SendTimeout = value;
-            }
+            get => tcpClient.Client?.SendTimeout ?? -1;
+            set => tcpClient.Client.SendTimeout = value;
         }
 
         /// <inheritdoc/>
@@ -49,55 +47,58 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public event EventHandler<AsyncDataEventArgs> DataReceived;
         /// <inheritdoc/>
-        public event EventHandler<AsyncExceptionEventArgs> Exception;
+        public event EventHandler<AsyncExceptionEventArgs> ExceptionEvent;
 
-        private byte[] _Buffer;
-        private TcpClient _TcpClient;
-        /// <summary>
-        /// 连接参数
-        /// </summary>
-        private IPEndPoint _ConnectEP;
-        private String _ConnectStatus = "Ready";
+        private byte[] buffer;
+        private TcpClient tcpClient;        
+        private IPEndPoint remoteEndPoint = null;
+        private ConnectStatus connectStatus = ConnectStatus.Ready;
+
+        enum ConnectStatus
+        {
+            Ready,
+            Connecting,
+            ConnectSuccess,
+            ConnectFailed,
+            ConnectException,
+        }
 
         /// <summary>
         /// 异步 TCP 客户端对象
         /// </summary>
         public AsyncTcpClient() 
         {
-            LocalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
-            RemoteEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
+            buffer = new byte[8192];
         }
-
-        internal AsyncTcpClient(TcpClient tcpClient):base()
+        /// <summary>
+        /// 异步 TCP 客户端对象
+        /// </summary>
+        public AsyncTcpClient(TcpClient tcpClient):this()
         {
-            this._TcpClient = tcpClient;
-            _ConnectEP = tcpClient.Client.RemoteEndPoint as IPEndPoint;
+            if (tcpClient == null) throw new ArgumentNullException(nameof(tcpClient), "参数不能为空");
+
+            this.tcpClient = tcpClient;
+            remoteEndPoint = tcpClient.Client?.RemoteEndPoint as IPEndPoint;
         }
 
         /// <inheritdoc/>
         public bool Close()
         {
-            if (_TcpClient == null) return false;
+            connectStatus = ConnectStatus.Ready;
 
-            _ConnectStatus = "Ready";
             try
             {
-                _TcpClient?.Dispose();
-                _TcpClient = null;
-
-                if (_Buffer != null)
-                {
-                    Array.Clear(_Buffer, 0, _Buffer.Length);
-                    _Buffer = null;
-                }
+                if(IsConnected)  tcpClient?.Close();
                 return true;
             }
             catch(Exception ex)
             {
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
                 return false;
             }
         }
+        /// <inheritdoc/>
+        public bool Connect() => remoteEndPoint != null ? Connect(remoteEndPoint) : false;
         /// <inheritdoc/>
         public bool Connect(IPEndPoint remoteEP) => Connect(remoteEP.Address, (ushort)remoteEP.Port);
         /// <inheritdoc/>
@@ -105,139 +106,137 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public bool Connect(IPAddress remoteAddress, ushort remotePort)
         {
-            if (_TcpClient != null && _TcpClient.Connected) return true;
-            if (_TcpClient != null && _ConnectStatus == "Connecting") return false;
+            if (remoteAddress == null || remotePort == 0) throw new ArgumentException("参数异常");
+            if (IsConnected || connectStatus == ConnectStatus.Connecting) return true;
 
-            if (_TcpClient == null)
-            {
-                _ConnectStatus = "Connecting";
-                _TcpClient = new TcpClient();
-                _ConnectEP = new IPEndPoint(remoteAddress, remotePort);
-                _Buffer = new byte[Math.Max(Math.Min(_TcpClient.ReceiveBufferSize, 8192), 2048)];
-            }
+            tcpClient?.Dispose();
+            tcpClient = new TcpClient();
+
+            connectStatus = ConnectStatus.Connecting;
+            remoteEndPoint = new IPEndPoint(remoteAddress, remotePort);
 
             try
             {
-                _TcpClient.BeginConnect(remoteAddress, remotePort, ConnectCallback, _TcpClient);
+                tcpClient.BeginConnect(remoteAddress, remotePort, ConnectCallback, tcpClient);
                 return true;
             }
             catch (Exception ex)
             {
-                _ConnectStatus = "ConnectException";
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
+                connectStatus = ConnectStatus.ConnectException;
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
                 return false;
             }
-        }
+        }        
+       
         private void ConnectCallback(IAsyncResult ar)
         {
             try
             {
-                _TcpClient.EndConnect(ar);
+                tcpClient.EndConnect(ar);
             }
             catch(Exception ex)
             {
-                _ConnectStatus = "ConnectException";
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
+                connectStatus = ConnectStatus.ConnectException;
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
             }
 
-            if (_TcpClient.Connected)
+            if (this.IsConnected)
             {
-                _ConnectStatus = "ConnectSuccess";
-
-                LocalEndPoint = _TcpClient.Client.LocalEndPoint as IPEndPoint;
-                RemoteEndPoint = _TcpClient.Client.RemoteEndPoint as IPEndPoint;
-
-                Connected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
-                _TcpClient.GetStream()?.BeginRead(_Buffer, 0, _Buffer.Length, ReadCallback, _TcpClient);
+                connectStatus = ConnectStatus.ConnectSuccess;
+                Connected?.Invoke(this, new AsyncEventArgs(remoteEndPoint));
+                tcpClient.GetStream().BeginRead(buffer, 0, buffer.Length, ReadCallback, tcpClient);
             }
             else
             {
-                _ConnectStatus = "ConnectFailed";
-                Disconnected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
+                connectStatus = ConnectStatus.ConnectFailed;
+                Disconnected?.Invoke(this, new AsyncEventArgs(remoteEndPoint));
             }
         }
         private void ReadCallback(IAsyncResult ar)
         {
-            if (_TcpClient == null || !_TcpClient.Connected) return;
+            if (!this.IsConnected)
+            {
+                Disconnected?.Invoke(this, new AsyncEventArgs(remoteEndPoint));
+                return;
+            }
 
             int count = -1;
             try
             {
-                if (_TcpClient?.GetStream() != null)
-                    count = _TcpClient.GetStream().EndRead(ar);
-                else
-                    return;
+                count = tcpClient.GetStream()?.EndRead(ar) ?? -1;
             }
             catch (Exception ex)
             {
                 count = 0;
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
             }
 
             if (count <= -1) return;
             if (count == 0)
             {
-                Close();
-                Disconnected?.Invoke(this, new AsyncEventArgs(_ConnectEP));
+                Disconnected?.Invoke(this, new AsyncEventArgs(remoteEndPoint));
                 return;
             }            
 
             byte[] buffer = new byte[count];
-            Buffer.BlockCopy(_Buffer, 0, buffer, 0, count);
-            DataReceived?.Invoke(this, new AsyncDataEventArgs(_ConnectEP, buffer));
+            Buffer.BlockCopy(this.buffer, 0, buffer, 0, count);
+            DataReceived?.Invoke(this, new AsyncDataEventArgs(remoteEndPoint, buffer));
 
-            if(_TcpClient?.GetStream() != null)
-                _TcpClient.GetStream().BeginRead(_Buffer, 0, _Buffer.Length, ReadCallback, _TcpClient);
+            if(IsConnected && tcpClient.GetStream() != null)
+                tcpClient.GetStream().BeginRead(this.buffer, 0, this.buffer.Length, ReadCallback, tcpClient);
         }
 
-        /// <inheritdoc/>
-        public bool SendMessage(string message) => SendBytes(Encoding.Default.GetBytes(message));
-        /// <inheritdoc/>
+        /// <summary>
+        /// 异步发送数据到远程服务端
+        /// </summary>
+        /// <param name="data">要发送的数据</param>
+        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
         public bool SendBytes(byte[] data)
         {
-            if (_TcpClient == null || !_TcpClient.Connected) return false;
+            if (!this.IsConnected || data?.Length <= 0) return false;
 
             try
             {
-                _TcpClient.GetStream().BeginWrite(data, 0, data.Length, SendCallback, _TcpClient);
+                tcpClient.GetStream().WriteAsync(data, 0, data.Length);
                 return true;
             }
             catch(Exception ex)
             {
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
                 return false;
             }
         }
-        private void SendCallback(IAsyncResult ar)
-        {
-            try
-            {
-                _TcpClient.GetStream().EndWrite(ar);
-            }
-            catch(Exception ex)
-            {
-                Exception?.Invoke(this, new AsyncExceptionEventArgs(_ConnectEP, ex));
-                return;
-            }
-        }
+        /// <summary>
+        /// 异步发送数据到远程服务端
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
+        public bool SendMessage(string message) => SendBytes(Encoding.Default.GetBytes(message));
 
         /// <inheritdoc/>
         public void Dispose()
         {
-            Close();
+            this.ExceptionEvent = null;
+            this.Disconnected = null;
+            this.Connected = null;
+            this.DataReceived = null;
 
-            _Buffer = null;
-            _ConnectEP = null;
-            _TcpClient = null;
-            _ConnectStatus = null;
+            tcpClient?.Close();
+            tcpClient?.Dispose();
+            this.tcpClient = null;
 
-            LocalEndPoint = null;
-            RemoteEndPoint = null;
+            if (buffer != null)
+            {
+                Array.Clear(buffer, 0, buffer.Length);
+                this.buffer = null;
+            }
+
+            this.remoteEndPoint = null;
         }
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(AsyncTcpClient)}] {LocalEndPoint} => {RemoteEndPoint}";
+            return $"[{nameof(AsyncTcpClient)}] {nameof(Name)}:{Name} {nameof(IsConnected)}:{IsConnected} {LocalEndPoint} => {RemoteEndPoint}";
         }
     }
 }

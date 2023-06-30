@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using SpaceCG.Generic;
@@ -16,15 +17,23 @@ namespace SpaceCG.Net
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(AsyncTcpServer));
 
         /// <inheritdoc/>
-        public int ClientCount => _Clients != null ? _Clients.Count : 0;
+        public string Name { get; set; }
         /// <inheritdoc/>
-        public bool IsRunning { get; private set; }
+        public ConnectionType Type => ConnectionType.TcpServer;
+        /// <summary>
+        /// 与客户端的连接状态，服务端已启动且客户端连接大于 0
+        /// </summary>
+        public bool IsConnected => IsListening && ClientCount > 0;
 
         /// <inheritdoc/>
-        public IPEndPoint LocalEndPoint { get; private set; }
+        public int ClientCount => clients?.Count ?? 0;
+        /// <inheritdoc/>
+        public bool IsListening { get; private set; }
+        /// <inheritdoc/>
+        public IPEndPoint LocalEndPoint => tcpListener.LocalEndpoint as IPEndPoint;
 
         /// <inheritdoc/>
-        public ICollection<EndPoint> Clients => _Clients?.Keys;
+        public ICollection<EndPoint> Clients => clients?.Keys;
         /// <inheritdoc/>
         public event EventHandler<AsyncEventArgs> ClientConnected;
         /// <inheritdoc/>
@@ -32,14 +41,14 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public event EventHandler<AsyncDataEventArgs> ClientDataReceived;
         /// <inheritdoc/>
-        public event EventHandler<AsyncExceptionEventArgs> ExceptionEventHandler;
+        public event EventHandler<AsyncExceptionEventArgs> ExceptionEvent;
 
         /// <summary>
         /// 服务器使用的异步TcpListener
         /// </summary>
-        private TcpListener _Listener;
-        private ConcurrentDictionary<EndPoint, byte[]> _Buffers;// = new ConcurrentDictionary<EndPoint, byte[]>();
-        private ConcurrentDictionary<EndPoint, TcpClient> _Clients;// = new ConcurrentDictionary<EndPoint, TcpClient>();
+        private TcpListener tcpListener;
+        private ConcurrentDictionary<EndPoint, byte[]> buffers;
+        private ConcurrentDictionary<EndPoint, TcpClient> clients;
 
         /// <summary>
         /// 异步 TCP 服务器
@@ -60,12 +69,19 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="localIPAddress">监听的IP地址</param>
         /// <param name="listenPort">监听的端口</param>
+        public AsyncTcpServer(String localIPAddress, ushort listenPort) : this(IPAddress.Parse(localIPAddress), listenPort)
+        {
+        }
+        /// <summary>
+        /// 异步 TCP 服务器
+        /// </summary>
+        /// <param name="localIPAddress">监听的IP地址</param>
+        /// <param name="listenPort">监听的端口</param>
         public AsyncTcpServer(IPAddress localIPAddress, ushort listenPort)
         {
             try
             {
-                _Listener = new TcpListener(localIPAddress, listenPort);
-                LocalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
+                tcpListener = new TcpListener(localIPAddress, listenPort);
             }
             catch (Exception ex)
             {
@@ -74,68 +90,57 @@ namespace SpaceCG.Net
             }
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                try
-                {
-                    _Listener.AllowNatTraversal(true);
-                }
+                try { tcpListener.AllowNatTraversal(true); }
                 catch { }
             }
 
-            _Buffers = new ConcurrentDictionary<EndPoint, byte[]>();
-            _Clients = new ConcurrentDictionary<EndPoint, TcpClient>();
-        }
-        /// <summary>
-        /// 异步 TCP 服务器
-        /// </summary>
-        /// <param name="localIPAddress">监听的IP地址</param>
-        /// <param name="listenPort">监听的端口</param>
-        public AsyncTcpServer(String localIPAddress, ushort listenPort) : this(IPAddress.Parse(localIPAddress), listenPort)
-        {
+            buffers = new ConcurrentDictionary<EndPoint, byte[]>();
+            clients = new ConcurrentDictionary<EndPoint, TcpClient>();
         }
 
         /// <inheritdoc/>
         public bool Start()
         {
-            if (IsRunning) return true;
+            if (tcpListener == null) return false;
+            if (IsListening) return true;
 
-            IsRunning = true;
+            IsListening = true;
             try
             {
-                _Listener.Start(1024);
-                _Listener.BeginAcceptTcpClient(AcceptCallback, _Listener);
-                LocalEndPoint = _Listener.Server.LocalEndPoint as IPEndPoint;
+                tcpListener.Start(1024);
+                tcpListener.BeginAcceptTcpClient(AcceptCallback, tcpListener);
             }
             catch (Exception ex)
             {
-                IsRunning = _Listener.Server.IsBound;
+                IsListening = false;
                 Logger.Error($"{nameof(AsyncTcpServer)} 启动失败：{ex}");
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
                 return false;
             }
 
-            return IsRunning;
+            return IsListening;
         }
         /// <inheritdoc/>
         public bool Stop()
         {
-            if (!IsRunning) return true;
+            if (tcpListener == null) return true;
+            if (!IsListening) return true;
 
-            IsRunning = false;
+            IsListening = false;
             CloseAllClients();
 
             try
             {
-                _Listener.Stop();
+                tcpListener.Stop();
             }
             catch (Exception ex)
             {
-                IsRunning = _Listener.Server.IsBound;
                 Logger.Error($"{nameof(AsyncTcpServer)} 停止失败：{ex}");
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
                 return false;
             }
 
-            return !IsRunning;
+            return !IsListening;
         }
 
         /// <summary>
@@ -143,13 +148,26 @@ namespace SpaceCG.Net
         /// </summary>
         private void CloseAllClients()
         {
-            if (_Clients == null) return;
-            foreach (TcpClient client in _Clients.Values)
+            if (clients == null) return;
+            foreach (TcpClient client in clients.Values)
             {
-                client.Close();
+                try { client.Close(); }
+                catch { }
             }
-            _Clients.Clear();
-            _Buffers.Clear();
+            clients.Clear();
+            buffers.Clear();
+        }
+
+        private void RemoveClient(ref TcpClient tcpClient, EndPoint endPoint)
+        {
+            if (endPoint == null) endPoint = tcpClient.Client?.RemoteEndPoint;
+
+            tcpClient?.Close();
+            Logger.Info($"客户端 {endPoint} 断开连接");
+
+            buffers.TryRemove(endPoint, out byte[] buffer);
+            clients.TryRemove(endPoint, out TcpClient client);
+            ClientDisconnected?.Invoke(this, new AsyncEventArgs(endPoint));
         }
 
         /// <summary>
@@ -158,29 +176,29 @@ namespace SpaceCG.Net
         /// <param name="ar"></param>
         private void AcceptCallback(IAsyncResult ar)
         {
-            if (!IsRunning || ar.AsyncState == null) return;
+            if (!IsListening || ar.AsyncState == null) return;
 
-            TcpClient tcpClient = _Listener.EndAcceptTcpClient(ar);
+            TcpClient tcpClient = tcpListener.EndAcceptTcpClient(ar);
             EndPoint endPoint = tcpClient.Client.RemoteEndPoint;
 
-            if (_Clients.TryAdd(endPoint, tcpClient) && _Buffers.TryAdd(endPoint, new byte[Math.Max(Math.Min(tcpClient.ReceiveBufferSize, 8192), 2048)]))
+            if (clients.TryAdd(endPoint, tcpClient) && buffers.TryAdd(endPoint, new byte[Math.Max(Math.Min(tcpClient.ReceiveBufferSize, 8192), 2048)]))
             {
                 Logger.Info($"客户端 {endPoint} 连接成功");
 
                 tcpClient.NoDelay = true;
                 ClientConnected?.Invoke(this, new AsyncEventArgs(endPoint));
-                tcpClient.GetStream().BeginRead(_Buffers[endPoint], 0, _Buffers[endPoint].Length, ReadCallback, tcpClient);
+                tcpClient.GetStream().BeginRead(buffers[endPoint], 0, buffers[endPoint].Length, ReadCallback, tcpClient);
             }
             else
             {
-                _Buffers.TryRemove(endPoint, out byte[] buffer);
-                _Clients.TryRemove(endPoint, out TcpClient client);
+                buffers.TryRemove(endPoint, out byte[] buffer);
+                clients.TryRemove(endPoint, out TcpClient client);
 
                 tcpClient?.Dispose();
                 Logger.Info($"客户端 {endPoint} 连接失败, 已移除");
             }
 
-            _Listener.BeginAcceptTcpClient(AcceptCallback, _Listener);
+            tcpListener.BeginAcceptTcpClient(AcceptCallback, tcpListener);
         }
 
         /// <summary>
@@ -189,41 +207,42 @@ namespace SpaceCG.Net
         /// <param name="ar"></param>
         private void ReadCallback(IAsyncResult ar)
         {
-            if (!IsRunning || ar.AsyncState == null) return;
+            if (!IsListening || ar.AsyncState == null) return;
 
             TcpClient tcpClient = (TcpClient)ar.AsyncState;
-            EndPoint endPoint = tcpClient.Client.RemoteEndPoint;
+            EndPoint endPoint = tcpClient.Client?.RemoteEndPoint;
+
+            if(!IsOnline(ref tcpClient))
+            {
+                RemoveClient(ref tcpClient, endPoint);
+                return;
+            }
 
             int count = 0;
             try
             {
-                count = (int)(tcpClient?.GetStream().EndRead(ar));
+                count = tcpClient.GetStream()?.EndRead(ar) ?? 0;
                 if (count > 0) Logger.Info($"接收客户端 {endPoint} 数据 {count} Bytes");
             }
             catch (Exception ex)
             {
                 count = 0;
                 Logger.Error($"客户端 {endPoint} 处理异步读取异常：{ex}");
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(endPoint, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(endPoint, ex));
             }
 
             if (count == 0)
             {
-                tcpClient?.Close();
-                Logger.Info($"客户端 {endPoint} 断开连接");
-
-                _Buffers.TryRemove(endPoint, out byte[] buffer);
-                _Clients.TryRemove(endPoint, out TcpClient client);
-                ClientDisconnected?.Invoke(this, new AsyncEventArgs(endPoint));
+                RemoveClient(ref tcpClient, endPoint);
                 return;
             }
 
             byte[] buff = new byte[count];
-            Buffer.BlockCopy(_Buffers[endPoint], 0, buff, 0, count);
+            Buffer.BlockCopy(buffers[endPoint], 0, buff, 0, count);
             ClientDataReceived?.Invoke(this, new AsyncDataEventArgs(endPoint, buff));
 
-            if(tcpClient?.GetStream() != null)
-                tcpClient.GetStream().BeginRead(_Buffers[endPoint], 0, _Buffers[endPoint].Length, ReadCallback, tcpClient);
+            if (IsOnline(ref tcpClient))
+                tcpClient.GetStream().BeginRead(buffers[endPoint], 0, buffers[endPoint].Length, ReadCallback, tcpClient);
         }
 
         /// <inheritdoc/>
@@ -231,15 +250,13 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public bool SendBytes(byte[] data, EndPoint remote)
         {
-            if (!IsRunning || remote == null) return false;
+            if (!IsListening || remote == null) return false;
 
-            if (_Clients.TryGetValue(remote, out TcpClient tcpClient))
+            if (clients.TryGetValue(remote, out TcpClient tcpClient))
             {
-                if (!tcpClient.Connected)
+                if(!IsOnline(ref tcpClient))
                 {
-                    _Buffers.TryRemove(remote, out byte[] buffer);
-                    _Clients.TryRemove(remote, out TcpClient client);
-                    ClientDisconnected?.Invoke(this, new AsyncEventArgs(remote));
+                    RemoveClient(ref tcpClient, remote);
                     return false;
                 }
 
@@ -251,7 +268,7 @@ namespace SpaceCG.Net
                 catch (Exception ex)
                 {
                     Logger.Warn($"客户端 {remote} 发送数据异常：{ex}");
-                    ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
+                    ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
                     return false;
                 }
             }
@@ -281,26 +298,23 @@ namespace SpaceCG.Net
             {
                 tcpClient.GetStream().EndWrite(ar);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Warn($"客户端 {endPoint} 发送数据异常：{ex}");
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(endPoint, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(endPoint, ex));
             }
         }
 
         /// <inheritdoc/>
         public bool SendBytes(byte[] data)
         {
-            foreach (var kv in _Clients)
+            foreach (var kv in clients)
             {
                 TcpClient tcpClient = kv.Value;
                 EndPoint remote = tcpClient.Client.RemoteEndPoint;
-
-                if (!tcpClient.Connected)
+                if (!IsOnline(ref tcpClient))
                 {
-                    _Buffers.TryRemove(remote, out byte[] buffer);
-                    _Clients.TryRemove(remote, out TcpClient client);
-                    ClientDisconnected?.Invoke(this, new AsyncEventArgs(remote));
+                    RemoveClient(ref tcpClient, remote);
                     continue;
                 }
 
@@ -311,7 +325,7 @@ namespace SpaceCG.Net
                 catch (Exception ex)
                 {
                     Logger.Warn($"客户端 {remote} 发送数据异常：{ex}");
-                    ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
+                    ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
                 }
             }
             return true;
@@ -325,24 +339,31 @@ namespace SpaceCG.Net
             Stop();
             CloseAllClients();
 
-            if (_Listener != null)
+            if (tcpListener != null)
             {
-                _Listener.Server.Dispose();
-                _Listener = null;
+                tcpListener.Server?.Dispose();
+                tcpListener = null;
             }
 
-            _Clients = null;
-            _Buffers = null;
-            LocalEndPoint = null;
-
-            //GC.SuppressFinalize(this);
+            clients = null;
+            buffers = null;
         }
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(AsyncTcpServer)}] {LocalEndPoint}";
+            return $"[{nameof(AsyncTcpServer)}] {nameof(IsListening)}:{IsListening}  {nameof(LocalEndPoint)}:{LocalEndPoint}";
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="tcpClient"></param>
+        /// <returns></returns>
+        private static bool IsOnline(ref TcpClient tcpClient)
+        {
+            if (tcpClient == null || tcpClient.Client == null) return false;
+            return tcpClient?.Client != null && !((tcpClient.Client.Poll(1000, SelectMode.SelectRead) && (tcpClient.Client.Available == 0)) || !tcpClient.Client.Connected);
+        }
     }
 
 }

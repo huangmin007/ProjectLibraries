@@ -2,59 +2,71 @@
 
 namespace SpaceCG.Net
 {
-#pragma warning disable CS1591
     /// <summary>
     /// 连接类型
     /// </summary>
     public enum ConnectionType
     {
+        /// <summary> <see cref="Unknow"/> 未知类型  </summary>
         Unknow,
 
-        SERIAL,
+        /// <summary> <see cref="SerialPort"/> 类型 </summary>
+        SerialPort,
 
-        SERIAL_RTU,
+        /// <summary> <see cref="TcpClient"/> 类型 </summary>
+        TcpClient,
 
-        TCP_CLIENT,
+        /// <summary> <see cref="UdpClient"/> 类型 </summary>
+        UdpClient,
 
-        UDP_CLIENT,
+        /// <summary> <see cref="TcpServer"/> 类型 </summary>
+        TcpServer,
 
-        TCP_CLIENT_RTU,
+        /// <summary> <see cref="UdpServer"/> 类型 </summary>
+        UdpServer,
 
-        UDP_CLIENT_RTU,
+        /// <summary> <see cref="SerialPortRtu"/> 类型, RTU协议 </summary>
+        SerialPortRtu,
 
-        TCP_SERVER,
+        /// <summary> <see cref="TcpClientRtu"/> 类型, RTU协议 </summary>
+        TcpClientRtu,
 
-        UDP_SERVER,
+        /// <summary> <see cref="UdpClientRtu"/> 类型, RTU协议 </summary>
+        UdpClientRtu,
     }
 
     /// <summary>
-    /// 连接接口
+    /// 连接对象接口
     /// </summary>
     public interface IConnection : IDisposable
     {
-        event EventHandler<EventArgs> ConnectedEvent;
+        /// <summary>
+        /// 连接对象的类型
+        /// </summary>
+        ConnectionType Type { get; }
 
-        event EventHandler<EventArgs> DisconnectedEvent;
-
+        /// <summary>
+        /// 连接对象的名称
+        /// </summary>
         string Name { get; set; }
+
+        /// <summary>
+        /// 连接对象的连接状态
+        /// </summary>
         bool IsConnected { get; }
 
-        int ReadTimeout { get; set; }
+        /// <summary>
+        /// 向连接的另一端发送数据，或是广播数据
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns>发送成功则返回 True, 否则返回 False</returns>
+        bool SendBytes(byte[] data);
 
-        int WriteTimeout { get; set; }
-
-        void Connect(string hostOrComm, uint portOrRate, params object[] args);
-
-        void Close();
-
-        void SendBytes(byte[] data);
-
-        void SendMessage(String message);
-
-        //int ReceiveBytes(byte[] data, int offset, int length);
-
-        //String ReceiveMessage(int offset, int length);
-
+        /// <summary>
+        /// 向连接的另一端发送文本消息，或是广播文本消息
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns>发送成功则返回 True, 否则返回 False</returns>
+        bool SendMessage(String message);
     }
-#pragma warning restore CA1591
 }

@@ -7,7 +7,7 @@ namespace SpaceCG.Net
     /// <summary>
     /// 简单的异步服务端接口，为可跨平台编译准备的
     /// </summary>
-    public interface IAsyncServer : IDisposable
+    public interface IAsyncServer : IConnection, IDisposable
     {
         /// <summary>
         /// 与客户端的连接已建立事件
@@ -24,7 +24,7 @@ namespace SpaceCG.Net
         /// <summary>
         /// 产生了异常事件
         /// </summary>
-        event EventHandler<AsyncExceptionEventArgs> ExceptionEventHandler;
+        event EventHandler<AsyncExceptionEventArgs> ExceptionEvent;
 
         /// <summary>
         /// 客户端对象集合
@@ -37,7 +37,7 @@ namespace SpaceCG.Net
         /// <summary>
         /// 服务是否正在运行
         /// </summary>
-        bool IsRunning { get; }
+        bool IsListening { get; }
         /// <summary>
         /// 绑定的本地 IP 地址和端口号
         /// </summary>
@@ -84,19 +84,6 @@ namespace SpaceCG.Net
         /// <param name="port">远程端口号</param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
         bool SendMessage(String message,  String ipAddress, int port);
-
-        /// <summary>
-        /// 异步发送数据到所有远程客户端
-        /// </summary>
-        /// <param name="data">要发送的数据</param>
-        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
-        bool SendBytes(byte[] data);
-        /// <summary>
-        /// 异步发送数据到所有远程客户端
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
-        bool SendMessage(String message);
     }
 
     /// <summary>

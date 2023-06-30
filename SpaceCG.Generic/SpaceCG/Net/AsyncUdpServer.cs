@@ -13,16 +13,24 @@ namespace SpaceCG.Net
     public class AsyncUdpServer : IAsyncServer
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(AsyncUdpServer));
-        
 
         /// <inheritdoc/>
-        public int ClientCount => _Clients != null ? _Clients.Count : 0;
+        public string Name { get; set; }
         /// <inheritdoc/>
-        public bool IsRunning { get; private set; }
+        public ConnectionType Type => ConnectionType.UdpServer;
+        /// <summary>
+        /// 与客户端的连接状态，服务端已启动且客户端连接大于 0
+        /// </summary>
+        public bool IsConnected => IsListening && ClientCount > 0;
+
         /// <inheritdoc/>
-        public IPEndPoint LocalEndPoint { get; private set; }
+        public int ClientCount => clients != null ? clients.Count : 0;
         /// <inheritdoc/>
-        public ICollection<EndPoint> Clients => _Clients?.ToArray();
+        public bool IsListening => udpClient?.Client != null && udpClient.Client.IsBound;
+        /// <inheritdoc/>
+        public IPEndPoint LocalEndPoint => udpClient.Client.LocalEndPoint as IPEndPoint;
+        /// <inheritdoc/>
+        public ICollection<EndPoint> Clients => clients?.ToArray();
         /// <inheritdoc/>
         public event EventHandler<AsyncEventArgs> ClientConnected;
         /// <inheritdoc/>
@@ -30,10 +38,11 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public event EventHandler<AsyncDataEventArgs> ClientDataReceived;
         /// <inheritdoc/>
-        public event EventHandler<AsyncExceptionEventArgs> ExceptionEventHandler;
+        public event EventHandler<AsyncExceptionEventArgs> ExceptionEvent;
 
-        private UdpClient _Server;
-        private List<IPEndPoint> _Clients;
+        private UdpClient udpClient;
+        private IPEndPoint localEndPoint;
+        private List<IPEndPoint> clients;
 
         /// <summary>
         /// 异步 UDP 服务
@@ -56,9 +65,9 @@ namespace SpaceCG.Net
         /// <param name="listenPort"></param>
         public AsyncUdpServer(IPAddress localIPAddress, ushort listenPort)
         {
-            _Clients = new List<IPEndPoint>();
-            _Server = new UdpClient(new IPEndPoint(localIPAddress, listenPort));
-            LocalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
+            clients = new List<IPEndPoint>();
+            localEndPoint = new IPEndPoint(localIPAddress, listenPort);
+            
         }
         /// <summary>
         /// 异步 UDP 服务
@@ -72,45 +81,39 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public bool Start()
         {
-            if (!IsRunning)
-            {
-                IsRunning = true;
-                _Server.EnableBroadcast = true;
-                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-                {
-                    try
-                    {
-                        _Server.AllowNatTraversal(true);
-                    }
-                    catch { }
-                }
+            if (IsListening) return true;
 
-                _Server.BeginReceive(ReceiveCallback, null);
-                LocalEndPoint = _Server.Client.LocalEndPoint as IPEndPoint;
+            udpClient?.Dispose();
+
+            udpClient = new UdpClient(localEndPoint);
+            udpClient.EnableBroadcast = true;
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                try { udpClient.AllowNatTraversal(true); }
+                catch { }
             }
 
-            return IsRunning;
+            udpClient.BeginReceive(ReceiveCallback, null);
+
+            return IsListening;
         }
         /// <inheritdoc/>
         public bool Stop()
         {
-            if (IsRunning)
-            {
-                IsRunning = false;
-                try
-                {
-                    _Server.Close();
-                }
-                catch(Exception ex)
-                {
-                    IsRunning = false;
-                    ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
-                }
+            if (!IsListening) return true;
+            clients.Clear();
 
-                _Clients.Clear();
+            try
+            {
+                udpClient?.Close();
+                udpClient?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(LocalEndPoint, ex));
             }
 
-            return !IsRunning;
+            return !IsListening;
         }
         
         /// <summary>
@@ -119,17 +122,17 @@ namespace SpaceCG.Net
         /// <param name="ar"></param>
         private void ReceiveCallback(IAsyncResult ar)
         {
-            if (!IsRunning || _Server == null) return;
+            if (!IsListening || udpClient == null) return;
 
             byte[] buffer = null;
             IPEndPoint remote = null;
 
             try
             {
-                buffer = _Server.EndReceive(ar, ref remote);
-                if (_Clients.IndexOf(remote) == -1)
+                buffer = udpClient.EndReceive(ar, ref remote);
+                if (clients.IndexOf(remote) == -1)
                 {
-                    _Clients.Add(remote);
+                    clients.Add(remote);
                     ClientConnected?.Invoke(this, new AsyncEventArgs(remote));
                 }
                 ClientDataReceived?.Invoke(this, new AsyncDataEventArgs(remote, buffer));
@@ -139,29 +142,29 @@ namespace SpaceCG.Net
                 if (ar.AsyncState != null)
                 {
                     remote = (IPEndPoint)ar.AsyncState;
-                    _Clients.Remove(remote);
+                    clients.Remove(remote);
                     ClientDisconnected?.Invoke(this, new AsyncEventArgs(remote));
                 }
                 Logger.Error(ex.ToString());
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
             }
 
-            if (remote != null) _Server.BeginReceive(ReceiveCallback, remote);
+            if (remote != null) udpClient.BeginReceive(ReceiveCallback, remote);
         }
 
         /// <inheritdoc/>
         public bool SendBytes(byte[] datagram, EndPoint remote)
         {
-            if (!IsRunning || remote?.GetType() != typeof(IPEndPoint)) return false;
+            if (!IsListening || remote?.GetType() != typeof(IPEndPoint)) return false;
 
             try
             {
-                _Server.BeginSend(datagram, datagram.Length, (IPEndPoint)remote, SendCallback, remote);
+                udpClient.BeginSend(datagram, datagram.Length, (IPEndPoint)remote, SendCallback, remote);
             }
             catch (Exception ex)
             {
                 Logger.Error($"数据报异步发送到目标 {remote} 异常：{ex}");
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
                 return false;
             }
             return true;
@@ -172,12 +175,12 @@ namespace SpaceCG.Net
             IPEndPoint remote = new IPEndPoint(IPAddress.Parse(ipAddress), port);
             try
             {
-                _Server.BeginSend(datagram, datagram.Length, ipAddress, port, SendCallback, remote);
+                udpClient.BeginSend(datagram, datagram.Length, ipAddress, port, SendCallback, remote);
             }
             catch (Exception ex)
             {
                 Logger.Error($"数据报异步发送到目标 {ipAddress}:{port} 异常：{ex}");
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
                 return false;
             }
             return true;
@@ -193,24 +196,32 @@ namespace SpaceCG.Net
             int count = 0;
             try
             {
-                count = _Server.EndSend(ar);
+                count = udpClient.EndSend(ar);
             }
             catch (Exception ex)
             {
                 Logger.Error($"{ar.AsyncState} 结束挂起的异步发送异常：{ex}");
-                ExceptionEventHandler?.Invoke(this, new AsyncExceptionEventArgs((IPEndPoint)ar.AsyncState, ex));
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs((IPEndPoint)ar.AsyncState, ex));
             }
         }
-        /// <inheritdoc/>
+        /// <summary>
+        /// 异步发送数据到所有远程客户端
+        /// </summary>
+        /// <param name="datagram">要发送的数据</param>
+        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
         public bool SendBytes(byte[] datagram)
         {
-            foreach(var client in _Clients)
+            foreach(var client in clients)
             {
                 SendBytes(datagram, client);
             }
             return true;
         }
-        /// <inheritdoc/>
+        /// <summary>
+        /// 异步发送数据到所有远程客户端
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
         public bool SendMessage(String message) => SendBytes(Encoding.Default.GetBytes(message));
 
         /// <inheritdoc/>
@@ -218,18 +229,17 @@ namespace SpaceCG.Net
         {
             Stop();
 
-            _Clients?.Clear();
-            _Clients = null;
+            clients?.Clear();
+            clients = null;
 
-            _Server?.Dispose();
-            _Server = null;
+            udpClient?.Dispose();
+            udpClient = null;
 
-            LocalEndPoint = null;
         }
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(AsyncUdpServer)}] {LocalEndPoint}";
+            return $"[{nameof(AsyncUdpServer)}] {nameof(IsListening)}:{IsListening}  {nameof(LocalEndPoint)}:{LocalEndPoint}";
         }
 
     }
