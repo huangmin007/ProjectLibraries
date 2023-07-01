@@ -1,14 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Ports;
 using System.Linq;
 using System.Threading;
-using System.Xml;
 using System.Xml.Linq;
 using Modbus.Device;
 using SpaceCG.Generic;
-using SpaceCG.Net;
 
 namespace SpaceCG.Extensions.Modbus
 {
@@ -46,22 +42,22 @@ namespace SpaceCG.Extensions.Modbus
         /// Name
         /// </summary>
         public String Name { get; private set; } = null;
-        private ControlInterface ControlInterface;
+        private ReflectionInterface ReflectionInterface;
         private IEnumerable<XElement> ModbusElements;
 
         /// <summary>
         /// Modbus 设备管理对象
         /// </summary>
-        /// <param name="controlInterface"></param>
+        /// <param name="reflectionInterface"></param>
         /// <param name="name"></param>
-        public ModbusDeviceManager(ControlInterface controlInterface, string name)
+        public ModbusDeviceManager(ReflectionInterface reflectionInterface, string name)
         {
-            if (controlInterface == null || string.IsNullOrWhiteSpace(name))  
+            if (reflectionInterface == null || string.IsNullOrWhiteSpace(name))  
                 throw new ArgumentNullException("参数错误，不能为空");
 
             this.Name = name;
-            this.ControlInterface = controlInterface;
-            this.ControlInterface.AccessObjects.Add(name, this);
+            this.ReflectionInterface = reflectionInterface;
+            this.ReflectionInterface.AccessObjects.Add(name, this);
         }
        
         /// <summary>
@@ -77,9 +73,9 @@ namespace SpaceCG.Extensions.Modbus
 
             foreach (XElement modbusElement in modbusElements)
             {
-                String name = modbusElement.Attribute(ControlInterface.XName)?.Value;
+                String name = modbusElement.Attribute(ReflectionInterface.XName)?.Value;
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                if (this.ControlInterface.AccessObjects.ContainsKey(name))
+                if (this.ReflectionInterface.AccessObjects.ContainsKey(name))
                 {
                     Logger.Warn($"对象名称 {name} 已存在, {modbusElement}");
                     continue;
@@ -93,11 +89,11 @@ namespace SpaceCG.Extensions.Modbus
 
                     if (!string.IsNullOrWhiteSpace(connectionName))
                     {
-                        var master = this.ControlInterface.AccessObjects[connectionName];
+                        var master = this.ReflectionInterface.AccessObjects[connectionName];
                         if (typeof(IModbusMaster).IsAssignableFrom(master.GetType()))
                         {
                             transport.StartTransport(master as IModbusMaster);
-                            ControlInterface.AccessObjects.Add(transport.Name, transport);
+                            ReflectionInterface.AccessObjects.Add(transport.Name, transport);
                         }
                         else
                         {
@@ -158,12 +154,12 @@ namespace SpaceCG.Extensions.Modbus
             if (ModbusElements?.Count() <= 0) return;
             foreach (XElement modbus in ModbusElements)
             {
-                if (modbus.Attribute(ControlInterface.XName)?.Value != transportName) continue;
+                if (modbus.Attribute(ReflectionInterface.XName)?.Value != transportName) continue;
 
-                IEnumerable<XElement> events = modbus.Descendants(ControlInterface.XEvent);
+                IEnumerable<XElement> events = modbus.Descendants(ReflectionInterface.XEvent);
                 foreach (XElement evt in events)
                 {
-                    if (evt.Attribute(ControlInterface.XType)?.Value != eventType) continue;
+                    if (evt.Attribute(ReflectionInterface.XType)?.Value != eventType) continue;
                     
                     if (!StringExtensions.TryParse(evt.Attribute(XDeviceAddress)?.Value, out byte deviceAddress)) continue;
                     if (deviceAddress != slaveAddress) continue;
@@ -171,13 +167,13 @@ namespace SpaceCG.Extensions.Modbus
                     if (!StringExtensions.TryParse(evt.Attribute($"{register.Type}Address")?.Value, out ushort regAddress)) continue;
                     if (regAddress != register.Address) continue;
 
-                    if (StringExtensions.TryParse(evt.Attribute(ControlInterface.XValue)?.Value, out long regValue) && regValue == register.Value)
+                    if (StringExtensions.TryParse(evt.Attribute(ReflectionInterface.XValue)?.Value, out long regValue) && regValue == register.Value)
                     {
                         if (Logger.IsInfoEnabled)
                             Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
-                        IEnumerable<XElement> actions = evt.Elements(ControlInterface.XAction);
-                        foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
+                        IEnumerable<XElement> actions = evt.Elements(ReflectionInterface.XAction);
+                        foreach (XElement action in actions) ReflectionInterface.TryParseControlMessage(action, out object result);
                         continue;
                     }
                     else if(StringExtensions.TryParse(evt.Attribute(XMinValue)?.Value, out long minValue) && StringExtensions.TryParse(evt.Attribute(XMaxValue)?.Value, out long maxValue))
@@ -187,8 +183,8 @@ namespace SpaceCG.Extensions.Modbus
                             if (Logger.IsInfoEnabled)
                                 Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
-                            IEnumerable<XElement> actions = evt.Elements(ControlInterface.XAction);
-                            foreach (XElement action in actions) ControlInterface.TryParseCallMethod(action, out object result);
+                            IEnumerable<XElement> actions = evt.Elements(ReflectionInterface.XAction);
+                            foreach (XElement action in actions) ReflectionInterface.TryParseControlMessage(action, out object result);
                         }
                     }
                 }//End for                
@@ -204,15 +200,15 @@ namespace SpaceCG.Extensions.Modbus
             if (ModbusElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventType) || string.IsNullOrWhiteSpace(transportName)) return;
 
             IEnumerable<XElement> events = from modbus in ModbusElements
-                                           where modbus.Attribute(ControlInterface.XName)?.Value == transportName
-                                           from evt in modbus.Descendants(ControlInterface.XEvent)
-                                           where evt.Attribute(ControlInterface.XType)?.Value == eventType
+                                           where modbus.Attribute(ReflectionInterface.XName)?.Value == transportName
+                                           from evt in modbus.Descendants(ReflectionInterface.XEvent)
+                                           where evt.Attribute(ReflectionInterface.XType)?.Value == eventType
                                            select evt;
 
             if (events?.Count() <= 0) return;
             foreach (XElement evt in events)
             {
-                ControlInterface.TryParseControlMessage(evt, out object returnResult);
+                ReflectionInterface.TryParseControlMessage(evt, out object returnResult);
             }
         }
 
@@ -226,15 +222,15 @@ namespace SpaceCG.Extensions.Modbus
             if (ModbusElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventName) || string.IsNullOrWhiteSpace(transportName)) return;
 
             IEnumerable<XElement> events = from modbus in ModbusElements
-                                           where modbus.Attribute(ControlInterface.XName)?.Value == transportName
-                                           from evt in modbus.Descendants(ControlInterface.XEvent)
-                                           where evt.Attribute(ControlInterface.XName)?.Value == eventName
+                                           where modbus.Attribute(ReflectionInterface.XName)?.Value == transportName
+                                           from evt in modbus.Descendants(ReflectionInterface.XEvent)
+                                           where evt.Attribute(ReflectionInterface.XName)?.Value == eventName
                                            select evt;
 
             foreach (XElement element in events.Elements())
             {
-                if (element.Name.LocalName == ControlInterface.XAction)
-                    ControlInterface.TryParseControlMessage(element, out object result);
+                if (element.Name.LocalName == ReflectionInterface.XAction)
+                    ReflectionInterface.TryParseControlMessage(element, out object result);
             }
         }
         /// <summary>
@@ -245,17 +241,16 @@ namespace SpaceCG.Extensions.Modbus
         {
             if (ModbusElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventName)) return;
 
-            IEnumerable<XElement> events = from evt in ModbusElements.Descendants(ControlInterface.XEvent)
-                                           where evt.Attribute(ControlInterface.XName)?.Value == eventName
+            IEnumerable<XElement> events = from evt in ModbusElements.Descendants(ReflectionInterface.XEvent)
+                                           where evt.Attribute(ReflectionInterface.XName)?.Value == eventName
                                            select evt;
 
             foreach (XElement element in events.Elements())
             {
-                if(element.Name.LocalName == ControlInterface.XAction)
-                    ControlInterface.TryParseControlMessage(element, out object result);
+                if(element.Name.LocalName == ReflectionInterface.XAction)
+                    ReflectionInterface.TryParseControlMessage(element, out object result);
             }
         }
-
 
         /// <summary>
         /// Clear Devices
@@ -269,15 +264,15 @@ namespace SpaceCG.Extensions.Modbus
             Type DisposableType = typeof(IDisposable);
             foreach (XElement modbus in ModbusElements)
             {
-                string name = modbus.Attribute(ControlInterface.XName)?.Value;
+                string name = modbus.Attribute(ReflectionInterface.XName)?.Value;
 
                 if (string.IsNullOrWhiteSpace(name) || name == this.Name) continue;
-                if (!ControlInterface.AccessObjects.ContainsKey(name)) continue;
+                if (!ReflectionInterface.AccessObjects.ContainsKey(name)) continue;
 
-                ModbusTransport transport = ControlInterface.AccessObjects[name] as ModbusTransport;
+                ModbusTransport transport = ReflectionInterface.AccessObjects[name] as ModbusTransport;
                 if (transport == null)
                 {
-                    ControlInterface.AccessObjects.Remove(name);
+                    ReflectionInterface.AccessObjects.Remove(name);
                     continue;
                 }
 
@@ -292,7 +287,7 @@ namespace SpaceCG.Extensions.Modbus
                 }
                 finally
                 {
-                    ControlInterface.AccessObjects.Remove(name);
+                    ReflectionInterface.AccessObjects.Remove(name);
                 }
             }
 

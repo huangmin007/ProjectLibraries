@@ -17,7 +17,7 @@ namespace ModbusDevicesManagerServices
         static readonly LoggerTrace Logger = new LoggerTrace("ProgramMain");
 
         private static bool Running = true;
-        private static ControlInterface ControlInterface;
+        private static ReflectionInterface ControlInterface;
         private static ConnectionManager ConnectionManager;
         private static ModbusDeviceManager ModbusDeviceManager;
         
@@ -87,7 +87,7 @@ namespace ModbusDevicesManagerServices
 
             ushort localPort = ushort.TryParse(Configuration.Attribute("LocalPort")?.Value, out ushort port) && port >= 1024 ? port : (ushort)2023;
             if(ControlInterface == null)
-                ControlInterface = new ControlInterface(localPort);
+                ControlInterface = new ReflectionInterface(localPort);
 
             if (ConnectionManager == null)
                 ConnectionManager = new ConnectionManager(ControlInterface, Connections.Attribute("Name")?.Value);

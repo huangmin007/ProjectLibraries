@@ -13,6 +13,14 @@ using System.Threading.Tasks;
 namespace SpaceCG.Generic
 {
     /// <summary>
+    /// 更名, 建议更换使用 <see cref="ReflectionInterface"/>
+    /// </summary>
+    [Obsolete("更名, 建议更换使用 ReflectionInterface", false)]
+    public class ControlInterface : ReflectionInterface
+    {
+    }
+
+    /// <summary>
     /// 网络消息事件参数
     /// </summary>
     public class MessageEventArgs : EventArgs
@@ -45,15 +53,15 @@ namespace SpaceCG.Generic
     }
 
     /// <summary>
-    /// 控制器接口对象
-    /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-    /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
-    /// <para>控制协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
-    /// <para>网络接口返回(XML)：&lt;Return Result="True/False" Value="value" /&gt; 属性 Result 表示远程执行返回状态(成功/失败)，Value 表示远程执行返回值 (Method 返回值，或是 Property 值)</para>
+    /// 反射接口对象, 用于网络、键盘、代码、配置、或是其它方式的控制或访问对象
+    /// <para>消息协议(XML)：&lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+    /// <para>消息协议(XML)：&lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
+    /// <para>消息协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
+    /// <para>网络接口可以有返回值(XML)：&lt;Return Result="True/False" Value="value" /&gt; 属性 Result 表示远程执行返回状态(成功/失败)，Value 表示远程执行返回值 (Method 返回值，或是 Property 值)</para>
     /// </summary>
-    public sealed class ControlInterface : IDisposable
+    public class ReflectionInterface : IDisposable
     {
-        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ControlInterface));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ReflectionInterface));
 
         /// <summary> <see cref="XEvent"/> Name </summary>
         public const string XEvent = "Event";
@@ -79,43 +87,43 @@ namespace SpaceCG.Generic
         public const string XSync = "Sync";
 
         /// <summary>
-        /// Network Control Message Event Handler
+        /// Network Message Event Handler
         /// </summary>
         public event EventHandler<MessageEventArgs> NetworkMessageEvent;
 
         /// <summary>
-        /// 网络控制接口服务对象
+        /// 网络访问接口服务对象
         /// </summary>
         private Dictionary<String, IDisposable> NetworkServices = new Dictionary<String, IDisposable>(8);
 
         /// <summary>
-        /// 组合控制消息的集合，调用方式 <see cref="CallMessageGroup(int)"/>
+        /// 组合访问消息的集合，调用方式 <see cref="CallMessageGroup(int)"/>
         /// <para>主要用于键盘控制，或其它形式的组合操作</para>
-        /// <para>key值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息</para>
+        /// <para>key 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息</para>
         /// </summary>
         public Dictionary<int, ICollection<String>> MessageGroups { get; private set; } = new Dictionary<int, ICollection<String>>(16);
 
         /// <summary>
-        /// 可访问或可控制对象的集合，可以通过反射技术访问的对象集合
+        /// 可控制、访问的对象集合，就是可以通过反射技术访问的对象集合
         /// <para>值键对 &lt;name, object&gt; name 表示唯一的对象名称</para>
         /// </summary>
         public Dictionary<String, Object> AccessObjects { get; private set; } = new Dictionary<String, Object>(16);
 
         /// <summary>
-        /// 可访问对象的方法过滤集，指定对象的方法不在控制范围内；字符格式为：objectName.methodName, objectName 支持通配符 '*'
-        /// <para>例如："*.Dispose" 禁可访所有对象的 Dispose 方法，默认已添加</para>
+        /// 可控制、访问的对象的方法过滤集合，指定对象的方法不在控制范围内；字符格式为：objectName.methodName, objectName 支持通配符 '*'
+        /// <para>例如："*.Dispose" 禁止反射访问所有对象的 Dispose 方法，默认已添加</para>
         /// </summary>
         public List<String> MethodFilters { get; } = new List<String>(16) { "*.Dispose" };
 
         /// <summary>
-        /// 可访问对象的属性过滤集，指定对象的属性不在控制范围内；字符格式为：objectName.propertyName, objectName 支持通配符 '*'
-        /// <para>例如："*.Name" 禁访问所有对象的 Name 属性，默认已添加</para>
+        /// 可控制、访问的对象的属性过滤集合，指定对象的属性不在访问范围内；字符格式为：objectName.propertyName, objectName 支持通配符 '*'
+        /// <para>例如："*.Name" 禁止反射访问所有对象的 Name 属性，默认已添加</para>
         /// </summary>
         public List<String> PropertyFilters { get; } = new List<String>(16) { "*.Name" };
 
         /// <summary>
-        /// 默认情况下, 使用同步执行控制, 默认为 true
-        /// <para>可以跟据控制指令属性 Sync 动态调整当前指令是使用同步执行还是异步执行</para>
+        /// 默认情况下, 使用同步执行控制或是访问对象, 默认为 true
+        /// <para>可以跟据消息协议属性 Sync 动态调整当前消息是使用同步执行还是异步执行</para>
         /// </summary>
         public bool SyncControl { get; set; } = true;
 
@@ -125,13 +133,14 @@ namespace SpaceCG.Generic
         private SynchronizationContext SyncContext { get; set; } = SynchronizationContext.Current;
 
         /// <summary>
-        /// 反射控制接口对象
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
-        /// <para>控制协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
-        /// <param name="localPort">服务端口，小于 1024 则不启动服务接口</param>
+        /// 反射接口对象, 用于网络、键盘、代码、配置、或是其它方式的控制或访问对象
+        /// <para>消息协议(XML)：&lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// <para>消息协议(XML)：&lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
+        /// <para>消息协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
+        /// <para>网络接口可以有返回值(XML)：&lt;Return Result="True/False" Value="value" /&gt; 属性 Result 表示远程执行返回状态(成功/失败)，Value 表示远程执行返回值 (Method 返回值，或是 Property 值)</para>
+        /// <param name="localPort">是否启用网络服务访问，小于 1024 则不启动服务接口</param>
         /// </summary>
-        public ControlInterface(ushort localPort = 2023)
+        public ReflectionInterface(ushort localPort = 2023)
         {
             InstallNetworkService(localPort);
         }
@@ -274,7 +283,7 @@ namespace SpaceCG.Generic
             {
                 foreach (string message in messages)
                 {
-                    this.TryParseControlMessage(message, out object returnValue);
+                    this.TryParseControlMessage(message, out _);
                 }
             }
             return true;
@@ -304,10 +313,10 @@ namespace SpaceCG.Generic
         }
 
         /// <summary>
-        /// 试图解析 xml 格式消息，在 Objects 字典中查找实例对象，并调用实例对象的方法或属性
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
-        /// <para>控制协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
+        /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
+        /// <para>消息协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// <para>消息协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
+        /// <para>消息协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
         /// </summary>
         /// <param name="xmlMessage"></param>
         /// <param name="returnResult"></param>
@@ -320,10 +329,10 @@ namespace SpaceCG.Generic
             return TryParseControlMessage(actionElement, out returnResult);
         }
         /// <summary>
-        /// 试图解析 xml 格式消息，在 Objects 字典中查找实例对象，并调用实例对象的方法或属性
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// <para>控制协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
-        /// <para>控制协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
+        /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
+        /// <para>消息协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
+        /// <para>消息协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
+        /// <para>消息协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
         /// </summary>
         /// <param name="actionElement"></param>
         /// <param name="returnResult"></param>
@@ -355,6 +364,20 @@ namespace SpaceCG.Generic
                 return TryParseChangeValues(actionElement);
             }
         }
+        /// <summary>
+        /// 试图解析多个 xml 格式消息的集合, 在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
+        /// </summary>
+        /// <param name="actionElements"></param>
+        /// <returns></returns>
+        public bool TryParseControlMessage(IEnumerable<XElement> actionElements)
+        {
+            if (actionElements == null || actionElements.Count() <= 0) return false;
+
+            foreach (var action in actionElements) 
+                TryParseControlMessage(action, out _);
+            
+            return true;
+        }
 
         /// <summary>
         /// 试图解析 xml 格式消息，在 Object 字典找实例对象，并调用实例对象的方法
@@ -381,7 +404,7 @@ namespace SpaceCG.Generic
                 return false;
             }
             //不可操作的对象类型
-            if (targetObject.GetType() == typeof(ControlInterface)) return false;
+            if (targetObject.GetType() == typeof(ReflectionInterface)) return false;
             //不可操作的对象方法
             if (MethodFilters.IndexOf($"*.{methodName}") != -1 || MethodFilters.IndexOf($"{objectName}.{methodName}") != -1) return false;
 
@@ -473,7 +496,7 @@ namespace SpaceCG.Generic
             }
 
             //不可操作的对象类型
-            if (targetObject.GetType() == typeof(ControlInterface)) return false;
+            if (targetObject.GetType() == typeof(ReflectionInterface)) return false;
             //不可操作的对象属性
             if (PropertyFilters.IndexOf($"*.{propertyName}") != -1 || PropertyFilters.IndexOf($"{objectName}.{propertyName}") != -1) return false;
 

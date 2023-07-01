@@ -34,7 +34,7 @@ namespace SpaceCG.Generic
         /// Name
         /// </summary>
         public String Name { get; private set; } = null;
-        private ControlInterface ControlInterface;
+        private ReflectionInterface ReflectionInterface;
         private IEnumerable<XElement> ConnectionElements;
 
         private ConcurrentDictionary<string, IReadOnlyCollection<DataEventParams>> ConnectionDataEvents = new ConcurrentDictionary<string, IReadOnlyCollection<DataEventParams>>();
@@ -42,20 +42,20 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 连接管理对象
         /// </summary>
-        /// <param name="controlInterface"></param>
+        /// <param name="reflectionInterface"></param>
         /// <param name="name"></param>
-        public ConnectionManager(ControlInterface controlInterface, string name)
+        public ConnectionManager(ReflectionInterface reflectionInterface, string name)
         {
-            if (controlInterface == null || string.IsNullOrWhiteSpace(name))
+            if (reflectionInterface == null || string.IsNullOrWhiteSpace(name))
                 throw new ArgumentNullException("参数错误，不能为空");
 
             this.Name = name;
-            this.ControlInterface = controlInterface;
-            this.ControlInterface.AccessObjects.Add(name, this);
+            this.ReflectionInterface = reflectionInterface;
+            this.ReflectionInterface.AccessObjects.Add(name, this);
         }
 
         /// <summary>
-        /// 解析连接配置，并添加到 <see cref="ControlInterface.AccessObjects"/> 集合中
+        /// 解析连接配置，并添加到 <see cref="ReflectionInterface.AccessObjects"/> 集合中
         /// </summary>
         /// <param name="connectionElements">至少具有 Name, Type, Parameters 属性的 Connection 节点集合 </param>
         public void TryParseConnectionElements(IEnumerable<XElement> connectionElements)
@@ -68,15 +68,15 @@ namespace SpaceCG.Generic
             foreach (XElement connectionElement in connectionElements)
             {
                 if (connectionElement.Name.LocalName != XConnection) continue;
-                string name = connectionElement.Attribute(ControlInterface.XName)?.Value;
+                string name = connectionElement.Attribute(ReflectionInterface.XName)?.Value;
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                if (this.ControlInterface.AccessObjects.ContainsKey(name))
+                if (this.ReflectionInterface.AccessObjects.ContainsKey(name))
                 {
                     Logger.Warn($"对象名称 {name} 已存在, {connectionElement}");
                     continue;
                 }
 
-                string type = connectionElement.Attribute(ControlInterface.XType)?.Value;
+                string type = connectionElement.Attribute(ReflectionInterface.XType)?.Value;
                 if (string.IsNullOrWhiteSpace(type)) continue;
                 if (!Enum.TryParse(type, out ConnectionType connectionType))
                 {
@@ -89,10 +89,10 @@ namespace SpaceCG.Generic
                 String[] args = parameters.Split(',');
 
                 if (!CreateConnection(connectionType, out object connectionObject, args)) continue;
-                ControlInterface.AccessObjects.Add(name, connectionObject);
+                ReflectionInterface.AccessObjects.Add(name, connectionObject);
 
                 object connection = connectionObject;
-                IReadOnlyCollection<DataEventParams> dataEvents = GetConnectionDataEvents(connectionElement.Elements(ControlInterface.XEvent));
+                IReadOnlyCollection<DataEventParams> dataEvents = GetConnectionDataEvents(connectionElement.Elements(ReflectionInterface.XEvent));
 
                 switch (connectionType)
                 {
@@ -120,18 +120,18 @@ namespace SpaceCG.Generic
                         if (dataEvents?.Count > 0)
                         { 
                             client.Name = name;
-                            client.DataReceived += Client_DataReceived;
+                            client.DataReceived += Network_DataReceived;
                             ConnectionDataEvents.TryAdd(client.Name, dataEvents);
                         }
                         break;
 
                     case ConnectionType.TcpServer:
                     case ConnectionType.UdpServer:
-                        if (connectionElement.Elements(ControlInterface.XEvent)?.Count() > 0)
+                        if (connectionElement.Elements(ReflectionInterface.XEvent)?.Count() > 0)
                         {
                             IAsyncServer server = connectionObject as IAsyncServer;
                             server.Name = name;
-                            server.ClientDataReceived += Server_ClientDataReceived;
+                            server.ClientDataReceived += Network_DataReceived;
                             ConnectionDataEvents.TryAdd(server.Name, dataEvents);
                         }
                         break;
@@ -142,8 +142,8 @@ namespace SpaceCG.Generic
                 {
                     XElement elementClone = XElement.Parse(connectionElement.ToString());
                     elementClone.Attribute(XParameters).Remove();
-                    elementClone.Attribute(ControlInterface.XName).Remove();
-                    elementClone.Attribute(ControlInterface.XType).Remove();
+                    elementClone.Attribute(ReflectionInterface.XName).Remove();
+                    elementClone.Attribute(ReflectionInterface.XType).Remove();
 
                     InstanceExtensions.SetInstancePropertyValues(connection, elementClone.Attributes());
                 }
@@ -163,8 +163,8 @@ namespace SpaceCG.Generic
 
             foreach (XElement evt in events)
             {
-                if (evt.Name.LocalName != ControlInterface.XEvent || 
-                    evt.Attribute(ControlInterface.XType)?.Value != "Data") continue;
+                if (evt.Name.LocalName != ReflectionInterface.XEvent || 
+                    evt.Attribute(ReflectionInterface.XType)?.Value != "Data") continue;
 
                 DataEventParams dataArgs = new DataEventParams();
                 string bytes = evt.Attribute("Bytes")?.Value;
@@ -182,13 +182,17 @@ namespace SpaceCG.Generic
                     }
                 }
 
-                dataArgs.Actions = evt.Elements(ControlInterface.XAction);
+                dataArgs.Actions = evt.Elements(ReflectionInterface.XAction);
                 dataEvents.Add(dataArgs);
             }
 
             return dataEvents;
         }
-
+        /// <summary>
+        /// 试图 Call 匹配的对象
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="bytes"></param>
         private void TryCallDataEvents(string name, byte[] bytes)
         {
             if (string.IsNullOrWhiteSpace(name) || bytes?.Length <= 0) return;
@@ -200,23 +204,17 @@ namespace SpaceCG.Generic
                     if ((dataEvent.Message != null && bytes.SequenceEqual(dataEvent.Message)) ||
                         (dataEvent.Bytes != null && bytes.SequenceEqual(dataEvent.Bytes)))
                     {
-                        foreach (var action in dataEvent.Actions)
-                            this.ControlInterface.TryParseControlMessage(action, out object returnResult);
+                        this.ReflectionInterface.TryParseControlMessage(dataEvent.Actions);
                     }
                 }
             }
         }
 
-        private void Client_DataReceived(object sender, AsyncDataEventArgs e)
+        private void Network_DataReceived(object sender, AsyncDataEventArgs e)
         {
-            IAsyncClient client = (IAsyncClient)sender;
-            TryCallDataEvents(client.Name, e.Bytes);
-        }
-        private void Server_ClientDataReceived(object sender, AsyncDataEventArgs e)
-        {
-            IAsyncServer server = (IAsyncServer)sender;
-            TryCallDataEvents(server.Name, e.Bytes);
-        }
+            IConnection connection = sender as IConnection;
+            TryCallDataEvents(connection.Name, e.Bytes);
+        }       
         private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
             if (e.EventType != SerialData.Eof) return;
@@ -241,7 +239,7 @@ namespace SpaceCG.Generic
         }
 
         /// <summary>
-        /// 移除并断开指定连接，从 <see cref="ControlInterface.AccessObjects"/> 集合中移除
+        /// 移除并断开指定连接，从 <see cref="ReflectionInterface.AccessObjects"/> 集合中移除
         /// </summary>
         /// <param name="connectionName"></param>
         public void Remove(string connectionName)
@@ -252,15 +250,15 @@ namespace SpaceCG.Generic
             foreach (XElement connection in ConnectionElements)
             {
                 if (connection.Name.LocalName != XConnection) continue;
-                string name = connection.Attribute(ControlInterface.XName)?.Value;
+                string name = connection.Attribute(ReflectionInterface.XName)?.Value;
                 
                 if (string.IsNullOrWhiteSpace(name) || name != connectionName) continue;
-                if (!ControlInterface.AccessObjects.ContainsKey(name)) continue;
+                if (!ReflectionInterface.AccessObjects.ContainsKey(name)) continue;
 
-                object obj = ControlInterface.AccessObjects[name];
+                object obj = ReflectionInterface.AccessObjects[name];
                 if (obj == null)
                 {
-                    ControlInterface.AccessObjects.Remove(name);
+                    ReflectionInterface.AccessObjects.Remove(name);
                     continue;
                 }
 
@@ -274,13 +272,13 @@ namespace SpaceCG.Generic
                 }
                 finally
                 {
-                    ControlInterface.AccessObjects.Remove(name);
+                    ReflectionInterface.AccessObjects.Remove(name);
                 }
             }
         }
 
         /// <summary>
-        /// 移除并断开所有连接，从 <see cref="ControlInterface.AccessObjects"/> 集合中移除
+        /// 移除并断开所有连接，从 <see cref="ReflectionInterface.AccessObjects"/> 集合中移除
         /// </summary>
         public void RemoveAll()
         {
@@ -290,15 +288,15 @@ namespace SpaceCG.Generic
             foreach (XElement connection in ConnectionElements)
             {
                 if (connection.Name.LocalName != XConnection) continue;
-                string name = connection.Attribute(ControlInterface.XName)?.Value;
+                string name = connection.Attribute(ReflectionInterface.XName)?.Value;
 
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                if (!ControlInterface.AccessObjects.ContainsKey(name)) continue;
+                if (!ReflectionInterface.AccessObjects.ContainsKey(name)) continue;
 
-                object obj = ControlInterface.AccessObjects[name];
+                object obj = ReflectionInterface.AccessObjects[name];
                 if (obj == null)
                 {
-                    ControlInterface.AccessObjects.Remove(name);
+                    ReflectionInterface.AccessObjects.Remove(name);
                     continue;
                 }
 
@@ -312,7 +310,7 @@ namespace SpaceCG.Generic
                 }
                 finally
                 {
-                    ControlInterface.AccessObjects.Remove(name);
+                    ReflectionInterface.AccessObjects.Remove(name);
                 }
             }
 
