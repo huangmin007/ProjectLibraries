@@ -376,7 +376,7 @@ namespace SpaceCG.Generic
                 WriteHeader(source, eventType, id);
                 WriteMessage(message);
                 WriteFooter(eventCache);
-                
+
                 TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, null));
             }
         }

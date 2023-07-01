@@ -22,7 +22,7 @@ namespace SpaceCG.Extensions
         /// <returns></returns>
         internal static object[] GetNumberStringBase(String numberString)
         {
-            if (string.IsNullOrWhiteSpace(numberString)) 
+            if (string.IsNullOrWhiteSpace(numberString))
                 throw new ArgumentNullException(nameof(numberString), "参数不能为空");
 
             object[] parameters = new object[2];
@@ -64,7 +64,7 @@ namespace SpaceCG.Extensions
         /// <param name="numberString"></param>
         /// <param name="result"></param>
         /// <returns></returns>
-        public static bool TryParse<NumberType>(this String numberString, out NumberType result) 
+        public static bool TryParse<NumberType>(this String numberString, out NumberType result)
             where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
         {
             result = default;
@@ -269,16 +269,16 @@ namespace SpaceCG.Extensions
                 if (!match.Success) continue;
 #if true
                 String trimValue = match.Value.Trim();
-                if((trimValue.IndexOf('\'') == 0 && trimValue.LastIndexOf('\'') == trimValue.Length - 1) ||
+                if ((trimValue.IndexOf('\'') == 0 && trimValue.LastIndexOf('\'') == trimValue.Length - 1) ||
                    (trimValue.IndexOf('\"') == 0 && trimValue.LastIndexOf('\"') == trimValue.Length - 1))
                 {
                     args.Add(trimValue.Substring(1, trimValue.Length - 2));
                 }
-                else if(trimValue.IndexOf('[') == 0 && trimValue.LastIndexOf(']') == trimValue.Length - 1)
+                else if (trimValue.IndexOf('[') == 0 && trimValue.LastIndexOf(']') == trimValue.Length - 1)
                 {
                     args.Add(SplitParameters(trimValue.Substring(1, trimValue.Length - 2)));
                 }
-                else if(trimValue.LastIndexOf(',') == trimValue.Length - 1)
+                else if (trimValue.LastIndexOf(',') == trimValue.Length - 1)
                 {
                     args.Add(trimValue.Substring(0, trimValue.Length - 1));
                 }
@@ -336,7 +336,7 @@ namespace SpaceCG.Extensions
 
             for (int i = 0; i < value.Length; i++)
             {
-                if(ConvertChangeTypeToValueType(value.GetValue(i), elementType, out ValueType cValue))
+                if (ConvertChangeTypeToValueType(value.GetValue(i), elementType, out ValueType cValue))
                 {
                     conversionValue.SetValue(cValue, i);
                 }
@@ -362,7 +362,7 @@ namespace SpaceCG.Extensions
         public static bool ConvertChangeTypeToValueType(object value, Type conversionType, out ValueType conversionValue)
         {
             conversionValue = null;
-            if (conversionType == null || !conversionType.IsValueType) 
+            if (conversionType == null || !conversionType.IsValueType)
                 throw new ArgumentException(nameof(conversionType), "需要转换的类型应为值类型参数");
 
             if (value == null) return true;
@@ -377,7 +377,7 @@ namespace SpaceCG.Extensions
                 conversionValue = value as ValueType;
                 return true;
             }
-            
+
             //Enum
             if (conversionType.IsEnum)
             {
@@ -400,7 +400,7 @@ namespace SpaceCG.Extensions
             else if (conversionType == typeof(sbyte) || conversionType == typeof(byte) || conversionType == typeof(short) || conversionType == typeof(ushort) ||
                 conversionType == typeof(Int32) || conversionType == typeof(UInt32) || conversionType == typeof(Int64) || conversionType == typeof(UInt64))
             {
-                string methodName = $"To{conversionType.Name}";                
+                string methodName = $"To{conversionType.Name}";
                 IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                                   where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == conversionType
                                                   let m_params = method.GetParameters()
@@ -409,8 +409,8 @@ namespace SpaceCG.Extensions
 
                 conversionValue = value as ValueType;
                 if (methods?.Count() != 1) return false;
-                
-                MethodInfo ConvertToNumber = methods.First(); 
+
+                MethodInfo ConvertToNumber = methods.First();
                 object[] parameters = GetNumberStringBase(value.ToString());
 
                 try
@@ -425,14 +425,14 @@ namespace SpaceCG.Extensions
                 }
             }
             //Double,Float
-            else if(conversionType == typeof(double) || conversionType == typeof(float))
+            else if (conversionType == typeof(double) || conversionType == typeof(float))
             {
                 string methodName = $"To{conversionType.Name}";
                 IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                                    where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == conversionType
-                                                    let m_params = method.GetParameters()
-                                                    where m_params[0].ParameterType == typeof(string)
-                                                    select method;
+                                                  where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == conversionType
+                                                  let m_params = method.GetParameters()
+                                                  where m_params[0].ParameterType == typeof(string)
+                                                  select method;
 
                 conversionValue = value as ValueType;
                 if (methods?.Count() != 1) return false;

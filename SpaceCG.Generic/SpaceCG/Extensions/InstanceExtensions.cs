@@ -117,10 +117,10 @@ namespace SpaceCG.Extensions
         /// <param name="fieldName"></param>
         /// <param name="value"></param>
         /// <returns>获取成功返回 true, 否则返回 false </returns>
-        public static bool GetInstanceFieldValue(object instanceObj, String fieldName, out object value)
+        public static bool GetInstanceFieldValue(object instanceObj, string fieldName, out object value)
         {
             value = null;
-            if (instanceObj == null || String.IsNullOrWhiteSpace(fieldName)) return false;
+            if (instanceObj == null || string.IsNullOrWhiteSpace(fieldName)) return false;
 
             try
             {
@@ -148,9 +148,9 @@ namespace SpaceCG.Extensions
         /// <param name="fieldName"></param>
         /// <param name="value"></param>
         /// <returns>设置成功返回 true, 否则返回 false </returns>
-        public static bool SetInstanceFieldValue(object instanceObj, String fieldName, object value)
+        public static bool SetInstanceFieldValue(object instanceObj, string fieldName, object value)
         {
-            if (instanceObj == null || String.IsNullOrWhiteSpace(fieldName)) return false;
+            if (instanceObj == null || string.IsNullOrWhiteSpace(fieldName)) return false;
 
             Type type = instanceObj.GetType();
             FieldInfo fieldInfo = type.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -160,7 +160,7 @@ namespace SpaceCG.Extensions
                 return false;
             }
 
-            if(ConvertChangeType(value, fieldInfo.FieldType, out object convertValue))
+            if (ConvertChangeType(value, fieldInfo.FieldType, out object convertValue))
             {
                 try
                 {
@@ -184,12 +184,12 @@ namespace SpaceCG.Extensions
         /// <param name="instanceParentObj"></param>
         /// <param name="element"></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public static void SetInstancePropertyValues(Object instanceParentObj, XElement element)
+        public static void SetInstancePropertyValues(object instanceParentObj, XElement element)
         {
             if (instanceParentObj == null || element == null)
                 throw new ArgumentNullException($"{nameof(instanceParentObj)},{nameof(element)}", "参数不能为空");
 
-            if(!GetInstanceFieldValue(instanceParentObj, element.Name.LocalName, out object instanceObj)) return;
+            if (!GetInstanceFieldValue(instanceParentObj, element.Name.LocalName, out object instanceObj)) return;
 
             SetInstancePropertyValues(instanceObj, element.Attributes());
         }
@@ -238,9 +238,9 @@ namespace SpaceCG.Extensions
         /// <param name="propertyName"></param>
         /// <param name="newValue"></param>
         /// <returns>设置成功返回 true, 否则返回 false </returns>
-        public static bool SetInstancePropertyValue(Object instanceObj, String propertyName, Object newValue)
+        public static bool SetInstancePropertyValue(object instanceObj, string propertyName, object newValue)
         {
-            if (instanceObj == null || String.IsNullOrWhiteSpace(propertyName)) return false;
+            if (instanceObj == null || string.IsNullOrWhiteSpace(propertyName)) return false;
 
             Type type = instanceObj.GetType();
             PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
@@ -269,10 +269,10 @@ namespace SpaceCG.Extensions
         /// <param name="propertyName"></param>
         /// <param name="value"></param>
         /// <returns>获取成功返回 true, 否则返回 false </returns>
-        public static bool GetInstancePropertyValue(Object instanceObj, String propertyName, out object value)
+        public static bool GetInstancePropertyValue(object instanceObj, string propertyName, out object value)
         {
             value = null;
-            if (instanceObj == null || String.IsNullOrWhiteSpace(propertyName)) return false;
+            if (instanceObj == null || string.IsNullOrWhiteSpace(propertyName)) return false;
 
             Type type = instanceObj.GetType();
             PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
@@ -283,7 +283,7 @@ namespace SpaceCG.Extensions
                 value = property.GetValue(instanceObj);
                 return true;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error(ex);
             }
@@ -322,7 +322,7 @@ namespace SpaceCG.Extensions
                     if (instanceObj.GetType().GetEvent(eventName) == null) continue;
 
                     instanceObj.GetType().GetEvent(eventName).RemoveEventHandler(instanceObj, handler);
-                    if(Logger.IsDebugEnabled) Logger.Debug($"Object({instanceObj.GetType()}) Remove Event: {eventName}({handler.Method.Name})");
+                    if (Logger.IsDebugEnabled) Logger.Debug($"object({instanceObj.GetType()}) Remove Event: {eventName}({handler.Method.Name})");
                 }
                 return true;
             }
@@ -339,7 +339,7 @@ namespace SpaceCG.Extensions
         /// <exception cref="ArgumentNullException"></exception>
         public static void RemoveInstanceEvents(object instanceObj)
         {
-            if (instanceObj == null) 
+            if (instanceObj == null)
                 throw new ArgumentNullException(nameof(instanceObj), "参数不能为空");
 
             EventInfo[] events = instanceObj.GetType().GetEvents();
@@ -399,7 +399,7 @@ namespace SpaceCG.Extensions
             returnValue = null;
             if (methodInfo == null) return false;
 
-            String paramDebugInfo = "";
+            string paramDebugInfo = "";
             ParameterInfo[] parameterInfos = methodInfo.GetParameters();
             if (parameterInfos.Length > 0)
             {
@@ -473,10 +473,10 @@ namespace SpaceCG.Extensions
         /// <param name="parameters"></param>
         /// <param name="returnValue">函数的返回值</param>
         /// <returns>方法调用成功返回 true, 否则返回 false</returns>
-        public static bool CallInstanceMethod(object instanceObj, String methodName, object[] parameters, out object returnValue)
+        public static bool CallInstanceMethod(object instanceObj, string methodName, object[] parameters, out object returnValue)
         {
             returnValue = null;
-            if (instanceObj == null || String.IsNullOrWhiteSpace(methodName)) return false;
+            if (instanceObj == null || string.IsNullOrWhiteSpace(methodName)) return false;
 
             Type type = instanceObj.GetType();
             int paramLength = parameters == null ? 0 : parameters.Length;
@@ -493,7 +493,7 @@ namespace SpaceCG.Extensions
                 Logger.Info($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName}/{paramLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
                 return CallInstanceExtensionMethod(instanceObj, methodName, parameters, out returnValue);
             }
-            
+
             return CallInstanceMethod(instanceObj, methods.First(), parameters, out returnValue);
         }
 
@@ -506,10 +506,10 @@ namespace SpaceCG.Extensions
         /// <param name="parameters"></param>
         /// <param name="returnValue">函数的返回值</param>
         /// <returns>方法调用成功返回 true, 否则返回 false</returns>
-        public static bool CallInstanceExtensionMethod(object instanceObj, String methodName, object[] parameters, out object returnValue)
+        public static bool CallInstanceExtensionMethod(object instanceObj, string methodName, object[] parameters, out object returnValue)
         {
             returnValue = null;
-            if (instanceObj == null || String.IsNullOrWhiteSpace(methodName)) return false;
+            if (instanceObj == null || string.IsNullOrWhiteSpace(methodName)) return false;
 
             List<MethodInfo> methods = (from type in typeof(InstanceExtensions).Assembly.GetTypes()
                                         where type.IsSealed && !type.IsGenericType && !type.IsNested
@@ -538,10 +538,10 @@ namespace SpaceCG.Extensions
         /// <param name="parameters"></param>
         /// <param name="returnValue">函数的返回值</param>
         /// <returns>方法调用成功返回 true, 否则返回 false</returns>
-        public static bool CallClassStaticMethod(String classFullName, String methodName, object[] parameters, out object returnValue)
+        public static bool CallClassStaticMethod(String classFullName, string methodName, object[] parameters, out object returnValue)
         {
             returnValue = null;
-            if (String.IsNullOrWhiteSpace(classFullName) || String.IsNullOrWhiteSpace(methodName)) return false;
+            if (string.IsNullOrWhiteSpace(classFullName) || string.IsNullOrWhiteSpace(methodName)) return false;
 
             List<MethodInfo> methods = (from assembly in AppDomain.CurrentDomain.GetAssemblies()
                                         let type = assembly.GetType(classFullName)

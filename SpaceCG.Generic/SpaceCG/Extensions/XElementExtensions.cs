@@ -39,7 +39,7 @@ namespace SpaceCG.Extensions
             var refTemplates = rootElement.Descendants(refTemplateXName);
             if (refTemplates?.Count() <= 0) return;
 
-            //Analyse Replace
+            //Analyse And Replace
             for (int i = 0; i < refTemplates?.Count(); i++)
             {
                 var refTemplate = refTemplates.ElementAt(i);

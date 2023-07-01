@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using SpaceCG.Generic;
+using SpaceCG.Net;
 
 namespace SpaceCG.Extensions
 {
@@ -16,8 +17,73 @@ namespace SpaceCG.Extensions
         /// <summary>
         /// log4net.Logger 对象
         /// </summary>
-        //private static readonly log4net.ILog Logger = log4net.LogManager.GetLogger(nameof(NetworkExtensions));
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(InstanceExtensions));
+
+
+        /// <summary>
+        /// 创建 TCP/UDP 网络连接对象
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="type"></param>
+        /// <param name="address"></param>
+        /// <param name="port"></param>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        public static bool CreateConnection<T>(ConnectionType type, string address, ushort port, out T connection) where T : IConnection, new()
+        {
+            connection = default(T);
+            if (type == ConnectionType.Unknow || string.IsNullOrWhiteSpace(address) || port == 0)
+            {
+                Logger.Warn($"无效的参数 {type} {address} {port}");
+                return false;
+            }
+            if (!IPAddress.TryParse(address, out IPAddress ipAddress))
+            {
+                Logger.Warn($"无效的 IP 地址 {address}");
+                return false;
+            }
+
+            switch (type)
+            {
+                case ConnectionType.TcpServer:
+                case ConnectionType.UdpServer:
+                    try
+                    {
+                        IAsyncServer Server = null;
+                        if (type == ConnectionType.TcpServer) Server = new AsyncTcpServer(ipAddress, port);
+                        if (type == ConnectionType.UdpServer) Server = new AsyncUdpServer(ipAddress, port);
+
+                        Server.Start();
+                        connection = (T)Server;
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"创建连接类型 {type} 错误: {ex}");
+                    }
+                    break;
+
+                case ConnectionType.TcpClient:
+                case ConnectionType.UdpClient:
+                    try
+                    {
+                        IAsyncClient Client = null;
+                        if (type == ConnectionType.TcpClient) Client = new AsyncTcpClient();
+                        if (type == ConnectionType.UdpClient) Client = new AsyncUdpClient();
+
+                        connection = (T)Client;
+                        Client.Connect(ipAddress, port);
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"创建连接类型 {type} 错误: {ex}");
+                    }
+                    break;
+            }
+
+            return false;
+        }
 
         /// <summary>
         /// 获取本机的 IPv4 地址
