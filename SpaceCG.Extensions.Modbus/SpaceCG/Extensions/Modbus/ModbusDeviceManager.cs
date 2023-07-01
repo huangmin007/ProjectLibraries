@@ -5,6 +5,8 @@ using System.Threading;
 using System.Xml.Linq;
 using Modbus.Device;
 using SpaceCG.Generic;
+using SpaceCG.Net;
+using static System.Collections.Specialized.BitVector32;
 
 namespace SpaceCG.Extensions.Modbus
 {
@@ -21,6 +23,8 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary> <see cref="XDevices"/> Name </summary>
         public const string XDevices = "Devices";
 
+        /// <summary> <see cref="XConnectionName"/> Name </summary>
+        public const string XConnectionName = "ConnectionName";
 
         /// <summary> <see cref="XDisposed"/> Name </summary>
         public const string XDisposed = "Disposed";
@@ -39,7 +43,7 @@ namespace SpaceCG.Extensions.Modbus
         public const string XDeviceAddress = "DeviceAddress";
 
         /// <summary>
-        /// Name
+        /// Current Object Name
         /// </summary>
         public String Name { get; private set; } = null;
         private ReflectionInterface ReflectionInterface;
@@ -52,19 +56,26 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="name"></param>
         public ModbusDeviceManager(ReflectionInterface reflectionInterface, string name)
         {
-            if (reflectionInterface == null || string.IsNullOrWhiteSpace(name))  
-                throw new ArgumentNullException("参数错误，不能为空");
+            if (reflectionInterface == null)  
+                throw new ArgumentNullException(nameof(reflectionInterface), "参数错误，不能为空");
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentNullException(nameof(name), "参数错误，不能为空");
 
             this.Name = name;
             this.ReflectionInterface = reflectionInterface;
             this.ReflectionInterface.AccessObjects.Add(name, this);
         }
-       
+
         /// <summary>
         /// 解析 Modbus 节点元素
+        /// <code>//配置示例：
+        /// &lt;Modbus Name="Bus.#01" ConnectionName="modbusConnection"&gt; ... 
+        /// //OR 建议采用以下方式
+        /// &lt;Modbus Name="Bus.#01" Type="ModbusRtu" Parameters="COM7,115200" WriteTimeout="30" &gt; ...
+        /// </code>
         /// </summary>
         /// <param name="modbusElements"></param>
-        public void TryParseModbusElements(IEnumerable<XElement> modbusElements)
+        public void TryParseElements(IEnumerable<XElement> modbusElements)
         {
             if (modbusElements?.Count() <= 0) return;
 
@@ -73,43 +84,61 @@ namespace SpaceCG.Extensions.Modbus
 
             foreach (XElement modbusElement in modbusElements)
             {
+                if (modbusElement.Name.LocalName != XModbus) continue;
+
                 String name = modbusElement.Attribute(ReflectionInterface.XName)?.Value;
-                if (string.IsNullOrWhiteSpace(name)) continue;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    Logger.Warn($"配置格式错误, 属性 {ReflectionInterface.XName} 不能为空, {modbusElement}");
+                    continue;
+                }
                 if (this.ReflectionInterface.AccessObjects.ContainsKey(name))
                 {
-                    Logger.Warn($"对象名称 {name} 已存在, {modbusElement}");
+                    Logger.Warn($"配置格式错误, 访问对象名称 {name} 已存在, {modbusElement}");
                     continue;
                 }
 
-                if (ModbusTransport.TryParse(modbusElement, out ModbusTransport transport))
+                if (!ModbusTransport.TryParse(modbusElement, out ModbusTransport transport))
                 {
-                    transport.InputChangeEvent += Transport_InputChangeEvent;
-                    transport.OutputChangeEvent += Transport_OutputChangeEvent;
-                    string connectionName = modbusElement.Attribute("ConnectionName")?.Value;
+                    Logger.Warn($"解析/创建 传输总线 设备失败: {modbusElement}");
+                    continue;
+                }
 
-                    if (!string.IsNullOrWhiteSpace(connectionName))
-                    {
-                        var master = this.ReflectionInterface.AccessObjects[connectionName];
-                        if (typeof(IModbusMaster).IsAssignableFrom(master.GetType()))
-                        {
-                            transport.StartTransport(master as IModbusMaster);
-                            ReflectionInterface.AccessObjects.Add(transport.Name, transport);
-                        }
-                        else
-                        {
-                            transport.Dispose();
-                            Logger.Error($"错误：连接对象 {master} 未实现 IModbusMaster 接口");
-                        }
-                    }
+                object master = null;
+                string connectionName = modbusElement.Attribute(XConnectionName)?.Value;
+                if (!string.IsNullOrWhiteSpace(connectionName))
+                {
+                    if (this.ReflectionInterface.AccessObjects.ContainsKey(connectionName))
+                        master = this.ReflectionInterface.AccessObjects[connectionName];
                     else
                     {
                         transport.Dispose();
-                        Logger.Warn($"Modbus 对象未指定连接 ConnectionName 对象");
+                        Logger.Warn($"{XModbus} 对象指定的连接 {XConnectionName} 对象 {name} 不存在, {modbusElement}");
+                        continue;
                     }
                 }
                 else
                 {
-                    Logger.Warn($"解析/添加 传输总线 设备失败: {modbusElement}");
+                    if (!ConnectionManager.CreateConnection(modbusElement, out master))
+                    {
+                        transport.Dispose();
+                        Logger.Warn($"创建 {XModbus} 的连接对象失败 {modbusElement}");
+                        continue;
+                    }
+                }
+
+                if (master != null && typeof(IModbusMaster).IsAssignableFrom(master.GetType()))
+                {
+                    transport.InputChangeEvent += Transport_InputChangeEvent;
+                    transport.OutputChangeEvent += Transport_OutputChangeEvent;
+
+                    transport.StartTransport(master as IModbusMaster);
+                    ReflectionInterface.AccessObjects.Add(transport.Name, transport);
+                }
+                else
+                {
+                    transport.Dispose();
+                    Logger.Error($"错误：连接对象 {master} 未实现 {nameof(IModbusMaster)} 接口");
                 }
             }
 
@@ -172,8 +201,8 @@ namespace SpaceCG.Extensions.Modbus
                         if (Logger.IsInfoEnabled)
                             Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
-                        IEnumerable<XElement> actions = evt.Elements(ReflectionInterface.XAction);
-                        foreach (XElement action in actions) ReflectionInterface.TryParseControlMessage(action, out object result);
+                        ReflectionInterface.TryParseControlMessage(evt.Elements());
+                        //ReflectionInterface.TryParseControlMessage(evt.Elements(ReflectionInterface.XAction));
                         continue;
                     }
                     else if(StringExtensions.TryParse(evt.Attribute(XMinValue)?.Value, out long minValue) && StringExtensions.TryParse(evt.Attribute(XMaxValue)?.Value, out long maxValue))
@@ -183,8 +212,8 @@ namespace SpaceCG.Extensions.Modbus
                             if (Logger.IsInfoEnabled)
                                 Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
-                            IEnumerable<XElement> actions = evt.Elements(ReflectionInterface.XAction);
-                            foreach (XElement action in actions) ReflectionInterface.TryParseControlMessage(action, out object result);
+                            ReflectionInterface.TryParseControlMessage(evt.Elements());
+                            //ReflectionInterface.TryParseControlMessage(evt.Elements(ReflectionInterface.XAction));
                         }
                     }
                 }//End for                
@@ -205,11 +234,7 @@ namespace SpaceCG.Extensions.Modbus
                                            where evt.Attribute(ReflectionInterface.XType)?.Value == eventType
                                            select evt;
 
-            if (events?.Count() <= 0) return;
-            foreach (XElement evt in events)
-            {
-                ReflectionInterface.TryParseControlMessage(evt, out object returnResult);
-            }
+            ReflectionInterface.TryParseControlMessage(events.Elements());
         }
 
         /// <summary>
@@ -227,11 +252,7 @@ namespace SpaceCG.Extensions.Modbus
                                            where evt.Attribute(ReflectionInterface.XName)?.Value == eventName
                                            select evt;
 
-            foreach (XElement element in events.Elements())
-            {
-                if (element.Name.LocalName == ReflectionInterface.XAction)
-                    ReflectionInterface.TryParseControlMessage(element, out object result);
-            }
+            ReflectionInterface.TryParseControlMessage(events.Elements());
         }
         /// <summary>
         /// 跟据事件名称，调用事件
@@ -245,11 +266,7 @@ namespace SpaceCG.Extensions.Modbus
                                            where evt.Attribute(ReflectionInterface.XName)?.Value == eventName
                                            select evt;
 
-            foreach (XElement element in events.Elements())
-            {
-                if(element.Name.LocalName == ReflectionInterface.XAction)
-                    ReflectionInterface.TryParseControlMessage(element, out object result);
-            }
+            ReflectionInterface.TryParseControlMessage(events.Elements());
         }
 
         /// <summary>
@@ -257,9 +274,10 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         public void RemoveAll()
         {
+            if (ModbusElements == null || ModbusElements.Count() <= 0) return;
+
             CallEventType(XDisposed, null);
             Thread.Sleep(100);
-            if (ModbusElements == null || ModbusElements.Count() <= 0) return;
 
             Type DisposableType = typeof(IDisposable);
             foreach (XElement modbus in ModbusElements)

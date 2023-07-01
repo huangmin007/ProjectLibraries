@@ -5,6 +5,8 @@ using System.IO.Ports;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using Modbus.Device;
 using SpaceCG.Extensions;
@@ -25,19 +27,21 @@ namespace SpaceCG.Generic
         public const string XConnection = "Connection";
         /// <summary> <see cref="XParameters"/> Name </summary>
         public const string XParameters = "Parameters";
-        /// <summary> <see cref="XReadTimeout"/> Name </summary>
-        public const string XReadTimeout = "ReadTimeout";
-        /// <summary> <see cref="XWriteTimeout"/> Name </summary>
-        public const string XWriteTimeout = "WriteTimeout";
+
+        /// <summary> <see cref="XData"/> Name </summary>
+        public const string XData = "Data";
+        /// <summary> <see cref="XBytes"/> Name </summary>
+        public const string XBytes = "Bytes";
+        /// <summary> <see cref="XMessage"/> Name </summary>
+        public const string XMessage = "Message";
 
         /// <summary>
-        /// Name
+        /// Current Object Name
         /// </summary>
         public String Name { get; private set; } = null;
         private ReflectionInterface ReflectionInterface;
         private IEnumerable<XElement> ConnectionElements;
-
-        private ConcurrentDictionary<string, IReadOnlyCollection<DataEventParams>> ConnectionDataEvents = new ConcurrentDictionary<string, IReadOnlyCollection<DataEventParams>>();
+        private ConcurrentDictionary<string, IReadOnlyCollection<DataEventParams>> ConnectionDataEvents;
 
         /// <summary>
         /// 连接管理对象
@@ -46,19 +50,32 @@ namespace SpaceCG.Generic
         /// <param name="name"></param>
         public ConnectionManager(ReflectionInterface reflectionInterface, string name)
         {
-            if (reflectionInterface == null || string.IsNullOrWhiteSpace(name))
+            if (reflectionInterface == null)
                 throw new ArgumentNullException("参数错误，不能为空");
 
             this.Name = name;
             this.ReflectionInterface = reflectionInterface;
-            this.ReflectionInterface.AccessObjects.Add(name, this);
+            this.ConnectionDataEvents = new ConcurrentDictionary<string, IReadOnlyCollection<DataEventParams>>();
+
+            if (!string.IsNullOrWhiteSpace(Name)) this.ReflectionInterface.AccessObjects.Add(name, this);
         }
 
         /// <summary>
-        /// 解析连接配置，并添加到 <see cref="ReflectionInterface.AccessObjects"/> 集合中
+        /// 解析连接配置 Connection 节点的集合，并添加到 <see cref="ReflectionInterface.AccessObjects"/> 集合中
+        /// <code>//配置示例：
+        /// &lt;Connection Name = "tcpServer" Type="TcpServer" Parameters="0.0.0.0,3000" /&gt;
+        /// &lt;Connection Name = "tcp" Type="TcpClient" Parameters="127.0.0.1,9600" ReadTimeout="30" &gt;
+        ///    &lt;Event Type = "Data" Message="Hello" &gt;
+        ///        &lt;Action Target = "Bus.#01" Method="TurnSingleCoil" Params="0x02, 1" /&gt;
+        ///    &lt;/Event&gt;
+        ///    &lt;Event Type = "Data" Bytes="0x01,0x02,0x03" &gt;
+        ///        &lt;Action Target = "Bus.#01" Method="TurnSingleCoil" Params="0x02, 1" /&gt;
+        ///    &lt;/Event&gt;
+        /// &lt;/Connection&gt;
+        /// </code>
         /// </summary>
         /// <param name="connectionElements">至少具有 Name, Type, Parameters 属性的 Connection 节点集合 </param>
-        public void TryParseConnectionElements(IEnumerable<XElement> connectionElements)
+        public void TryParseElements(IEnumerable<XElement> connectionElements)
         {
             if (connectionElements?.Count() <= 0) return;
 
@@ -68,31 +85,27 @@ namespace SpaceCG.Generic
             foreach (XElement connectionElement in connectionElements)
             {
                 if (connectionElement.Name.LocalName != XConnection) continue;
+
                 string name = connectionElement.Attribute(ReflectionInterface.XName)?.Value;
-                if (string.IsNullOrWhiteSpace(name)) continue;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    Logger.Warn($"配置格式错误, 属性 {ReflectionInterface.XName} 不能为空, {connectionElement}");
+                    continue;
+                }
+
+                if (!CreateConnection(connectionElement, out object connectionObject)) continue;
                 if (this.ReflectionInterface.AccessObjects.ContainsKey(name))
                 {
-                    Logger.Warn($"对象名称 {name} 已存在, {connectionElement}");
+                    Logger.Warn($"配置格式错误, 访问对象名称 {name} 已存在, {connectionElement}");
+                    if (typeof(IDisposable).IsAssignableFrom(connectionObject.GetType())) (connectionObject as IDisposable)?.Dispose();
                     continue;
                 }
 
-                string type = connectionElement.Attribute(ReflectionInterface.XType)?.Value;
-                if (string.IsNullOrWhiteSpace(type)) continue;
-                if (!Enum.TryParse(type, out ConnectionType connectionType))
-                {
-                    Logger.Warn($"连接类型 {type} 错误, 不存在的连接类型, {connectionElement}");
-                    continue;
-                }
-
-                string parameters = connectionElement.Attribute(XParameters)?.Value;
-                if (string.IsNullOrWhiteSpace(parameters)) continue;
-                String[] args = parameters.Split(',');
-
-                if (!CreateConnection(connectionType, out object connectionObject, args)) continue;
                 ReflectionInterface.AccessObjects.Add(name, connectionObject);
-
-                object connection = connectionObject;
                 IReadOnlyCollection<DataEventParams> dataEvents = GetConnectionDataEvents(connectionElement.Elements(ReflectionInterface.XEvent));
+
+                if (dataEvents?.Count <= 0) continue;
+                ConnectionType connectionType = (ConnectionType)Enum.Parse(typeof(ConnectionType), connectionElement.Attribute(ReflectionInterface.XType).Value, true);
 
                 switch (connectionType)
                 {
@@ -101,51 +114,30 @@ namespace SpaceCG.Generic
                     case ConnectionType.ModbusUdp:
                     case ConnectionType.ModbusTcpRtu:
                     case ConnectionType.ModbusUdpRtu:
-                        connection = (connectionObject as IModbusMaster)?.Transport;
                         break;
 
                     case ConnectionType.SerialPort:
-                        if (dataEvents?.Count > 0)
-                        {
-                            SerialPort serialPort = connectionObject as SerialPort;
-                            serialPort.DataReceived += SerialPort_DataReceived;
-                            ConnectionDataEvents.TryAdd($"{serialPort.PortName}_{serialPort.BaudRate}", dataEvents);
-                        }
+                        SerialPort serialPort = connectionObject as SerialPort;
+                        serialPort.DataReceived += SerialPort_DataReceived;
+                        ConnectionDataEvents.TryAdd($"{serialPort.PortName}_{serialPort.BaudRate}", dataEvents);
                         break;
 
                     case ConnectionType.TcpClient:
                     case ConnectionType.UdpClient:
                         IAsyncClient client = connectionObject as IAsyncClient;
-                        client.Disconnected += (s, e) => { client.Connect(); };
-                        if (dataEvents?.Count > 0)
-                        { 
-                            client.Name = name;
-                            client.DataReceived += Network_DataReceived;
-                            ConnectionDataEvents.TryAdd(client.Name, dataEvents);
-                        }
+                        client.Name = name;
+                        client.DataReceived += Network_DataReceived;
+                        ConnectionDataEvents.TryAdd(client.Name, dataEvents);
                         break;
 
                     case ConnectionType.TcpServer:
                     case ConnectionType.UdpServer:
-                        if (connectionElement.Elements(ReflectionInterface.XEvent)?.Count() > 0)
-                        {
-                            IAsyncServer server = connectionObject as IAsyncServer;
-                            server.Name = name;
-                            server.ClientDataReceived += Network_DataReceived;
-                            ConnectionDataEvents.TryAdd(server.Name, dataEvents);
-                        }
+                        IAsyncServer server = connectionObject as IAsyncServer;
+                        server.Name = name;
+                        server.ClientDataReceived += Network_DataReceived;
+                        ConnectionDataEvents.TryAdd(server.Name, dataEvents);
+
                         break;
-                }
-
-                //设置实例的其它属性值
-                if (connectionElement.Attributes()?.Count() > 3)
-                {
-                    XElement elementClone = XElement.Parse(connectionElement.ToString());
-                    elementClone.Attribute(XParameters).Remove();
-                    elementClone.Attribute(ReflectionInterface.XName).Remove();
-                    elementClone.Attribute(ReflectionInterface.XType).Remove();
-
-                    InstanceExtensions.SetInstancePropertyValues(connection, elementClone.Attributes());
                 }
             }
         }
@@ -155,7 +147,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="events"></param>
         /// <returns></returns>
-        private IReadOnlyCollection<DataEventParams> GetConnectionDataEvents(IEnumerable<XElement> events)
+        protected IReadOnlyCollection<DataEventParams> GetConnectionDataEvents(IEnumerable<XElement> events)
         {
             if (events == null || events.Count() == 0) return null;
 
@@ -163,20 +155,20 @@ namespace SpaceCG.Generic
 
             foreach (XElement evt in events)
             {
-                if (evt.Name.LocalName != ReflectionInterface.XEvent || 
-                    evt.Attribute(ReflectionInterface.XType)?.Value != "Data") continue;
+                if (evt.Name.LocalName != ReflectionInterface.XEvent ||
+                    evt.Attribute(ReflectionInterface.XType)?.Value != XData) continue;
 
+                string bytes = evt.Attribute(XBytes)?.Value;
+                string message = evt.Attribute(XMessage)?.Value;
                 DataEventParams dataArgs = new DataEventParams();
-                string bytes = evt.Attribute("Bytes")?.Value;
-                string message = evt.Attribute("Message")?.Value;
 
                 if (!string.IsNullOrWhiteSpace(message))
                 {
-                    dataArgs.Message = (Encoding.UTF8.GetBytes(message));
+                    dataArgs.Message = Encoding.UTF8.GetBytes(message);
                 }
                 if (!string.IsNullOrWhiteSpace(bytes))
                 {
-                    if(StringExtensions.ConvertChangeTypeToArrayType(bytes.Split(','), typeof(byte[]), out Array conversionValue))
+                    if (StringExtensions.ConvertChangeTypeToArrayType(bytes.Split(','), typeof(byte[]), out Array conversionValue))
                     {
                         dataArgs.Bytes = (byte[])conversionValue;
                     }
@@ -189,17 +181,17 @@ namespace SpaceCG.Generic
             return dataEvents;
         }
         /// <summary>
-        /// 试图 Call 匹配的对象
+        /// 试图调用匹配数据的对象
         /// </summary>
         /// <param name="name"></param>
         /// <param name="bytes"></param>
-        private void TryCallDataEvents(string name, byte[] bytes)
+        protected void TryCallDataEvents(string name, byte[] bytes)
         {
-            if (string.IsNullOrWhiteSpace(name) || bytes?.Length <= 0) return;
+            if (string.IsNullOrWhiteSpace(name) || bytes?.Length <= 0 || ConnectionDataEvents.Count <= 0) return;
 
             if (ConnectionDataEvents.TryGetValue(name, out IReadOnlyCollection<DataEventParams> dataEvents))
             {
-                foreach (var dataEvent in dataEvents)
+                foreach (DataEventParams dataEvent in dataEvents)
                 {
                     if ((dataEvent.Message != null && bytes.SequenceEqual(dataEvent.Message)) ||
                         (dataEvent.Bytes != null && bytes.SequenceEqual(dataEvent.Bytes)))
@@ -214,7 +206,7 @@ namespace SpaceCG.Generic
         {
             IConnection connection = sender as IConnection;
             TryCallDataEvents(connection.Name, e.Bytes);
-        }       
+        }
         private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
             if (e.EventType != SerialData.Eof) return;
@@ -223,13 +215,12 @@ namespace SpaceCG.Generic
             string objName = $"{serialPort.PortName}_{serialPort.BaudRate}";
 
             byte[] buffer = null;
-
             try
             {
                 buffer = new byte[serialPort.BytesToRead];
                 serialPort.Read(buffer, 0, buffer.Length);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error(ex);
                 return;
@@ -239,51 +230,13 @@ namespace SpaceCG.Generic
         }
 
         /// <summary>
-        /// 移除并断开指定连接，从 <see cref="ReflectionInterface.AccessObjects"/> 集合中移除
-        /// </summary>
-        /// <param name="connectionName"></param>
-        public void Remove(string connectionName)
-        {
-            if (ConnectionElements?.Count() <= 0) return;
-
-            Type DisposableType = typeof(IDisposable);
-            foreach (XElement connection in ConnectionElements)
-            {
-                if (connection.Name.LocalName != XConnection) continue;
-                string name = connection.Attribute(ReflectionInterface.XName)?.Value;
-                
-                if (string.IsNullOrWhiteSpace(name) || name != connectionName) continue;
-                if (!ReflectionInterface.AccessObjects.ContainsKey(name)) continue;
-
-                object obj = ReflectionInterface.AccessObjects[name];
-                if (obj == null)
-                {
-                    ReflectionInterface.AccessObjects.Remove(name);
-                    continue;
-                }
-
-                try
-                {
-                    if (DisposableType.IsAssignableFrom(obj.GetType())) (obj as IDisposable)?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn(ex);
-                }
-                finally
-                {
-                    ReflectionInterface.AccessObjects.Remove(name);
-                }
-            }
-        }
-
-        /// <summary>
-        /// 移除并断开所有连接，从 <see cref="ReflectionInterface.AccessObjects"/> 集合中移除
+        /// 移除并断开所有连接对象，并从 <see cref="ReflectionInterface.AccessObjects"/> 集合中移除
         /// </summary>
         public void RemoveAll()
         {
             if (ConnectionElements == null || ConnectionElements.Count() <= 0) return;
 
+            ConnectionDataEvents.Clear();
             Type DisposableType = typeof(IDisposable);
             foreach (XElement connection in ConnectionElements)
             {
@@ -329,7 +282,7 @@ namespace SpaceCG.Generic
             connectionObject = null;
             if (args.Length < 2 || !int.TryParse(args[1].ToString(), out int portOrRate))
             {
-                Logger.Warn($"连接类型 {type} 参数错误, {args}");
+                Logger.Warn($"连接类型 {type} 的参数 {nameof(args)} 错误, 其参数值不能少于 2 个");
                 return false;
             }
 
@@ -349,11 +302,11 @@ namespace SpaceCG.Generic
 
                         serialPort.Open();
                         connectionObject = serialPort;
-                        return true;
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn($"创建连接类型 {type} 错误: {ex}");
+                        Logger.Warn($"创建连接对象 {type}/{nameof(SerialPort)} 错误: {ex}");
+                        return false;
                     }
                     break;
 
@@ -367,11 +320,11 @@ namespace SpaceCG.Generic
                         IModbusMaster master = ModbusSerialMaster.CreateRtu(serialPortAdapter);
 
                         connectionObject = master;
-                        return true;
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn($"创建连接类型 {type} 错误: {ex}");
+                        Logger.Warn($"创建连接对象 {type}/{nameof(IModbusMaster)} 错误: {ex}");
+                        return false;
                     }
                     break;
 
@@ -379,16 +332,16 @@ namespace SpaceCG.Generic
                 case ConnectionType.UdpServer:
                     try
                     {
-                        IAsyncServer Server = null;
-                        if (type == ConnectionType.TcpServer) Server = new AsyncTcpServer(args[0].ToString(), (ushort)portOrRate);
-                        if (type == ConnectionType.UdpServer) Server = new AsyncUdpServer(args[0].ToString(), (ushort)portOrRate);
+                        IAsyncServer server = null;
+                        if (type == ConnectionType.TcpServer) server = new AsyncTcpServer(args[0].ToString(), (ushort)portOrRate);
+                        if (type == ConnectionType.UdpServer) server = new AsyncUdpServer(args[0].ToString(), (ushort)portOrRate);
 
-                        connectionObject = Server;
-                        return true;
+                        connectionObject = server;
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn($"创建连接类型 {type} 错误: {ex}");
+                        Logger.Warn($"创建连接对象 {type}/{nameof(IAsyncServer)} 错误: {ex}");
+                        return false;
                     }
                     break;
 
@@ -396,17 +349,28 @@ namespace SpaceCG.Generic
                 case ConnectionType.UdpClient:
                     try
                     {
-                        IAsyncClient Client = null;
-                        if (type == ConnectionType.TcpClient) Client = new AsyncTcpClient();
-                        if (type == ConnectionType.UdpClient) Client = new AsyncUdpClient();
+                        IAsyncClient client = null;
+                        if (type == ConnectionType.UdpClient) client = new AsyncUdpClient();
+                        if (type == ConnectionType.TcpClient)
+                        {
+                            client = new AsyncTcpClient();
+                            client.Disconnected += (s, e) =>
+                            {
+                                Task.Run(() =>
+                                {
+                                    Thread.Sleep(1000);
+                                    client.Connect();
+                                });
+                            };
+                        }
 
-                        Client.Connect(args[0].ToString(), (ushort)portOrRate);
-                        connectionObject = Client;
-                        return true;
+                        client.Connect(args[0].ToString(), (ushort)portOrRate);
+                        connectionObject = client;
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn($"创建连接类型 {type} 错误: {ex}");
+                        Logger.Warn($"创建连接对象 {type}/{nameof(IAsyncClient)} 错误: {ex}");
+                        return false;
                     }
                     break;
 
@@ -421,11 +385,11 @@ namespace SpaceCG.Generic
                         if (type == ConnectionType.ModbusTcpRtu) master = ModbusSerialMaster.CreateRtu(tcpClientAdapter);
 
                         connectionObject = master;
-                        return true;
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn($"创建连接类型 {type} 错误: {ex}");
+                        Logger.Warn($"创建连接对象 {type}/{nameof(IModbusMaster)} 错误: {ex}");
+                        return false;
                     }
                     break;
 
@@ -440,16 +404,83 @@ namespace SpaceCG.Generic
                         if (type == ConnectionType.ModbusUdpRtu) master = ModbusSerialMaster.CreateRtu(udpClient);
 
                         connectionObject = master;
-                        return true;
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn($"创建连接类型 {type} 错误: {ex}");
+                        Logger.Warn($"创建连接对象 {type}/{nameof(IModbusMaster)} 错误: {ex}");
+                        return false;
                     }
+                    break;
+
+                default:
+                    Logger.Warn($"未处理的连接类型 {type}");
+                    return false;
+            }
+
+            return true;
+        }
+        /// <summary>
+        /// 创建连接对象
+        /// </summary>
+        /// <param name="connectionElement"></param>
+        /// <param name="connectionObject"></param>
+        /// <returns>创建的连接对象有效时返回 true, 否则返 false</returns>
+        public static bool CreateConnection(XElement connectionElement, out object connectionObject)
+        {
+            connectionObject = null;
+            if (connectionElement == null || !connectionElement.HasAttributes) return false;
+
+            string type = connectionElement.Attribute(ReflectionInterface.XType)?.Value;
+            if (string.IsNullOrWhiteSpace(type))
+            {
+                Logger.Warn($"配置格式错误, 属性 {ReflectionInterface.XType} 不能为空, {connectionElement}");
+                return false;
+            }
+            if (!Enum.TryParse(type, true, out ConnectionType connectionType))
+            {
+                Logger.Warn($"配置格式错误, 属性 {ReflectionInterface.XType} 值 {type} 错误, 不存在的值类型, {connectionElement}");
+                return false;
+            }
+
+            string parameters = connectionElement.Attribute(XParameters)?.Value;
+            if (string.IsNullOrWhiteSpace(parameters))
+            {
+                Logger.Warn($"配置格式错误, 属性 {XParameters} 不能为空, {connectionElement}");
+                return false;
+            }
+            String[] args = parameters.Split(',');
+            if (args.Length < 2)
+            {
+                Logger.Warn($"配置格式错误, 属性 {XParameters} 值 {parameters} 错误, 其参数值不能少于 2 个, {connectionElement}");
+                return false;
+            }
+
+            if (!CreateConnection(connectionType, out connectionObject, args)) return false;
+            object connection = connectionObject;
+
+            switch (connectionType)
+            {
+                case ConnectionType.ModbusRtu:
+                case ConnectionType.ModbusTcp:
+                case ConnectionType.ModbusUdp:
+                case ConnectionType.ModbusTcpRtu:
+                case ConnectionType.ModbusUdpRtu:
+                    connection = (connectionObject as IModbusMaster)?.Transport;
                     break;
             }
 
-            return false;
+            //设置实例的其它属性值
+            if (connectionElement.Attributes()?.Count() > 3)
+            {
+                XElement elementClone = XElement.Parse(connectionElement.ToString());
+                elementClone.Attribute(XParameters).Remove();
+                elementClone.Attribute(ReflectionInterface.XName).Remove();
+                elementClone.Attribute(ReflectionInterface.XType).Remove();
+
+                InstanceExtensions.SetInstancePropertyValues(connection, elementClone.Attributes());
+            }
+
+            return true;
         }
 
         /// <inheritdoc/>
@@ -459,14 +490,26 @@ namespace SpaceCG.Generic
         }
     }
 
-    internal class DataEventParams
+    /// <summary>
+    /// 连接对象的数据事件参数
+    /// </summary>
+    public class DataEventParams
     {
+        /// <summary>
+        /// Bytes
+        /// </summary>
         public byte[] Bytes;
-
+        /// <summary>
+        /// Message
+        /// </summary>
         public byte[] Message;
-
+        /// <summary>
+        /// Actions
+        /// </summary>
         public IEnumerable<XElement> Actions;
-
+        /// <summary>
+        /// 连接对象的数据事件参数
+        /// </summary>
         public DataEventParams() 
         {            
         }

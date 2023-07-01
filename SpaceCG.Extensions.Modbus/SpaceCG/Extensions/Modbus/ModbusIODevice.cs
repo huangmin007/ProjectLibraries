@@ -204,6 +204,9 @@ namespace SpaceCG.Extensions.Modbus
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusIODevice));
 
+        /// <summary> <see cref="XDevice"/> Name </summary>
+        public const string XDevice = "Device";
+
         /// <summary>
         /// Read Only 寄存器数据 Change 处理
         /// <para>(ModbusIODevice ioDevice, Register register)</para>
@@ -664,7 +667,7 @@ namespace SpaceCG.Extensions.Modbus
         {
             device = null;
             if (element == null) return false;
-            if (element.Name != "Device" || String.IsNullOrWhiteSpace(element.Attribute(nameof(Address))?.Value))
+            if (element.Name != XDevice || String.IsNullOrWhiteSpace(element.Attribute(nameof(Address))?.Value))
             {
                 Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element}");
                 return false;
@@ -708,9 +711,6 @@ namespace SpaceCG.Extensions.Modbus
                 {
                     RegisterType type = (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true);
                     device.Registers.Add(new Register(startAddress, type));
-
-                    //if (!device.AddRegister(startAddress, (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true)))
-                    //    Logger.Warn($"{device} 添加寄存器失败, {element} 节点属性 {attributes[i]} 值格式错误");
                 }
             }
 

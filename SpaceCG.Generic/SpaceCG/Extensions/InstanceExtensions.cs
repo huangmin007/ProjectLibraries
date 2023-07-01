@@ -128,7 +128,7 @@ namespace SpaceCG.Extensions
                 FieldInfo fieldInfo = type.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
                 if (fieldInfo == null)
                 {
-                    Logger.Warn($"在实例对象 {instanceObj} 中，未找到指定字段 {fieldName} 对象");
+                    Logger.Warn($"在实例对象 {type.Name} 中，未找到指定字段 {fieldName} 对象");
                     return false;
                 }
 
@@ -156,7 +156,7 @@ namespace SpaceCG.Extensions
             FieldInfo fieldInfo = type.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
             if (fieldInfo == null)
             {
-                Logger.Warn($"在实例对象 {instanceObj} 中，未找到指定字段 {fieldName} 对象");
+                Logger.Warn($"在实例对象 {type.Name} 中，未找到指定字段 {fieldName} 对象");
                 return false;
             }
 
@@ -169,12 +169,13 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"设置实例对象 {type} 的字段 {fieldInfo} 值 {(value == null ? "null" : value)} 失败：{ex}");
+                    Logger.Error($"设置实例对象 {type.Name} 的字段 {fieldInfo} 值 {(value == null ? "null" : value)} 失败：{ex}");
                 }
             }
 
             return false;
         }
+
 
         /// <summary>
         /// 动态的设置实例对象的字段 (公有字段或私有字段) 的多个属性 (公有) 值，跟据 XML 配置文件节点名称 (实例的公有字段或私有字段) 及节点属性 (字段对象的属性) 来个修改实例的字段属性
@@ -230,6 +231,7 @@ namespace SpaceCG.Extensions
             }
         }
 
+
         /// <summary>
         /// 动态的设置实例对象的属性值, Only Support <see cref="ValueType"/> And <see cref="Array"/>Type
         /// <para>属性是指实现了 get,set 方法的对象</para>
@@ -244,7 +246,11 @@ namespace SpaceCG.Extensions
 
             Type type = instanceObj.GetType();
             PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
-            if (property == null || !property.CanWrite || !property.CanRead) return false;
+            if (property == null || !property.CanWrite || !property.CanRead)
+            {
+                Logger.Warn($"实例对象 {type.Name} 的属性 {property} 是要实现了 get/set 可读写的");
+                return false;
+            }
 
             if (ConvertChangeType(newValue, property.PropertyType, out object convertValue))
             {
@@ -255,7 +261,7 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"设置实例对象 {type} 的属性 {property} 值 {(newValue == null ? "null" : newValue)} 失败：{ex}");
+                    Logger.Error($"设置实例对象 {type.Name} 的属性 {property} 值 {(newValue == null ? "null" : newValue)} 失败：{ex}");
                 }
             }
 
@@ -290,6 +296,7 @@ namespace SpaceCG.Extensions
 
             return false;
         }
+
 
         /// <summary>
         /// 动态移除实例对象指定的委托事件
@@ -404,7 +411,7 @@ namespace SpaceCG.Extensions
             if (parameterInfos.Length > 0)
             {
                 foreach (ParameterInfo info in parameterInfos)
-                    paramDebugInfo += info.ToString() + ", ";
+                    paramDebugInfo += $"{info.ParameterType.Name} {info.Name}, ";
                 paramDebugInfo = paramDebugInfo.Substring(0, paramDebugInfo.Length - 2);
             }
 
@@ -417,7 +424,7 @@ namespace SpaceCG.Extensions
                 if (!methodInfo.IsStatic)
                 {
                     _parameters = parameters;
-                    Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的函数(实例函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{paramsLength} 个");
+                    Logger.Info($"实例对象 {instanceObj.GetType().Name}, 准备执行匹配的函数(实例函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{paramsLength} 个");
                 }
                 //扩展方法
                 else
@@ -425,7 +432,7 @@ namespace SpaceCG.Extensions
                     _parameters = new object[paramsLength + 1];
                     _parameters[0] = instanceObj;
                     for (int i = 0; i < paramsLength; i++) _parameters[i + 1] = parameters[i];
-                    Logger.Info($"实例对象 {instanceObj}, 准备执行匹配的函数(扩展函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
+                    Logger.Info($"实例对象 {instanceObj.GetType().Name}, 准备执行匹配的函数(扩展函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
                 }
             }
             //静态方法
@@ -438,7 +445,7 @@ namespace SpaceCG.Extensions
                 }
                 else
                 {
-                    Logger.Warn($"实例对象 {instanceObj}, 匹配的函数(超出处理范围的函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
+                    Logger.Warn($"实例对象 {instanceObj.GetType().Name}, 匹配的函数(超出处理范围的函数) {methodInfo.Name}({paramDebugInfo}), 参数 {parameterInfos.Length}/{_parameters?.Length} 个");
                     return false;
                 }
             }
@@ -490,12 +497,13 @@ namespace SpaceCG.Extensions
 
             if (methodCount != 1)
             {
-                Logger.Info($"在实例对象 {instanceObj} 中，找到匹配的函数 {methodName}/{paramLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
+                Logger.Info($"在实例对象 {type.Name} 中，找到匹配的函数 {methodName}/{paramLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
                 return CallInstanceExtensionMethod(instanceObj, methodName, parameters, out returnValue);
             }
 
             return CallInstanceMethod(instanceObj, methods.First(), parameters, out returnValue);
         }
+
 
         /// <summary>
         /// 动态调用 对象扩展 的方法
@@ -522,7 +530,7 @@ namespace SpaceCG.Extensions
 
             if (methodCount != 1)
             {
-                Logger.Warn($"在实例对象 {instanceObj} 中，找到匹配的扩展函数 {methodName} 有 {methodCount} 个，取消执行");
+                Logger.Warn($"在实例对象 {instanceObj.GetType().Name} 中，找到匹配的扩展函数 {methodName} 有 {methodCount} 个，取消执行");
                 return false;
             }
 

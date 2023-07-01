@@ -20,7 +20,7 @@
 
   <ItemGroup>
     <None Update="ModbusDevices.Config">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

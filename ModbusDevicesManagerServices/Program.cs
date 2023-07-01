@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Threading;
@@ -91,11 +89,11 @@ namespace ModbusDevicesManagerServices
 
             if (ConnectionManager == null)
                 ConnectionManager = new ConnectionManager(ControlInterface, Connections.Attribute("Name")?.Value);
-            ConnectionManager.TryParseConnectionElements(Connections.Descendants(ConnectionManager.XConnection));
+            ConnectionManager.TryParseElements(Connections.Descendants(ConnectionManager.XConnection));
 
             if(ModbusDeviceManager == null)
                 ModbusDeviceManager = new ModbusDeviceManager(ControlInterface, modbusMName);
-            ModbusDeviceManager.TryParseModbusElements(ModbusElements);
+            ModbusDeviceManager.TryParseElements(ModbusElements);
         }
         
         private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)

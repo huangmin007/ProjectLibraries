@@ -275,9 +275,9 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="keyValue">keyValue 值可以是 UID 值、键盘值、鼠标值，等其它关联的有效数据信息</param>
         /// <returns>调用成功返回 true, 否则返回 false</returns>
-        public bool CallMessageGroup(int keyValue)
+        public void CallMessageGroup(int keyValue)
         {
-            if (MessageGroups == null) return false;
+            if (MessageGroups == null) return;
 
             if (MessageGroups.ContainsKey(keyValue) && MessageGroups.TryGetValue(keyValue, out ICollection<string> messages))
             {
@@ -286,7 +286,6 @@ namespace SpaceCG.Generic
                     this.TryParseControlMessage(message, out _);
                 }
             }
-            return true;
         }
 
         /// <summary>
@@ -314,9 +313,6 @@ namespace SpaceCG.Generic
 
         /// <summary>
         /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
-        /// <para>消息协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// <para>消息协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
-        /// <para>消息协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
         /// </summary>
         /// <param name="xmlMessage"></param>
         /// <param name="returnResult"></param>
@@ -330,9 +326,6 @@ namespace SpaceCG.Generic
         }
         /// <summary>
         /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
-        /// <para>消息协议(XML)：&lt;Action Target="object name" Method="method name" Params="method params" Return="False" Sync="True" /&gt; 跟据调用的 Method 决定 Params 可选属性值</para>
-        /// <para>消息协议(XML)：&lt;Action Target="object name" Property="property name" Value="newValue" Return="True" Sync="False"/&gt; 读写对象的一个属性值，如果 Value 属性不存在，则表示获取属性的值</para>
-        /// <para>消息协议(XML)：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; 设置对象的多个属性及其值</para>
         /// </summary>
         /// <param name="actionElement"></param>
         /// <param name="returnResult"></param>

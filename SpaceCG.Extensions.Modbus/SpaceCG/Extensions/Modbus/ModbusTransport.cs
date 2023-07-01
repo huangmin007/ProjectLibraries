@@ -14,11 +14,10 @@ namespace SpaceCG.Extensions.Modbus
     public partial class ModbusTransport : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusTransport));
+
         /// <summary> <see cref="XModbus"/> Name </summary>
         public const string XModbus = "Modbus";
-        /// <summary> <see cref="XDevice"/> Name </summary>
-        public const string XDevice = "Device";
-
+        
         /// <summary>
         /// 传输对象名称
         /// </summary>
@@ -65,19 +64,19 @@ namespace SpaceCG.Extensions.Modbus
                 throw new ArgumentNullException(nameof(name), "参数不能为空");
 
             this.Name = name;
-            EventTimer = new Timer(SyncRegisterChangeEvents, this, Timeout.Infinite, Timeout.Infinite);
+            this.EventTimer = new Timer(SyncRegisterChangeEvents, this, Timeout.Infinite, Timeout.Infinite);
         }
 
         /// <summary>
         /// 从当前总线上获取指定地址的设备
         /// </summary>
-        /// <param name="slaveAddress"></param>
+        /// <param name="deviceAddress"></param>
         /// <returns></returns>
-        public ModbusIODevice GetDevice(byte slaveAddress)
+        public ModbusIODevice GetDevice(byte deviceAddress)
         {
             foreach(var device in ModbusDevices) 
             {
-                if(device.Address == slaveAddress) return device;
+                if(device.Address == deviceAddress) return device;
             }
 
             return null;
@@ -133,15 +132,9 @@ namespace SpaceCG.Extensions.Modbus
             Logger.Info($"传输总线 ({this}) 停止同步传输");
         }
 
-        private void ModbusDevice_InputChangeHandler(ModbusIODevice device, Register register)
-        {
-            InputChangeEvent?.Invoke(this, device, register);
-        }
-        private void ModbusDevice_OutputChangeHandler(ModbusIODevice device, Register register)
-        {
-            OutputChangeEvent?.Invoke(this, device, register);
-        }
-
+        private void ModbusDevice_InputChangeHandler(ModbusIODevice device, Register register) => InputChangeEvent?.Invoke(this, device, register);
+        private void ModbusDevice_OutputChangeHandler(ModbusIODevice device, Register register) => OutputChangeEvent?.Invoke(this, device, register);
+            
         /// <summary>
         /// 同步寄存器描述状态
         /// </summary>
@@ -216,19 +209,17 @@ namespace SpaceCG.Extensions.Modbus
         public static bool TryParse(XElement element, out ModbusTransport transport)
         {
             transport = null;
-            if (element?.Name != XModbus || !element.HasElements) return false;
+            if (element?.Name.LocalName != XModbus || !element.HasElements) return false;
 
             string name = element.Attribute(nameof(Name))?.Value;
             if (String.IsNullOrWhiteSpace(name))
             {
-                Logger.Warn($"({nameof(ModbusTransport)}) 配置格式存在错误, {element}");
+                Logger.Warn($"({nameof(ModbusTransport)}) 配置格式存在错误, 属性 {nameof(Name)} 不能为空, {element}");
                 return false;
             }
 
             transport = new ModbusTransport(name);
-            IEnumerable<XElement> deviceElements = element.Descendants(XDevice);
-
-            foreach (XElement deviceElement in deviceElements)
+            foreach (XElement deviceElement in element.Descendants(ModbusIODevice.XDevice))
             {
                 if(ModbusIODevice.TryParse(deviceElement, out ModbusIODevice device))
                 {
