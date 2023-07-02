@@ -211,14 +211,14 @@ namespace SpaceCG.Extensions.Modbus
             transport = null;
             if (element?.Name.LocalName != XModbus || !element.HasElements) return false;
 
-            string name = element.Attribute(nameof(Name))?.Value;
-            if (String.IsNullOrWhiteSpace(name))
+            string modbusName = element.Attribute(nameof(Name))?.Value;
+            if (String.IsNullOrWhiteSpace(modbusName))
             {
                 Logger.Warn($"({nameof(ModbusTransport)}) 配置格式存在错误, 属性 {nameof(Name)} 不能为空, {element}");
                 return false;
             }
 
-            transport = new ModbusTransport(name);
+            transport = new ModbusTransport(modbusName);
             foreach (XElement deviceElement in element.Descendants(ModbusIODevice.XDevice))
             {
                 if(ModbusIODevice.TryParse(deviceElement, out ModbusIODevice device))

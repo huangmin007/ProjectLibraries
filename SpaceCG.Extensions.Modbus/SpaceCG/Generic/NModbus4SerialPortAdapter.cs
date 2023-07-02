@@ -18,8 +18,7 @@ namespace SpaceCG.Generic
         /// <summary> <see cref="SerialPort"/> </summary>
         protected SerialPort serialPort;
 
-        private Thread thread;
-        private bool flags = true;
+        private bool running = true;
 
         /// <summary>
         /// NModbus4 SerialPort reconnect adapter
@@ -33,9 +32,7 @@ namespace SpaceCG.Generic
             this.serialPort = serialPort;
             if (!this.serialPort.IsOpen) this.serialPort.Open();
 
-            thread = new Thread(CheckConnectStatus);
-            thread.IsBackground = true;
-            thread.Start(this);
+            ThreadPool.QueueUserWorkItem(CheckConnectStatus);
         }
 
         /// <summary>
@@ -68,10 +65,7 @@ namespace SpaceCG.Generic
             }
 
             serialPort.Open();
-
-            thread = new Thread(CheckConnectStatus);
-            thread.IsBackground = true;
-            thread.Start(this);
+            ThreadPool.QueueUserWorkItem(CheckConnectStatus);
         }
 
         /// <summary>
@@ -80,7 +74,7 @@ namespace SpaceCG.Generic
         /// <param name="adapter"></param>
         protected void CheckConnectStatus(object adapter)
         {
-            while (flags)
+            while (running)
             {
                 if (serialPort == null) return;
 
@@ -188,9 +182,7 @@ namespace SpaceCG.Generic
         {
             if (disposing)
             {
-                flags = false;
-                thread?.Abort();
-                thread = null;
+                running = false;
 
                 serialPort?.Dispose();
                 serialPort = null;

@@ -20,9 +20,7 @@ namespace SpaceCG.Generic
         /// <summary> <see cref="TcpClient"/> </summary>
         protected TcpClient tcpClient;
 
-        private Thread thread;
-        private bool flags = true;
-
+        private bool running = true;
         private int readTimeout = -1;
         private int writeTimeout = -1;
 
@@ -37,11 +35,9 @@ namespace SpaceCG.Generic
                 throw new ArgumentNullException(nameof(tcpClient), "参数不能为空");
 
             this.tcpClient = tcpClient;
-            remoteEP = tcpClient.Client?.RemoteEndPoint as IPEndPoint;
+            this.remoteEP = tcpClient.Client?.RemoteEndPoint as IPEndPoint;
 
-            thread = new Thread(CheckConnectStatus);
-            thread.IsBackground = true;
-            thread.Start(this);
+            ThreadPool.QueueUserWorkItem(CheckConnectStatus);
         }
 
         /// <summary>
@@ -54,11 +50,8 @@ namespace SpaceCG.Generic
                 throw new ArgumentNullException(nameof(remoteEP), "参数不能为空");
 
             this.remoteEP = remoteEP;
-            tcpClient = new TcpClient(remoteEP);
-
-            thread = new Thread(CheckConnectStatus);
-            thread.IsBackground = true;
-            thread.Start(this);
+            this.tcpClient = new TcpClient(remoteEP);
+            ThreadPool.QueueUserWorkItem(CheckConnectStatus);
         }
 
         /// <summary>
@@ -85,7 +78,7 @@ namespace SpaceCG.Generic
         /// <param name="adapter"></param>
         protected void CheckConnectStatus(object adapter)
         {
-            while (flags)
+            while (running)
             {
                 if (tcpClient == null) return;
                 if (remoteEP == null) remoteEP = tcpClient.Client?.RemoteEndPoint as IPEndPoint;
@@ -185,11 +178,8 @@ namespace SpaceCG.Generic
         {
             if (disposing)
             {
-                flags = false;
+                running = false;
                 remoteEP = null;
-
-                thread?.Abort();
-                thread = null;
 
                 tcpClient?.Dispose();
                 tcpClient = null;

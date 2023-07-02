@@ -92,6 +92,7 @@ namespace SpaceCG.Extensions.Modbus
                     Logger.Warn($"配置格式错误, 属性 {ReflectionInterface.XName} 不能为空, {modbusElement}");
                     continue;
                 }
+                
                 if (this.ReflectionInterface.AccessObjects.ContainsKey(name))
                 {
                     Logger.Warn($"配置格式错误, 访问对象名称 {name} 已存在, {modbusElement}");

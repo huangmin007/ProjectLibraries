@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -368,15 +369,53 @@ namespace SpaceCG.Generic
         }
         #endregion
 
+        /// <summary>
+        /// 跟据事件类型返回 控制台颜色
+        /// </summary>
+        /// <param name="eventType"></param>
+        /// <returns></returns>
+        protected static ConsoleColor GetConsoleColor(TraceEventType eventType)
+        {
+            return eventType == TraceEventType.Verbose ? ConsoleColor.Green :
+                eventType == TraceEventType.Information ? ConsoleColor.Gray :
+                eventType == TraceEventType.Warning ? ConsoleColor.Yellow :
+                eventType == TraceEventType.Error ? ConsoleColor.Red :
+                eventType == TraceEventType.Critical ? ConsoleColor.DarkRed :
+                ConsoleColor.Gray;
+        }
+        /// <summary>
+        /// 获取事件类型字符
+        /// </summary>
+        /// <param name="eventType"></param>
+        /// <returns></returns>
+        public static string GetEventTypeChars(TraceEventType eventType)
+        {
+            return eventType == TraceEventType.Verbose ? "DEBUG" :
+                eventType == TraceEventType.Information ? " INFO" :
+                eventType == TraceEventType.Warning ? " WARN" :
+                eventType == TraceEventType.Error ? "ERROR" :
+                eventType == TraceEventType.Critical ? "FATAL" :
+                eventType == TraceEventType.Start ? "START" :
+                eventType == TraceEventType.Stop ? " STOP" :
+                eventType == TraceEventType.Suspend ? "SUSPEND" :
+                eventType == TraceEventType.Resume ? "RESUME" :
+                eventType == TraceEventType.Transfer ? "TRANS" :
+                "UNKNOW";
+        }
+
         /// <inheritdoc/>
         public override void TraceEvent(TraceEventCache eventCache, string source, TraceEventType eventType, int id, string message)
         {
             if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, message, null, null, null))
             {
+                ConsoleColor color = Console.ForegroundColor;
+                Console.ForegroundColor = GetConsoleColor(eventType);
+
                 WriteHeader(source, eventType, id);
                 WriteMessage(message);
                 WriteFooter(eventCache);
 
+                Console.ForegroundColor = color;
                 TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, null));
             }
         }
@@ -385,12 +424,15 @@ namespace SpaceCG.Generic
         {
             if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, format, args, null, null))
             {
+                ConsoleColor color = Console.ForegroundColor;
+                Console.ForegroundColor = GetConsoleColor(eventType);
                 string message = args != null ? string.Format(format, args) : format;
 
                 WriteHeader(source, eventType, id);
                 WriteMessage(message);
                 WriteFooter(eventCache);
 
+                Console.ForegroundColor = color;
                 TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, null));
             }
         }
@@ -400,12 +442,15 @@ namespace SpaceCG.Generic
         {
             if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, null, null, data, null))
             {
+                ConsoleColor color = Console.ForegroundColor;
+                Console.ForegroundColor = GetConsoleColor(eventType);
                 string message = data != null ? data.ToString() : string.Empty;
 
                 WriteHeader(source, eventType, id);
                 WriteMessage(message);
                 WriteFooter(eventCache);
 
+                Console.ForegroundColor = color;
                 TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, new object[] { data }));
             }
         }
@@ -414,6 +459,8 @@ namespace SpaceCG.Generic
         {
             if (Filter != null && !Filter.ShouldTrace(eventCache, source, eventType, id, null, null, null, data)) return;
 
+            ConsoleColor color = Console.ForegroundColor;
+            Console.ForegroundColor = GetConsoleColor(eventType);
             StringBuilder messageBuilder = new StringBuilder();
             if (data != null)
             {
@@ -428,6 +475,7 @@ namespace SpaceCG.Generic
             WriteMessage(messageBuilder.ToString());
             WriteFooter(eventCache);
 
+            Console.ForegroundColor = color;
             TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, messageBuilder.ToString(), data));
         }
 
@@ -440,9 +488,9 @@ namespace SpaceCG.Generic
         /// <param name="id"></param>
         protected void WriteHeader(string source, TraceEventType eventType, int id)
         {
-            string eventName = eventType.ToString().ToUpper();
+            string eventName = GetEventTypeChars(eventType); //eventType.ToString().ToUpper();
             eventName = eventName.Length >= 5 ? eventName.Substring(0, 5) : eventName.PadLeft(5, ' ');
-            string formatMessage = string.Format("[{0}] [{1}] [{2}] ({3}) : ", DateTime.Now.ToString("HH:mm:ss.fff"), eventName, source, id);
+            string formatMessage = string.Format("[{0}] [{1}] [{2}] [{3}]: ", DateTime.Now.ToString("HH:mm:ss.fff"), eventName, id.ToString().PadLeft(2, ' '), source);
 
             Write(formatMessage);
             EventFormatMessage.Append(formatMessage);

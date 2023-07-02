@@ -25,19 +25,17 @@ namespace ModbusDevicesManagerServices
         static void Main(string[] args)
         {
             Console.Title = Title;
-            Console.WriteLine($"{Title}");
-            Console.WriteLine(Thread.CurrentThread.ExecutionContext.ToString());
+            Logger.Info($"{Title}");
+            Logger.Info("串口名称列表：");
             string[] names = SerialPort.GetPortNames();
-            if(names.Length > 0 ) 
-            {
-                foreach (string name in names) { Console.WriteLine(name); }
-            }
+            if (names.Length > 0)
+                foreach (string name in names) Logger.Info(name);
 
             Console.CancelKeyPress += Console_CancelKeyPress;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
             LoadDeviceConfig(DefaultConfigFile);
-            
+
             while (Running)
             {
                 ConsoleKeyInfo info = Console.ReadKey(true);
@@ -90,8 +88,8 @@ namespace ModbusDevicesManagerServices
             if (ConnectionManager == null)
                 ConnectionManager = new ConnectionManager(ControlInterface, Connections.Attribute("Name")?.Value);
             ConnectionManager.TryParseElements(Connections.Descendants(ConnectionManager.XConnection));
-
-            if(ModbusDeviceManager == null)
+            
+            if (ModbusDeviceManager == null)
                 ModbusDeviceManager = new ModbusDeviceManager(ControlInterface, modbusMName);
             ModbusDeviceManager.TryParseElements(ModbusElements);
         }
