@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using SpaceCG.Extensions;
@@ -374,6 +375,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="eventType"></param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static ConsoleColor GetConsoleColor(TraceEventType eventType)
         {
             return eventType == TraceEventType.Verbose ? ConsoleColor.Green :
@@ -381,6 +383,11 @@ namespace SpaceCG.Generic
                 eventType == TraceEventType.Warning ? ConsoleColor.Yellow :
                 eventType == TraceEventType.Error ? ConsoleColor.Red :
                 eventType == TraceEventType.Critical ? ConsoleColor.DarkRed :
+                eventType == TraceEventType.Start ? ConsoleColor.Cyan :
+                eventType == TraceEventType.Stop ? ConsoleColor.Cyan :
+                eventType == TraceEventType.Suspend ? ConsoleColor.Magenta :
+                eventType == TraceEventType.Resume ? ConsoleColor.Magenta :
+                eventType == TraceEventType.Transfer ? ConsoleColor.DarkYellow : 
                 ConsoleColor.Gray;
         }
         /// <summary>
@@ -388,18 +395,19 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="eventType"></param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string GetEventTypeChars(TraceEventType eventType)
         {
             return eventType == TraceEventType.Verbose ? "DEBUG" :
-                eventType == TraceEventType.Information ? " INFO" :
-                eventType == TraceEventType.Warning ? " WARN" :
+                eventType == TraceEventType.Information ? "INFO" :
+                eventType == TraceEventType.Warning ? "WARN" :
                 eventType == TraceEventType.Error ? "ERROR" :
                 eventType == TraceEventType.Critical ? "FATAL" :
                 eventType == TraceEventType.Start ? "START" :
-                eventType == TraceEventType.Stop ? " STOP" :
+                eventType == TraceEventType.Stop ? "STOP" :
                 eventType == TraceEventType.Suspend ? "SUSPEND" :
                 eventType == TraceEventType.Resume ? "RESUME" :
-                eventType == TraceEventType.Transfer ? "TRANS" :
+                eventType == TraceEventType.Transfer ? "TRANSFER" :
                 "UNKNOW";
         }
 

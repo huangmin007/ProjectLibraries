@@ -20,7 +20,7 @@ namespace ModbusDevicesManagerServices
         private static ModbusDeviceManager ModbusDeviceManager;
         
         private static string DefaultConfigFile = "ModbusDevices.Config";
-        private static string Title = "Modbus Device Manager Server v2.1.230602";
+        private static string Title = "Modbus Device Manager Server v2.1.230703";
 
         static void Main(string[] args)
         {
