@@ -16,11 +16,11 @@ using SpaceCG.Extensions.Modbus;
 namespace SpaceCG.Generic
 {
     /// <summary>
-    /// 连接管理
+    /// 连接管理，单例对象
     /// </summary>
-    public class ConnectionManager
+    public class ConnectionManagement
     {
-        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ConnectionManager));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ConnectionManagement));
 
         /// <summary> <see cref="XConnections"/> Name </summary>
         public const string XConnections = "Connections";
@@ -37,28 +37,88 @@ namespace SpaceCG.Generic
         public const string XMessage = "Message";
 
         /// <summary>
-        /// Current Object Name
+        /// Connection Management Name
         /// </summary>
-        public String Name { get; private set; } = null;
-        private ReflectionInterface ReflectionInterface;
+        public String Name { get; private set;} = null;
+        /// <summary>
+        /// Connection Management ReflectionInterface
+        /// </summary>
+        public ReflectionInterface ReflectionInterface { get; private set; } = null;
+
         private IEnumerable<XElement> ConnectionElements;
         private ConcurrentDictionary<string, IReadOnlyCollection<DataEventParams>> ConnectionDataEvents;
+
+        private static ConnectionManagement instance;
+        /// <summary>
+        /// 连接管理实例
+        /// </summary>
+        public static ConnectionManagement Instance
+        {
+            get
+            {
+                if (instance == null)
+                    instance = new ConnectionManagement();
+                return instance;
+            }
+        }
+
+        /// <summary>
+        /// 清理管理对象
+        /// </summary>
+        public static void Dispose()
+        {
+            if (instance != null)
+            {
+                if (!string.IsNullOrWhiteSpace(instance.Name) && instance.ReflectionInterface != null)
+                    instance.ReflectionInterface.AccessObjects.Remove(instance.Name);
+
+                instance.RemoveAll();
+                instance.Name = null;
+                instance.ReflectionInterface = null;
+
+                instance.ConnectionElements = null;
+                instance.ConnectionDataEvents = null;
+
+                instance = null;
+            }
+        }
 
         /// <summary>
         /// 连接管理对象
         /// </summary>
+        private ConnectionManagement()
+        {
+            this.ConnectionDataEvents = new ConcurrentDictionary<string, IReadOnlyCollection<DataEventParams>>();
+        }
+
+        /// <summary>
+        /// 配置连接管理对象
+        /// </summary>
         /// <param name="reflectionInterface"></param>
         /// <param name="name"></param>
-        public ConnectionManager(ReflectionInterface reflectionInterface, string name)
-        {
+        public void Configuration(ReflectionInterface reflectionInterface, string name)
+        {            
             if (reflectionInterface == null)
-                throw new ArgumentNullException("参数错误，不能为空");
+                throw new ArgumentNullException(nameof(reflectionInterface), "参数不能为空");
 
-            this.Name = name;
-            this.ReflectionInterface = reflectionInterface;
-            this.ConnectionDataEvents = new ConcurrentDictionary<string, IReadOnlyCollection<DataEventParams>>();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                if (reflectionInterface.AccessObjects.ContainsKey(name))
+                    throw new ArgumentException($"ReflectionInterface.AccessObject 对象集合中已包含名称 {name}");
 
-            if (!string.IsNullOrWhiteSpace(Name)) this.ReflectionInterface.AccessObjects.Add(name, this);
+                this.Name = name;
+            }
+            else
+            {
+                this.Name = nameof(ConnectionManagement);
+                Logger.Info($"{nameof(ConnectionManagement)} Name: {this.Name}");
+            }
+
+            if (this.ReflectionInterface == null)
+            {
+                this.ReflectionInterface = reflectionInterface;
+                this.ReflectionInterface.AccessObjects.Add(name, this);
+            }
         }
 
         /// <summary>
@@ -78,11 +138,13 @@ namespace SpaceCG.Generic
         /// <param name="connectionElements">至少具有 Name, Type, Parameters 属性的 Connection 节点集合 </param>
         public void TryParseElements(IEnumerable<XElement> connectionElements)
         {
+            if (string.IsNullOrWhiteSpace(Name) || ReflectionInterface == null)
+                throw new InvalidOperationException($"未配置管理对象，不可操作");
+
             if (connectionElements?.Count() <= 0) return;
 
             RemoveAll();
             this.ConnectionElements = connectionElements;
-
             foreach (XElement connectionElement in connectionElements)
             {
                 if (connectionElement.Name.LocalName != XConnection) continue;
@@ -181,16 +243,17 @@ namespace SpaceCG.Generic
 
             return dataEvents;
         }
-        /// <summary>
-        /// 试图调用匹配数据的对象
-        /// </summary>
-        /// <param name="name"></param>
-        /// <param name="bytes"></param>
-        protected void TryCallDataEvents(string name, byte[] bytes)
-        {
-            if (string.IsNullOrWhiteSpace(name) || bytes?.Length <= 0 || ConnectionDataEvents.Count <= 0) return;
 
-            if (ConnectionDataEvents.TryGetValue(name, out IReadOnlyCollection<DataEventParams> dataEvents))
+        /// <summary>
+        /// 跟据事件名称、参数调用配置功能
+        /// </summary>
+        /// <param name="connectionName"></param>
+        /// <param name="bytes"></param>
+        public void CallConnectionEvent(string connectionName, byte[] bytes)
+        {
+            if (string.IsNullOrWhiteSpace(connectionName) || bytes?.Length <= 0 || ConnectionDataEvents.Count <= 0) return;
+
+            if (ConnectionDataEvents.TryGetValue(connectionName, out IReadOnlyCollection<DataEventParams> dataEvents))
             {
                 foreach (DataEventParams dataEvent in dataEvents)
                 {
@@ -202,11 +265,17 @@ namespace SpaceCG.Generic
                 }
             }
         }
+        /// <summary>
+        /// 跟据事件名称、参数调用配置功能
+        /// </summary>
+        /// <param name="connectionName"></param>
+        /// <param name="message"></param>
+        public void CallConnectionEvent(string connectionName, string message) => CallConnectionEvent(connectionName, Encoding.UTF8.GetBytes(message));
 
         private void Network_DataReceived(object sender, AsyncDataEventArgs e)
         {
             IConnection connection = sender as IConnection;
-            TryCallDataEvents(connection.Name, e.Bytes);
+            CallConnectionEvent(connection.Name, e.Bytes);
         }
         private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
@@ -227,7 +296,7 @@ namespace SpaceCG.Generic
                 return;
             }
 
-            TryCallDataEvents(objName, buffer);
+            CallConnectionEvent(objName, buffer);
         }
 
         /// <summary>
@@ -237,26 +306,27 @@ namespace SpaceCG.Generic
         {
             if (ConnectionElements == null || ConnectionElements.Count() <= 0) return;
 
-            ConnectionDataEvents.Clear();
+            ConnectionDataEvents?.Clear();
             Type DisposableType = typeof(IDisposable);
+
             foreach (XElement connection in ConnectionElements)
             {
                 if (connection.Name.LocalName != XConnection) continue;
-                string name = connection.Attribute(ReflectionInterface.XName)?.Value;
+                string connectionName = connection.Attribute(ReflectionInterface.XName)?.Value;
 
-                if (string.IsNullOrWhiteSpace(name)) continue;
-                if (!ReflectionInterface.AccessObjects.ContainsKey(name)) continue;
+                if (string.IsNullOrWhiteSpace(connectionName)) continue;
+                if (!ReflectionInterface.AccessObjects.ContainsKey(connectionName)) continue;
 
-                object obj = ReflectionInterface.AccessObjects[name];
-                if (obj == null)
+                object instanceObj = ReflectionInterface.AccessObjects[connectionName];
+                if (instanceObj == null)
                 {
-                    ReflectionInterface.AccessObjects.Remove(name);
+                    ReflectionInterface.AccessObjects.Remove(connectionName);
                     continue;
                 }
 
                 try
                 {
-                    if (DisposableType.IsAssignableFrom(obj.GetType())) (obj as IDisposable)?.Dispose();
+                    if (DisposableType.IsAssignableFrom(instanceObj.GetType())) (instanceObj as IDisposable)?.Dispose();
                 }
                 catch (Exception ex)
                 {
@@ -264,11 +334,17 @@ namespace SpaceCG.Generic
                 }
                 finally
                 {
-                    ReflectionInterface.AccessObjects.Remove(name);
+                    ReflectionInterface.AccessObjects.Remove(connectionName);
                 }
             }
 
             ConnectionElements = null;
+        }
+
+        /// <inheritdoc/>
+        public override string ToString()
+        {
+            return $"[{nameof(ConnectionManagement)}] {nameof(Name)}:{Name}";
         }
 
         /// <summary>
@@ -484,11 +560,6 @@ namespace SpaceCG.Generic
             return true;
         }
 
-        /// <inheritdoc/>
-        public override string ToString()
-        {
-            return $"[{nameof(ConnectionManager)}] {nameof(Name)}:{Name}";
-        }
     }
 
     /// <summary>

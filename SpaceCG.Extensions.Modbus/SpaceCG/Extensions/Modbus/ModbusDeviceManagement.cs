@@ -12,9 +12,9 @@ namespace SpaceCG.Extensions.Modbus
     /// Modbus Device Manager CallEventName
     /// <para>遵循自定义的 XML 模型，参考 ModbusDevices.Config</para>
     /// </summary>
-    public class ModbusDeviceManager
+    public class ModbusDeviceManagement
     {
-        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusDeviceManager));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusDeviceManagement));
 
         /// <summary> <see cref="XModbus"/> Name </summary>
         public const string XModbus = "Modbus";
@@ -28,10 +28,10 @@ namespace SpaceCG.Extensions.Modbus
         public const string XDisposed = "Disposed";
         /// <summary> <see cref="XInitialized"/> Name </summary>
         public const string XInitialized = "Initialized";
-        /// <summary> <see cref="XInputChange"/> Name </summary>
-        public const string XInputChange = "InputChange";
-        /// <summary> <see cref="XOutputChange"/> Name </summary>
-        public const string XOutputChange = "OutputChange";
+        /// <summary> <see cref="XInputChanged"/> Name </summary>
+        public const string XInputChanged = "InputChanged";
+        /// <summary> <see cref="XOutputChanged"/> Name </summary>
+        public const string XOutputChanged = "OutputChanged";
 
         /// <summary> <see cref="XMinValue"/> Name </summary>
         public const string XMinValue = "MinValue";
@@ -41,27 +41,80 @@ namespace SpaceCG.Extensions.Modbus
         public const string XDeviceAddress = "DeviceAddress";
 
         /// <summary>
-        /// Current Object Name
+        /// Connection Management Name
         /// </summary>
         public String Name { get; private set; } = null;
-        private ReflectionInterface ReflectionInterface;
+        /// <summary>
+        /// Connection Management ReflectionInterface
+        /// </summary>
+        public ReflectionInterface ReflectionInterface { get; private set; } = null;
+
         private IEnumerable<XElement> ModbusElements;
+        private static ModbusDeviceManagement instance;
+        /// <summary>
+        /// 连接管理实例
+        /// </summary>
+        public static ModbusDeviceManagement Instance
+        {
+            get
+            {
+                if (instance == null)
+                    instance = new ModbusDeviceManagement();
+                return instance;
+            }
+        }
+        /// <summary>
+        /// 清理管理对象
+        /// </summary>
+        public static void Dispose()
+        {
+            if (instance != null)
+            {
+                if (!string.IsNullOrWhiteSpace(instance.Name) && instance.ReflectionInterface != null)
+                    instance.ReflectionInterface.AccessObjects.Remove(instance.Name);
+
+                instance.RemoveAll();
+                instance.Name = null;
+                instance.ReflectionInterface = null;
+
+                instance.ModbusElements = null;
+                instance = null;
+            }
+        }
+        
+        private ModbusDeviceManagement()
+        {
+            ModbusElements = null;
+        }
 
         /// <summary>
-        /// Modbus 设备管理对象
+        /// 配置管理对象
         /// </summary>
         /// <param name="reflectionInterface"></param>
         /// <param name="name"></param>
-        public ModbusDeviceManager(ReflectionInterface reflectionInterface, string name)
+        public void Configuration(ReflectionInterface reflectionInterface, string name)
         {
-            if (reflectionInterface == null)  
-                throw new ArgumentNullException(nameof(reflectionInterface), "参数错误，不能为空");
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentNullException(nameof(name), "参数错误，不能为空");
+            if (reflectionInterface == null)
+                throw new ArgumentNullException(nameof(reflectionInterface), "参数不能为空");
 
-            this.Name = name;
-            this.ReflectionInterface = reflectionInterface;
-            this.ReflectionInterface.AccessObjects.Add(name, this);
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                if (reflectionInterface.AccessObjects.ContainsKey(name))
+                    throw new ArgumentException($"ReflectionInterface.AccessObject 对象集合中已包含名称 {name}");
+
+                this.Name = name;
+            }
+            else
+            {
+                this.Name = nameof(ModbusDeviceManagement);
+                Logger.Info($"{nameof(ModbusDeviceManagement)} Name: {this.Name}");
+            }
+
+            if (this.ReflectionInterface == null)
+            {
+                this.ReflectionInterface = reflectionInterface;
+                this.ReflectionInterface.AccessObjects.Add(name, this);
+            }
         }
 
         /// <summary>
@@ -75,6 +128,9 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="modbusElements"></param>
         public void TryParseElements(IEnumerable<XElement> modbusElements)
         {
+            if (string.IsNullOrWhiteSpace(Name) || ReflectionInterface == null)
+                throw new InvalidOperationException($"未配置管理对象，不可操作");
+
             if (modbusElements?.Count() <= 0) return;
 
             RemoveAll();
@@ -118,7 +174,7 @@ namespace SpaceCG.Extensions.Modbus
                 }
                 else
                 {
-                    if (!ConnectionManager.CreateConnection(modbusElement, out master))
+                    if (!ConnectionManagement.CreateConnection(modbusElement, out master))
                     {
                         transport.Dispose();
                         Logger.Warn($"创建 {XModbus} 的连接对象失败 {modbusElement}");
@@ -154,7 +210,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="register"></param>
         private void Transport_OutputChangeEvent(ModbusTransport transportDevice, ModbusIODevice ioDevice, Register register)
         {
-            CallEventType(XOutputChange, transportDevice.Name, ioDevice.Address, register);
+            CallEventType(XOutputChanged, transportDevice.Name, ioDevice.Address, register);
         }
         /// <summary>
         /// 总线 Output 事件处理
@@ -164,7 +220,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="register"></param>
         private void Transport_InputChangeEvent(ModbusTransport transportDevice, ModbusIODevice ioDevice, Register register)
         {
-            CallEventType(XInputChange, transportDevice.Name, ioDevice.Address, register);
+            CallEventType(XInputChanged, transportDevice.Name, ioDevice.Address, register);
         }
 
         /// <summary>
@@ -314,7 +370,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(ModbusDeviceManager)}] {nameof(Name)}:{Name}";
+            return $"[{nameof(ModbusDeviceManagement)}] {nameof(Name)}:{Name}";
         }
     }
 }

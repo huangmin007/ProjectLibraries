@@ -12,12 +12,10 @@ namespace ModbusDevicesManagerServices
 {
     class Program
     {
-        static readonly LoggerTrace Logger = new LoggerTrace("ProgramMain");
+        static readonly LoggerTrace Logger = new LoggerTrace("MainProgram");
 
         private static bool Running = true;
         private static ReflectionInterface ControlInterface;
-        private static ConnectionManager ConnectionManager;
-        private static ModbusDeviceManager ModbusDeviceManager;
         
         private static string DefaultConfigFile = "ModbusDevices.Config";
         private static string Title = "Modbus Device Manager Server v2.1.230703";
@@ -62,13 +60,13 @@ namespace ModbusDevicesManagerServices
             XmlReader reader = XmlReader.Create(configFile, settings);
             XElement Configuration = XElement.Load(reader, LoadOptions.None);
 
-            string modbusMName = Configuration.Attribute("ModbusManagerName")?.Value;
+            string modbusMName = Configuration.Attribute("ModbusManagementName")?.Value;
             if (string.IsNullOrWhiteSpace(modbusMName))
             {
-                Logger.Error($"需要配置 {nameof(ConnectionManager)} 名称");
+                Logger.Error($"需要配置 {nameof(ModbusDeviceManagement)} 名称");
                 return;
             }
-            XElement Connections = Configuration.Element(ConnectionManager.XConnections);
+            XElement Connections = Configuration.Element(ConnectionManagement.XConnections);
             if (Connections == null)
             {
                 Logger.Error($"连接配置不存在");
@@ -85,13 +83,13 @@ namespace ModbusDevicesManagerServices
             if(ControlInterface == null)
                 ControlInterface = new ReflectionInterface(localPort);
 
-            if (ConnectionManager == null)
-                ConnectionManager = new ConnectionManager(ControlInterface, Connections.Attribute(ReflectionInterface.XName)?.Value);
-            ConnectionManager.TryParseElements(Connections.Descendants(ConnectionManager.XConnection));
-            
-            if (ModbusDeviceManager == null)
-                ModbusDeviceManager = new ModbusDeviceManager(ControlInterface, modbusMName);
-            ModbusDeviceManager.TryParseElements(ModbusElements);
+            ConnectionManagement.Dispose();
+            ConnectionManagement.Instance.Configuration(ControlInterface, Connections.Attribute(ReflectionInterface.XName)?.Value);
+            ConnectionManagement.Instance.TryParseElements(Connections.Descendants(ConnectionManagement.XConnection));
+
+            ModbusDeviceManagement.Dispose();
+            ModbusDeviceManagement.Instance.Configuration(ControlInterface, modbusMName);
+            ModbusDeviceManagement.Instance.TryParseElements(ModbusElements);
         }
         
         private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
@@ -127,8 +125,8 @@ namespace ModbusDevicesManagerServices
         {
             Running = false;
 
-            ModbusDeviceManager?.RemoveAll();
-            ConnectionManager?.RemoveAll();
+            ConnectionManagement.Dispose();
+            ModbusDeviceManagement.Dispose();
             ControlInterface?.Dispose();
 
             Environment.Exit(0);
