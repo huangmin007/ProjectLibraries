@@ -60,7 +60,7 @@ namespace ModbusDevicesManagerServices
             XmlReader reader = XmlReader.Create(configFile, settings);
             XElement Configuration = XElement.Load(reader, LoadOptions.None);
 
-            string modbusMName = Configuration.Attribute("ModbusManagementName")?.Value;
+            string modbusMName = Configuration.Attribute(nameof(ModbusDeviceManagement))?.Value;
             if (string.IsNullOrWhiteSpace(modbusMName))
             {
                 Logger.Error($"需要配置 {nameof(ModbusDeviceManagement)} 名称");
