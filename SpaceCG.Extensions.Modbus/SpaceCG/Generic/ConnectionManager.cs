@@ -11,6 +11,7 @@ using System.Xml.Linq;
 using Modbus.Device;
 using SpaceCG.Extensions;
 using SpaceCG.Net;
+using SpaceCG.Extensions.Modbus;
 
 namespace SpaceCG.Generic
 {

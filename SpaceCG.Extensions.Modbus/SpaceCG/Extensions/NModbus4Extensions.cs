@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using SpaceCG.Generic;
 using Modbus.Device;
 using System.Linq;
+using SpaceCG.Extensions.Modbus;
 
 namespace SpaceCG.Extensions
 {
@@ -248,13 +249,12 @@ namespace SpaceCG.Extensions
             {
                 if (type.IndexOf("TCP") >= 0)
                 {
-                    TcpClient tcpClient = new TcpClient();
-                    tcpClient.Connect(hostORcom, portORbaudRate);
+                    NModbus4TcpClientAdapter tcpClientAdapter = new NModbus4TcpClientAdapter(hostORcom, (ushort)portORbaudRate);
 
                     if (type.IndexOf("RTU") == -1)
-                        master = ModbusIpMaster.CreateIp(tcpClient);
+                        master = ModbusIpMaster.CreateIp(tcpClientAdapter);
                     else
-                        master = ModbusSerialMaster.CreateRtu(tcpClient);
+                        master = ModbusSerialMaster.CreateRtu(tcpClientAdapter);
                 }
                 else if (type.IndexOf("UDP") >= 0)
                 {
@@ -268,10 +268,7 @@ namespace SpaceCG.Extensions
                 }
                 else if (type.IndexOf("SERIAL") >= 0)
                 {
-                    System.IO.Ports.SerialPort serialPort = new System.IO.Ports.SerialPort(hostORcom, portORbaudRate);
-                    serialPort.Open();
-
-                    master = ModbusSerialMaster.CreateRtu(serialPort);
+                    master = ModbusSerialMaster.CreateRtu(new NModbus4SerialPortAdapter(hostORcom, portORbaudRate));
                 }
                 else
                 {

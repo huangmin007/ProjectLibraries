@@ -5,8 +5,6 @@ using System.Threading;
 using System.Xml.Linq;
 using Modbus.Device;
 using SpaceCG.Generic;
-using SpaceCG.Net;
-using static System.Collections.Specialized.BitVector32;
 
 namespace SpaceCG.Extensions.Modbus
 {

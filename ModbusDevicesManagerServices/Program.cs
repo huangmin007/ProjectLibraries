@@ -62,22 +62,22 @@ namespace ModbusDevicesManagerServices
             XmlReader reader = XmlReader.Create(configFile, settings);
             XElement Configuration = XElement.Load(reader, LoadOptions.None);
 
-            string modbusMName = Configuration.Attribute("Name")?.Value;
+            string modbusMName = Configuration.Attribute("ModbusManagerName")?.Value;
             if (string.IsNullOrWhiteSpace(modbusMName))
             {
                 Logger.Error($"需要配置 {nameof(ConnectionManager)} 名称");
                 return;
             }
-            XElement Connections = Configuration.Element("Connections");
+            XElement Connections = Configuration.Element(ConnectionManager.XConnections);
             if (Connections == null)
             {
                 Logger.Error($"连接配置不存在");
                 return;
             }
-            IEnumerable<XElement> ModbusElements = Configuration.Descendants("Modbus");
+            IEnumerable<XElement> ModbusElements = Configuration.Descendants(ModbusTransport.XModbus);
             if (Connections == null)
             {
-                Logger.Error($"Modbus 设备配置不存在");
+                Logger.Error($"{ModbusTransport.XModbus} 设备配置不存在");
                 return;
             }
 
@@ -86,7 +86,7 @@ namespace ModbusDevicesManagerServices
                 ControlInterface = new ReflectionInterface(localPort);
 
             if (ConnectionManager == null)
-                ConnectionManager = new ConnectionManager(ControlInterface, Connections.Attribute("Name")?.Value);
+                ConnectionManager = new ConnectionManager(ControlInterface, Connections.Attribute(ReflectionInterface.XName)?.Value);
             ConnectionManager.TryParseElements(Connections.Descendants(ConnectionManager.XConnection));
             
             if (ModbusDeviceManager == null)

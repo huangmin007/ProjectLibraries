@@ -3,8 +3,9 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using Modbus.IO;
+using SpaceCG.Generic;
 
-namespace SpaceCG.Generic
+namespace SpaceCG.Extensions.Modbus
 {
     /// <summary>
     /// NModbus4 TcpClient Reconnection Adapter
@@ -35,7 +36,7 @@ namespace SpaceCG.Generic
                 throw new ArgumentNullException(nameof(tcpClient), "参数不能为空");
 
             this.tcpClient = tcpClient;
-            this.remoteEP = tcpClient.Client?.RemoteEndPoint as IPEndPoint;
+            remoteEP = tcpClient.Client?.RemoteEndPoint as IPEndPoint;
 
             ThreadPool.QueueUserWorkItem(CheckConnectStatus);
         }
@@ -50,7 +51,7 @@ namespace SpaceCG.Generic
                 throw new ArgumentNullException(nameof(remoteEP), "参数不能为空");
 
             this.remoteEP = remoteEP;
-            this.tcpClient = new TcpClient(remoteEP);
+            tcpClient = new TcpClient(remoteEP);
             ThreadPool.QueueUserWorkItem(CheckConnectStatus);
         }
 

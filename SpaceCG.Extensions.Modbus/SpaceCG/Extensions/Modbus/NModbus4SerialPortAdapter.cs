@@ -2,10 +2,11 @@
 using System.IO.Ports;
 using System.Threading;
 using Modbus.IO;
+using SpaceCG.Generic;
 
-namespace SpaceCG.Generic
+namespace SpaceCG.Extensions.Modbus
 {
-    /// <summary>
+    /// <summary> 
     /// NModbus4 SerialPort Reconnection Adapter
     /// <para>只能解决串口 USB 接口断开重连的情况，不能解决总线断开重连，总线断开只是读写超时，串口 USB 连接还在</para>
     /// <para>示例：</para>
