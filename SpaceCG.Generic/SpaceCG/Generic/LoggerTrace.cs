@@ -133,6 +133,7 @@ namespace SpaceCG.Generic
         /// 日志跟踪对象
         /// </summary>
         /// <exception cref="Exception"></exception>
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public LoggerTrace()
         {
             Initialize(null, SourceLevels.All);
@@ -141,6 +142,7 @@ namespace SpaceCG.Generic
         /// 日志跟踪对象
         /// </summary>
         /// <param name="name"></param>
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public LoggerTrace(String name)
         {
             Initialize(name, SourceLevels.All);
@@ -149,6 +151,7 @@ namespace SpaceCG.Generic
         /// 日志跟踪对象
         /// </summary>
         /// <param name="defaultLevel"></param>
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public LoggerTrace(SourceLevels defaultLevel)
         {
             Initialize(null, defaultLevel);
@@ -158,6 +161,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="name"></param>
         /// <param name="defaultLevel"></param>
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public LoggerTrace(String name, SourceLevels defaultLevel)
         {
             Initialize(name, defaultLevel);
@@ -221,7 +225,7 @@ namespace SpaceCG.Generic
         /// <param name="eventType"></param>
         /// <param name="format"></param>
         /// <param name="args"></param>
-        public void TraceEvent(TraceEventType eventType, string format, params object[] args) => TraceSource?.TraceEvent(eventType, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+        public void TraceEvent(TraceEventType eventType, string format, params object[] args) => TraceSource?.TraceEvent(eventType, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(args.Length == 0 ? format : string.Format(format, args)));
 
         /// <summary>
         /// 使用指定的事件类型、事件标识符和跟踪数据，将跟踪数据写入 <see cref="TraceSource.Listeners"/> 集合中的跟踪侦听器中。
@@ -235,7 +239,7 @@ namespace SpaceCG.Generic
         /// <param name="eventType"></param>
         /// <param name="format"></param>
         /// <param name="args"></param>
-        public void TraceData(TraceEventType eventType, string format, params object[] args) => TraceSource?.TraceData(eventType, Thread.CurrentThread.ManagedThreadId, FormatStackMessage((string.Format(format, args))));
+        public void TraceData(TraceEventType eventType, string format, params object[] args) => TraceSource?.TraceData(eventType, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(args.Length == 0 ? format : string.Format(format, args)));
 
         /// <summary>
         /// 跟踪调试信息
@@ -247,7 +251,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="format"></param>
         /// <param name="args"></param>
-        public void Debug(string format, params object[] args) => TraceSource?.TraceEvent(TraceEventType.Verbose, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+        public void Debug(string format, params object[] args) => TraceSource?.TraceEvent(TraceEventType.Verbose, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(args.Length == 0 ? format : string.Format(format, args)));
         /// <summary>
         /// 跟踪信息性消息
         /// </summary>
@@ -258,7 +262,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="format"></param>
         /// <param name="args"></param>
-        public void Info(string format, params object[] args) => TraceSource?.TraceEvent(TraceEventType.Information, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+        public void Info(string format, params object[] args) => TraceSource?.TraceEvent(TraceEventType.Information, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(args.Length == 0 ? format : string.Format(format, args)));
         /// <summary>
         /// 跟踪非严重问题消息
         /// </summary>
@@ -269,7 +273,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="format"></param>
         /// <param name="args"></param>
-        public void Warn(string format, params object[] args) => TraceSource?.TraceEvent(TraceEventType.Warning, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+        public void Warn(string format, params object[] args) => TraceSource?.TraceEvent(TraceEventType.Warning, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(args.Length == 0 ? format : string.Format(format, args)));
         /// <summary>
         /// 跟踪可恢复的错误消息
         /// </summary>
@@ -280,7 +284,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="format"></param>
         /// <param name="args"></param>
-        public void Error(string format, params object[] args) => TraceSource?.TraceEvent(TraceEventType.Error, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+        public void Error(string format, params object[] args) => TraceSource?.TraceEvent(TraceEventType.Error, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(args.Length == 0 ? format : string.Format(format, args)));
         /// <summary>
         /// 跟踪致命错误或应用程序崩溃消息
         /// </summary>
@@ -291,7 +295,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="format"></param>
         /// <param name="args"></param>
-        public void Fatal(string format, params object[] args) => TraceSource.TraceEvent(TraceEventType.Critical, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(string.Format(format, args)));
+        public void Fatal(string format, params object[] args) => TraceSource.TraceEvent(TraceEventType.Critical, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(args.Length == 0 ? format : string.Format(format, args)));
 
         /// <summary>
         /// format stack frame message
@@ -434,7 +438,7 @@ namespace SpaceCG.Generic
             {
                 ConsoleColor color = Console.ForegroundColor;
                 Console.ForegroundColor = GetConsoleColor(eventType);
-                string message = args != null ? string.Format(format, args) : format;
+                string message = args.Length <= 0 ? format : string.Format(format, args);
 
                 WriteHeader(source, eventType, id);
                 WriteMessage(message);
@@ -470,7 +474,7 @@ namespace SpaceCG.Generic
             ConsoleColor color = Console.ForegroundColor;
             Console.ForegroundColor = GetConsoleColor(eventType);
             StringBuilder messageBuilder = new StringBuilder();
-            if (data != null)
+            if (data.Length > 0)
             {
                 for (int i = 0; i < data.Length; i++)
                 {
