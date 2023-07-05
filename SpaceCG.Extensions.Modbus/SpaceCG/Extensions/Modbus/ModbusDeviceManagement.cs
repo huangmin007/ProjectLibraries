@@ -113,7 +113,7 @@ namespace SpaceCG.Extensions.Modbus
             if (this.Controller == null)
             {
                 this.Controller = controller;
-                this.Controller.AccessObjects.Add(name, this);
+                this.Controller.AccessObjects.Add(this.Name, this);
             }
         }
 

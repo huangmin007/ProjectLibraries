@@ -117,7 +117,7 @@ namespace SpaceCG.Generic
             if (this.Controller == null)
             {
                 this.Controller = controller;
-                this.Controller.AccessObjects.Add(name, this);
+                this.Controller.AccessObjects.Add(this.Name, this);
             }
         }
 
