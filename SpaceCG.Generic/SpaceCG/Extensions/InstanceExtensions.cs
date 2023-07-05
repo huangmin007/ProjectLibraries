@@ -461,11 +461,20 @@ namespace SpaceCG.Extensions
 
             try
             {
-                returnValue = methodInfo.Invoke(instanceObj, arguments);
+                if (methodInfo.ReturnType == typeof(void))
+                {
+                    returnValue = "void";
+                    methodInfo.Invoke(instanceObj, arguments);
+                }
+                else
+                {
+                    returnValue = methodInfo.Invoke(instanceObj, arguments);
+                }
                 return true;
             }
             catch (Exception ex)
             {
+                returnValue = null;
                 Logger.Error($"函数 {methodInfo.Name} 执行失败: {ex}");
             }
 

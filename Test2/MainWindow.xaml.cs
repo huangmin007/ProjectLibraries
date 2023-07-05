@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -42,6 +43,7 @@ namespace Test2
 
         IAsyncClient client;
         IAsyncServer server;
+        ReflectionController controller;
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
@@ -59,6 +61,55 @@ namespace Test2
             //server.ClientDataReceived += Server_ClientDataReceived;
 
             Console.WriteLine($"test::{WindowState.Normal}");
+
+            Console.WriteLine($"SynchronizationContext.Current: {SynchronizationContext.Current}");
+            Console.WriteLine($"GetCurrentProcess.Id: {Thread.CurrentThread.ManagedThreadId}");
+            Console.WriteLine($"TaskScheduler.FromCurrentSynchronizationContextt: {TaskScheduler.FromCurrentSynchronizationContext().Id}");
+            Console.WriteLine($"TaskScheduler.Current: {TaskScheduler.Current.Id}");
+            Console.WriteLine($"TaskScheduler.Default: {TaskScheduler.Default.Id}");
+
+            int tf = 23;
+            var task1 = Task.Factory.StartNew<object>(() =>
+            {
+                Thread.Sleep(3000);
+                Console.WriteLine("test..");
+                return 12 + tf;
+            }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Current);// TaskScheduler.FromCurrentSynchronizationContext());
+            //Console.WriteLine(  task1.Result);
+            if(task1.IsCompleted)
+            {
+                Console.WriteLine(task1.Result);
+            }
+
+            MethodInfo method = this.GetType().GetMethod("Add");
+            Console.WriteLine(method.ReturnType);
+
+            XElement element = XElement.Parse("<Action Target=\"obj\" Method=\"Me\" Params=\"12\" />");
+            Console.WriteLine(  element);
+            element.Add(XElement.Parse("<Return Result=\"True\" Value=\"aaa\" />"));
+            Console.WriteLine(element);
+
+            Console.WriteLine($"async:{Exec(true, "async")}");
+            //Console.WriteLine($"sync::{Exec(false, "sync")}");
+
+            controller = new ReflectionController(2025);
+            controller.AccessObjects.Add("Window", this);
+            //this.Dispatcher.Invoke
+        }
+
+        public bool Exec(bool async, string msg)
+        {
+            int tf = 34;
+            Console.WriteLine($"start...{msg}");
+            var task1 = Task.Factory.StartNew<object>(() =>
+            {
+                Console.WriteLine($"GetCurrentProcess.Id: {Thread.CurrentThread.ManagedThreadId}");
+                Thread.Sleep(3000);
+                Console.WriteLine($"test..{msg}");
+                return 12 + tf;
+            }, CancellationToken.None, TaskCreationOptions.AttachedToParent, TaskScheduler.FromCurrentSynchronizationContext());// TaskScheduler.FromCurrentSynchronizationContext());
+            task1.Wait();
+            return task1.IsCompleted;
         }
 
         private void Server_ClientDataReceived(object sender, AsyncDataEventArgs e)
@@ -103,54 +154,36 @@ namespace Test2
                     });
         }
 
-        private void TTest(object obj)
-        {
-            using (LoggerTrace logger4 = new LoggerTrace())
-            {
-                logger4.Debug($"logger4...");
-            }
-
-            Console.WriteLine($"thread:{Thread.CurrentThread.ManagedThreadId}");
-            logger1.Info("THread...");
-        }
-
-        private void ModbusTransport_OutputChangeEvent(ModbusTransport transport, ModbusIODevice device, Register register)
-        {
-            if(register.Count == 1)
-                Console.WriteLine($"Output: {transport} DeviceAddress:{device.Address} RegisterAddress:{register} RegisterValue:{register.Value}");
-            else
-                Console.WriteLine($"Output: {transport} DeviceAddress:{device.Address} RegisterAddress:{register} RegisterValue:{Convert.ToString((int)register.Value, 2)}");
-        }
-
-        private void ModbusTransport_InputChangeEvent(ModbusTransport transport, ModbusIODevice device, Register register)
-        {
-            if (register.Count == 1)
-                Console.WriteLine($"Input: {transport} DeviceAddress:{device.Address} RegisterAddress:{register} RegisterValue:{register.Value}");
-            else
-                Console.WriteLine($"Input: {transport} DeviceAddress:{device.Address} RegisterAddress:{register} RegisterValue:{Convert.ToString((int)register.Value, 2)}");
-        }
         private void Button_btn_Click(object sender, RoutedEventArgs e)
         {
             Button button = (Button)sender;
             if (button == Button_Test)
             {
                 //logger1.Info(client);
-                logger1.Info(server);
+                //logger1.Info(server);
+
+                XElement action = XElement.Parse("<Action Target=\"Window\" Method=\"Add2\" Params=\"200,230\" />");
+
+                controller.TryParseControlMessage(action);
             }
             else if(button == Button_Close)
             {
                 //client.Close();
-                server.Stop();
+                //server.Stop();
+
+                XElement action = XElement.Parse("<Action Target=\"Window\" Method=\"Add2\" Params=\"100,230\" Sync=\"False\" />");
+
+                controller.TryParseControlMessage(action);
             }
             else if(button == Button_Connect)
             {
                 //client.Connect();
-                server.Start();
+                //server.Start();
             }
             else if(button == Button_Send)
             {
                 //client.SendMessage("hello");
-                server.SendMessage("hello");
+                //server.SendMessage("hello");
             }
         }
 
@@ -165,6 +198,8 @@ namespace Test2
 
         public int Add2(int a, int b)
         {
+            Thread.Sleep(5000);
+            this.Width = a + b;
             return a + b;
         }
 

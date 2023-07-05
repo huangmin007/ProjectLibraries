@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Ports;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
 using SpaceCG.Extensions.Modbus;
@@ -15,7 +16,7 @@ namespace ModbusDevicesManagerServices
         static readonly LoggerTrace Logger = new LoggerTrace("MainProgram");
 
         private static bool Running = true;
-        private static ReflectionInterface ControlInterface;
+        private static ReflectionController ControlInterface;
         
         private static string DefaultConfigFile = "ModbusDevices.Config";
         private static string Title = "Modbus Device Manager Server v2.1.230703";
@@ -31,7 +32,7 @@ namespace ModbusDevicesManagerServices
 
             Console.CancelKeyPress += Console_CancelKeyPress;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
-
+            
             LoadDeviceConfig(DefaultConfigFile);
 
             while (Running)
@@ -81,10 +82,10 @@ namespace ModbusDevicesManagerServices
 
             ushort localPort = ushort.TryParse(Configuration.Attribute("LocalPort")?.Value, out ushort port) && port >= 1024 ? port : (ushort)2023;
             if(ControlInterface == null)
-                ControlInterface = new ReflectionInterface(localPort);
+                ControlInterface = new ReflectionController(localPort);
 
             ConnectionManagement.Dispose();
-            ConnectionManagement.Instance.Configuration(ControlInterface, Connections.Attribute(ReflectionInterface.XName)?.Value);
+            ConnectionManagement.Instance.Configuration(ControlInterface, Connections.Attribute(ReflectionController.XName)?.Value);
             ConnectionManagement.Instance.TryParseElements(Connections.Descendants(ConnectionManagement.XConnection));
 
             ModbusDeviceManagement.Dispose();
