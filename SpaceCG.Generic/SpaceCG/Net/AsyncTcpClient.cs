@@ -20,12 +20,12 @@ namespace SpaceCG.Net
         /// <summary>
         /// 与服务端的连接状态
         /// </summary>
-        public bool IsConnected => tcpClient?.Client != null && !((tcpClient.Client.Poll(1000, SelectMode.SelectRead) && (tcpClient.Client.Available == 0)) || !tcpClient.Client.Connected);
+        public bool IsConnected => tcpClient != null && tcpClient.Client != null && !((tcpClient.Client.Poll(1000, SelectMode.SelectRead) && (tcpClient.Client.Available == 0)) || !tcpClient.Client.Connected);
 
         /// <inheritdoc/>
-        public IPEndPoint LocalEndPoint => tcpClient.Client?.LocalEndPoint as IPEndPoint;
+        public IPEndPoint LocalEndPoint => tcpClient?.Client?.LocalEndPoint as IPEndPoint;
         /// <inheritdoc/>
-        public IPEndPoint RemoteEndPoint => tcpClient.Client?.RemoteEndPoint as IPEndPoint;
+        public IPEndPoint RemoteEndPoint => tcpClient?.Client?.RemoteEndPoint as IPEndPoint;
         
         /// <inheritdoc/>
         public int ReadTimeout
@@ -132,7 +132,7 @@ namespace SpaceCG.Net
         {
             try
             {
-                tcpClient.EndConnect(ar);
+                tcpClient?.EndConnect(ar);
             }
             catch(Exception ex)
             {

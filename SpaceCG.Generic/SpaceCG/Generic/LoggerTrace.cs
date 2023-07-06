@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -21,7 +20,7 @@ namespace SpaceCG.Generic
         private static readonly TextFileStreamTraceListener textFileListener;
 
         /// <summary>
-        /// 全局文本文件记录源开关和事件类型筛选器筛选的跟踪消息的级别
+        /// 默认文本文件记录源开关和事件类型筛选器筛选的跟踪消息的级别
         /// <para>文本文件记录(日志)的跟踪消息的级别</para>
         /// </summary>
         public static SourceLevels FileTraceLevels
@@ -30,12 +29,12 @@ namespace SpaceCG.Generic
             set { ((EventTypeFilter)textFileListener.Filter).EventType = value; }
         }
         /// <summary>
-        /// 全局文本文件记录源跟踪事件
+        /// 默认文本文件记录源跟踪事件
         /// </summary>
         public static event EventHandler<TraceEventArgs> FileTraceEvent;
 
         /// <summary>
-        /// 全局控制台源开关和事件类型筛选器筛选的跟踪消息的级别
+        /// 默认控制台源开关和事件类型筛选器筛选的跟踪消息的级别
         /// <para>控制台记录的跟踪消息的级别</para>
         /// </summary>
         public static SourceLevels ConsoleTraceLevels
@@ -44,12 +43,12 @@ namespace SpaceCG.Generic
             set { ((EventTypeFilter)consoleListener.Filter).EventType = value; }
         }
         /// <summary>
-        /// 全局控制台消息源跟踪事件
+        /// 默认控制台消息源跟踪事件
         /// </summary>
         public static event EventHandler<TraceEventArgs> ConsoleTraceEvent;
 
         /// <summary>
-        /// <see cref="LoggerTrace"/> 静态结构函数
+        /// <see cref="LoggerTrace"/> 静态构造函数
         /// </summary>
         static LoggerTrace()
         {
@@ -68,20 +67,26 @@ namespace SpaceCG.Generic
             textFileListener = new TextFileStreamTraceListener(defaultFileName, "FileTrace");
             textFileListener.Filter = new EventTypeFilter(SourceLevels.Information);
             textFileListener.TraceSourceEvent += (s, e) => FileTraceEvent?.Invoke(s, e);
+            textFileListener.WriteLine(Environment.NewLine);
 
             consoleListener = new TextFileStreamTraceListener(Console.Out, "ConsoleTrace");
             consoleListener.Filter = new EventTypeFilter(SourceLevels.All);
             consoleListener.TraceSourceEvent += (s, e) => ConsoleTraceEvent?.Invoke(s, e);
 
             OperatingSystem os = Environment.OSVersion;
-            String systemInfo = $"{Environment.NewLine}[{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}] [{os} ({os.Platform})]({(Environment.Is64BitOperatingSystem ? "64" : "32")} 位操作系统 / 逻辑处理器: {Environment.ProcessorCount})";
-            String moduleInfo = $"[{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}] [{moduleFileName}]({(Environment.Is64BitProcess ? "64" : "32")} 位进程 / 进程 ID: {Process.GetCurrentProcess().Id})";
+            TraceEventCache eventCache = new TraceEventCache();
 
-            consoleListener.WriteLine(systemInfo);
-            textFileListener.WriteLine(systemInfo);
+            consoleListener.WriteLine($"[Header] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
+            textFileListener.WriteLine($"[Header] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
 
-            consoleListener.WriteLine(moduleInfo);
-            textFileListener.WriteLine(moduleInfo);
+            String systemInfo = $"[{os} ({os.Platform})]({(Environment.Is64BitOperatingSystem ? "64" : "32")} 位操作系统 / 逻辑处理器: {Environment.ProcessorCount})";
+            String moduleInfo = $"[{moduleFileName}]({(Environment.Is64BitProcess ? "64" : "32")} 位进程 / 进程 ID: {Process.GetCurrentProcess().Id})";
+
+            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, systemInfo);
+            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, moduleInfo);
+
+            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, systemInfo);
+            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, moduleInfo);
 
             if (processModule != null)
             {
@@ -93,7 +98,50 @@ namespace SpaceCG.Generic
             consoleListener.Flush();
             textFileListener.Flush();
             FileExtensions.ReserveFileDays(30, path, $"{mainModuleName}.*.log");
+
+            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
         }
+        private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        {
+            AppDomain.CurrentDomain.FirstChanceException -= CurrentDomain_FirstChanceException;
+
+            consoleListener.WriteLine($"[Footer] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
+            textFileListener.WriteLine($"[Footer] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
+
+            consoleListener.Flush();
+            textFileListener.Flush();
+        }
+        private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            TraceEventCache eventCache = new TraceEventCache();
+            TraceEventType eventType = e.IsTerminating ? TraceEventType.Critical : TraceEventType.Error;
+
+            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"公共语言运行时是否即将终止: {e.IsTerminating}");
+            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"未处理的异常对象: {e.ExceptionObject}");
+            textFileListener.Flush();
+
+            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"公共语言运行时是否即将终止: {e.IsTerminating}");
+            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"未处理的异常对象: {e.ExceptionObject}");
+            consoleListener.Flush();
+
+            if (e.IsTerminating)
+            {
+                AppDomain.CurrentDomain.FirstChanceException -= CurrentDomain_FirstChanceException;
+                Environment.Exit(System.Runtime.InteropServices.Marshal.GetHRForException((Exception)e.ExceptionObject));
+            }
+        }
+        private static void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        {
+            TraceEventCache eventCache = new TraceEventCache();
+            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");
+            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");
+
+            consoleListener.Flush();
+            textFileListener.Flush();
+        }
+        
 
         /// <summary>
         /// 当前 <see cref="LoggerTrace"/> 跟踪代码的执行并将跟踪消息的源对象
@@ -295,7 +343,12 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="format"></param>
         /// <param name="args"></param>
-        public void Fatal(string format, params object[] args) => TraceSource.TraceEvent(TraceEventType.Critical, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(args.Length == 0 ? format : string.Format(format, args)));
+        public void Fatal(string format, params object[] args) => TraceSource?.TraceEvent(TraceEventType.Critical, Thread.CurrentThread.ManagedThreadId, FormatStackMessage(args.Length == 0 ? format : string.Format(format, args)));
+        
+        /// <summary>
+        /// 刷新跟踪侦听器集合中的所有跟踪侦听器
+        /// </summary>
+        public void Flush() => TraceSource?.Flush();
 
         /// <summary>
         /// format stack frame message
@@ -327,11 +380,11 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 单个文件的最大大小
         /// </summary>
-        protected long FILE_MAX_SIZE = 1024 * 1024 * 2;
+        protected const long FILE_MAX_SIZE = 1024 * 1024 * 2;
         /// <summary>
         /// 跟踪事件 <see cref="TRACE_TARGET_COUNT"/> 次数后检测一次文件，减少频繁的检查文件大小
         /// </summary>
-        protected int TRACE_TARGET_COUNT = 16;
+        protected const int TRACE_TARGET_COUNT = 16;
 
         /// <summary>
         /// 当前跟踪次数
@@ -420,14 +473,13 @@ namespace SpaceCG.Generic
         {
             if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, message, null, null, null))
             {
-                ConsoleColor color = Console.ForegroundColor;
                 Console.ForegroundColor = GetConsoleColor(eventType);
 
                 WriteHeader(source, eventType, id);
                 WriteMessage(message);
                 WriteFooter(eventCache);
 
-                Console.ForegroundColor = color;
+                Console.ResetColor();
                 TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, null));
             }
         }
@@ -436,7 +488,6 @@ namespace SpaceCG.Generic
         {
             if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, format, args, null, null))
             {
-                ConsoleColor color = Console.ForegroundColor;
                 Console.ForegroundColor = GetConsoleColor(eventType);
                 string message = args.Length <= 0 ? format : string.Format(format, args);
 
@@ -444,7 +495,7 @@ namespace SpaceCG.Generic
                 WriteMessage(message);
                 WriteFooter(eventCache);
 
-                Console.ForegroundColor = color;
+                Console.ResetColor();
                 TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, null));
             }
         }
@@ -454,7 +505,6 @@ namespace SpaceCG.Generic
         {
             if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, null, null, data, null))
             {
-                ConsoleColor color = Console.ForegroundColor;
                 Console.ForegroundColor = GetConsoleColor(eventType);
                 string message = data != null ? data.ToString() : string.Empty;
 
@@ -462,7 +512,7 @@ namespace SpaceCG.Generic
                 WriteMessage(message);
                 WriteFooter(eventCache);
 
-                Console.ForegroundColor = color;
+                Console.ResetColor();
                 TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, new object[] { data }));
             }
         }
@@ -471,7 +521,6 @@ namespace SpaceCG.Generic
         {
             if (Filter != null && !Filter.ShouldTrace(eventCache, source, eventType, id, null, null, null, data)) return;
 
-            ConsoleColor color = Console.ForegroundColor;
             Console.ForegroundColor = GetConsoleColor(eventType);
             StringBuilder messageBuilder = new StringBuilder();
             if (data.Length > 0)
@@ -487,7 +536,7 @@ namespace SpaceCG.Generic
             WriteMessage(messageBuilder.ToString());
             WriteFooter(eventCache);
 
-            Console.ForegroundColor = color;
+            Console.ResetColor();
             TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, messageBuilder.ToString(), data));
         }
 

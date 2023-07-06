@@ -31,6 +31,7 @@ namespace ModbusDevicesManagerServices
                 foreach (string name in names) Logger.Info(name);
 
             Console.CancelKeyPress += Console_CancelKeyPress;
+            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             
             LoadDeviceConfig(DefaultConfigFile);
@@ -42,6 +43,7 @@ namespace ModbusDevicesManagerServices
                 Thread.Sleep(10);
             }
         }
+
 
         /// <summary>
         /// 加载设备配置文件，配置文件参考 ModbusDevices.Config
@@ -95,10 +97,14 @@ namespace ModbusDevicesManagerServices
         
         private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
         {
-            Logger.Info($"Console Cancel Key .");
+            Logger.Info($"Console_CancelKeyPress");
             ExitDispose();
         }
-
+        private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        {
+            Logger.Info($"CurrentDomain_ProcessExit");
+            ExitDispose();
+        }
         public static void ConsoleKeyHandler(ConsoleKeyInfo info)
         {
             switch (info.Key)

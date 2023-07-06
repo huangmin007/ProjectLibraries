@@ -50,10 +50,10 @@ namespace Test2
             LoggerTrace.ConsoleTraceEvent += LoggerTrace_TraceSourceEvent;            
             InstanceExtensions.ConvertChangeTypeExtension = ConvertChangeTypeExtension2;
 
-            //client = new AsyncTcpClient();
+            client = new AsyncTcpClient();
             //client = new AsyncUdpClient();
-            //client.Connect("127.0.0.1", 5334);
-
+            client.Connect("127.0.0.1", 5334);
+            Console.WriteLine(  client is IAsyncClient);
             logger1.Info(client);
 
             //server = new AsyncTcpServer(3000);
@@ -184,6 +184,7 @@ namespace Test2
             {
                 //client.SendMessage("hello");
                 //server.SendMessage("hello");
+                throw new Exception($"Test Exception...");
             }
         }
 
