@@ -11,6 +11,7 @@ using SpaceCG.Generic;
 
 namespace ModbusDevicesManagerServices
 {
+
     class Program
     {
         static readonly LoggerTrace Logger = new LoggerTrace("MainProgram");

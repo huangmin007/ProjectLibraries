@@ -142,7 +142,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 当前线程的同步上下文
         /// </summary>
-        private SynchronizationContext SyncContext { get; set; } = SynchronizationContext.Current;
+        public SynchronizationContext SyncContext { get; internal set; } = SynchronizationContext.Current;
 
         /// <summary>
         /// 应用程序反射控制接口, 用于网络、键盘、代码、配置、或是其它方式的反射控制访问对象的方法或属性
@@ -159,8 +159,13 @@ namespace SpaceCG.Generic
         /// </summary>
         public ReflectionController(ushort localPort = 2023)
         {
+            SyncContext = SynchronizationContext.Current;
             if (SyncContext == null)
+            {
+                Logger.Warn($"当前线程的同步上下文为空，重新创建 SynchronizationContext");
                 SyncContext = new SynchronizationContext();
+                //SyncContext = new ReflectionSynchronizationContext();
+            }
             
             InstallNetworkService(localPort);
         }
@@ -213,7 +218,7 @@ namespace SpaceCG.Generic
         /// </summary>
         public void UninstallNetworkServices()
         {
-            if (NetworkServices?.Count() == 0) return;
+            if (NetworkServices == null || NetworkServices.Count() == 0) return;
 
             Type disposeableType = typeof(IDisposable);
             foreach (var obj in NetworkServices)
@@ -469,7 +474,7 @@ namespace SpaceCG.Generic
             bool isSyncContext = bool.TryParse(actionElement.Attribute(XSync)?.Value, out bool booSync) ? booSync : DefaultSyncContext;
             bool isReturnResult = bool.TryParse(actionElement.Attribute(XReturn)?.Value, out bool booReturn) ? booReturn : DefaultReturnResult;
 
-            Action<SendOrPostCallback, object> dispatcher;
+            Action<SendOrPostCallback, object> dispatcher = null;
             if (isSyncContext) dispatcher = SyncContext.Send;
             else dispatcher = SyncContext.Post;
 
@@ -608,6 +613,21 @@ namespace SpaceCG.Generic
                 throw new ArgumentNullException($"{nameof(targetName)},{nameof(propertyName)}", "关键参数不能为空");
 
             return $"<{XAction} {XTarget}=\"{targetName}\" {XProperty}=\"{propertyName}\" {XValue}=\"{(propertyValue == null ? "null" : propertyValue)}\" {XSync}=\"{sync}\" {XReturn}=\"{isReturn}\" />";
+        }
+    }
+
+    /// <inheritdoc/>
+    public class ReflectionSynchronizationContext : SynchronizationContext
+    {
+        /// <inheritdoc/>
+        public ReflectionSynchronizationContext()
+        {
+        }
+
+        /// <inheritdoc/>
+        public override void Post(SendOrPostCallback d, object state)
+        {
+            ThreadPool.QueueUserWorkItem(new WaitCallback(d.Invoke), state);
         }
     }
 }
