@@ -139,10 +139,25 @@ namespace SpaceCG.Generic
         /// </summary>
         public bool DefaultReturnResult { get; private set; } = false;
 
+        private SynchronizationContext SyncContext = SynchronizationContext.Current;
         /// <summary>
-        /// 当前线程的同步上下文
+        /// 当前反射的同步上下文, 默认为 <see cref="SynchronizationContext.Current"/>
+        /// <code>//示例：
+        /// ReflectionController.SynchronizationContext = new SynchronizationContext();
+        /// ReflectionController.SynchronizationContext = new ReflectionSynchronizationContext();
+        /// </code>
         /// </summary>
-        public SynchronizationContext SyncContext { get; internal set; } = SynchronizationContext.Current;
+        /// <exception cref="ArgumentNullException"></exception>
+        public SynchronizationContext SynchronizationContext
+        {
+            get { return SyncContext; }
+            set
+            {
+                if (value == null) 
+                    throw new ArgumentNullException(nameof(SynchronizationContext), "参数不能设置为空");
+                SyncContext = value;
+            }
+        }
 
         /// <summary>
         /// 应用程序反射控制接口, 用于网络、键盘、代码、配置、或是其它方式的反射控制访问对象的方法或属性
@@ -164,7 +179,6 @@ namespace SpaceCG.Generic
             {
                 Logger.Warn($"当前线程的同步上下文为空，重新创建 SynchronizationContext");
                 SyncContext = new SynchronizationContext();
-                //SyncContext = new ReflectionSynchronizationContext();
             }
             
             InstallNetworkService(localPort);
@@ -557,7 +571,6 @@ namespace SpaceCG.Generic
             }
         }
 
-
         /// <inheritdoc/>
         public void Dispose()
         {
@@ -619,9 +632,18 @@ namespace SpaceCG.Generic
     /// <inheritdoc/>
     public class ReflectionSynchronizationContext : SynchronizationContext
     {
-        /// <inheritdoc/>
+        /// <summary>
+        /// 创建 <see cref="ReflectionSynchronizationContext"/> 类的新实例
+        /// </summary>
         public ReflectionSynchronizationContext()
         {
+        }
+
+        /// <inheritdoc/>
+        public override void Send(SendOrPostCallback d, object state)
+        {
+            if(Current != null) Current.Send(d, state);
+            else base.Send(d, state);
         }
 
         /// <inheritdoc/>

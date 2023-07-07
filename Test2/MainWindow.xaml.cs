@@ -39,35 +39,25 @@ namespace Test2
 
         private static LoggerTrace logger1 = new LoggerTrace();
 
-        ReflectionController controller = new ReflectionController(2023);
+        ReflectionController controller;
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            //controller = new ReflectionController(2023);
+            controller = new ReflectionController(2023);
+            //controller.SynchronizationContext = new ReflectionSynchronizationContext();
             controller.AccessObjects.Add("Window", this);
         }
-
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)
         {
             Button button = (Button)sender;
             if (button == Button_Test)
             {
-                this.Dispatcher.Invoke(() =>
-                {
-                    SetWidth(500);
-                });
-                //controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"300\" Sync=\"True\" />");
+                controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"300\" Sync=\"True\" />");
             }
             else if(button == Button_Close)
             {
-                this.Dispatcher.InvokeAsync(() =>
-                {
-                    Console.WriteLine($"InvokeAsync: {Thread.CurrentThread.ManagedThreadId}");
-
-                    SetWidth(700);
-                });
-                //controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
+                controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
             }
             else if(button == Button_Connect)
             {
@@ -75,7 +65,12 @@ namespace Test2
             }
             else if(button == Button_Send)
             {
-                
+                this.Dispatcher.InvokeAsync(() =>
+                {
+                    Console.WriteLine($"InvokeAsync 1  {Thread.CurrentThread.ManagedThreadId}");
+                    Thread.Sleep(3000);
+                    Console.WriteLine($"InvokeAsync 2");
+                });
             }
         }
 
