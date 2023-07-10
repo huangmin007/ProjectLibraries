@@ -64,6 +64,7 @@ namespace SpaceCG.Generic
             if (!Directory.Exists(path)) Directory.CreateDirectory(path);
             String defaultFileName = $"{path}/{mainModuleName}.{DateTime.Today.ToString("yyyy-MM-dd")}.log";
 
+            Trace.AutoFlush = true;
             textFileListener = new TextFileStreamTraceListener(defaultFileName, "FileTrace");
             textFileListener.Filter = new EventTypeFilter(SourceLevels.Information);
             textFileListener.TraceSourceEvent += (s, e) => FileTraceEvent?.Invoke(s, e);
@@ -93,8 +94,7 @@ namespace SpaceCG.Generic
                 consoleListener.Write(processModule.FileVersionInfo.ToString());
                 textFileListener.Write(processModule.FileVersionInfo.ToString());
             }
-
-            Trace.AutoFlush = true;
+            
             consoleListener.Flush();
             textFileListener.Flush();
             FileExtensions.ReserveFileDays(30, path, $"{mainModuleName}.*.log");
@@ -146,7 +146,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 当前 <see cref="LoggerTrace"/> 跟踪代码的执行并将跟踪消息的源对象
         /// </summary>
-        public TraceSource TraceSource { get; private set; }
+        private TraceSource TraceSource;
         /// <summary>
         /// 当前 <see cref="LoggerTrace"/> 源开关和事件类型筛选器筛选的跟踪消息的级别
         /// </summary>

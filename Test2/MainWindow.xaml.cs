@@ -61,7 +61,6 @@ namespace Test2
             }
             else if(button == Button_Connect)
             {
-                //ThreadPool.QueueUserWorkItem(new WaitCallback(Add), 300);
             }
             else if(button == Button_Send)
             {

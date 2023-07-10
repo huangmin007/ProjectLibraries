@@ -17,13 +17,16 @@ namespace SpaceCG.Generic
     /// </summary>
     public class MessageEventArgs : EventArgs
     {
-        /// <summary> Message  </summary>
-        public XElement Message { get; internal set; }
+        /// <summary> Action Element, 为 null 时则使用默认 <see cref="XElement.Parse(string)"/> 解析 </summary>
+        public XElement Action { get; set; } = null;
+
+        /// <summary> 接收的原字节数据  </summary>
+        public byte[] RawBytes { get; internal set; } = null;
 
         /// <summary> Sender </summary>
         internal object Sender { get; set; }
 
-        /// <summary> EndPoint </summary>
+        /// <summary> Remote EndPoint </summary>
         public EndPoint EndPoint { get; internal set; }
 
         /// <summary>
@@ -38,14 +41,19 @@ namespace SpaceCG.Generic
         /// <param name="endPoint"></param>
         public MessageEventArgs(XElement message, EndPoint endPoint)
         {
-            this.Message = message;
+            this.Action = message;
             this.EndPoint = endPoint;
         }
-
-        internal MessageEventArgs(object sender, EndPoint endPoint, XElement message)
+        /// <summary>
+        /// 网络消息事件参数
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="endPoint"></param>
+        /// <param name="rawBytes"></param>
+        internal MessageEventArgs(object sender, EndPoint endPoint, byte[] rawBytes)
         {
             this.Sender = sender;
-            this.Message = message;
+            this.RawBytes = rawBytes;
             this.EndPoint = endPoint;
         }
     }
@@ -139,23 +147,24 @@ namespace SpaceCG.Generic
         /// </summary>
         public bool DefaultReturnResult { get; private set; } = false;
 
-        private SynchronizationContext SyncContext = SynchronizationContext.Current;
+        private SynchronizationContext syncContext = SynchronizationContext.Current;
         /// <summary>
         /// 当前反射的同步上下文, 默认为 <see cref="SynchronizationContext.Current"/>
         /// <code>//示例：
         /// ReflectionController.SynchronizationContext = new SynchronizationContext();
+        /// ReflectionController.SynchronizationContext = new DispatcherSynchronizationContext();
         /// ReflectionController.SynchronizationContext = new ReflectionSynchronizationContext();
         /// </code>
         /// </summary>
         /// <exception cref="ArgumentNullException"></exception>
         public SynchronizationContext SynchronizationContext
         {
-            get { return SyncContext; }
+            get { return syncContext; }
             set
             {
                 if (value == null) 
                     throw new ArgumentNullException(nameof(SynchronizationContext), "参数不能设置为空");
-                SyncContext = value;
+                syncContext = value;
             }
         }
 
@@ -174,11 +183,11 @@ namespace SpaceCG.Generic
         /// </summary>
         public ReflectionController(ushort localPort = 2023)
         {
-            SyncContext = SynchronizationContext.Current;
-            if (SyncContext == null)
+            syncContext = SynchronizationContext.Current;
+            if (syncContext == null)
             {
                 Logger.Warn($"当前线程的同步上下文为空，重新创建 SynchronizationContext");
-                SyncContext = new SynchronizationContext();
+                syncContext = new SynchronizationContext();
             }
             
             InstallNetworkService(localPort);
@@ -270,24 +279,28 @@ namespace SpaceCG.Generic
         /// <param name="e"></param>
         private void Network_DataReceived(object sender, AsyncDataEventArgs e)
         {
-            XElement element = null;
-            string message = Encoding.Default.GetString(e.Bytes);
-
-            try
-            {
-                element = XElement.Parse(message);
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"控制消息 XML 格式数据 {message} 解析错误：{ex}");
-                return;
-            }
-
-            MessageEventArgs eventArgs = new MessageEventArgs(sender, e.EndPoint, element);
+            MessageEventArgs eventArgs = new MessageEventArgs(sender, e.EndPoint, e.Bytes);
             NetworkMessageEvent?.Invoke(this, eventArgs);
             if (!eventArgs.Handle) return;
 
-            this.TryParseControlMessage(element, eventArgs);
+            if (eventArgs.Action == null)
+            {
+                XElement element = null;
+                string message = Encoding.Default.GetString(e.Bytes);
+
+                try
+                {
+                    element = XElement.Parse(message);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"控制消息 {message} 应为 XML 格式数据, 试图解析错误：{ex}");
+                    return;
+                }
+                eventArgs.Action = element;
+            }
+
+            this.TryParseControlMessage(eventArgs.Action, eventArgs);
         }
 
         /// <summary>
@@ -330,7 +343,7 @@ namespace SpaceCG.Generic
         /// <param name="internalEventArgs"></param>
         protected void TryParseControlMessage(XElement actionElement, MessageEventArgs internalEventArgs = null)
         {
-            if (actionElement == null || AccessObjects.Count() <= 0) return;
+            if (actionElement == null || !actionElement.HasAttributes || AccessObjects.Count() <= 0) return;
 
             if (actionElement.Name.LocalName == XAction)
             {
@@ -388,7 +401,23 @@ namespace SpaceCG.Generic
 
             TryParseControlMessage(element, null);
         }
-
+        /// <summary>
+        /// 解析执行方法消息
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="method"></param>
+        /// <param name="args"></param>
+        /// <param name="sync"></param>
+        public void TryParseCallMethod(string target, string method, string args, bool sync = true) => TryParseControlMessage($"<{XAction} {XTarget}={target} {XMethod}={method} {XParams}={args} {XSync}={sync} />");
+        /// <summary>
+        /// 解析执行属性消息
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="property"></param>
+        /// <param name="value"></param>
+        /// <param name="sync"></param>
+        public void TryParseChangeValue(string target, string property, string value, bool sync = true) => TryParseControlMessage($"<{XAction} {XTarget}={target} {XProperty}={property} {XValue}={value} {XSync}={sync} />");
+        
         /// <summary>
         /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典找实例对象，并调用实例对象的方法
         /// <para>XML 格式：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; </para>
@@ -424,8 +453,8 @@ namespace SpaceCG.Generic
             bool isReturnResult = bool.TryParse(actionElement.Attribute(XReturn)?.Value, out bool booReturn) ? booReturn : DefaultReturnResult;
 
             Action<SendOrPostCallback, object> dispatcher;
-            if (isSyncContext) dispatcher = SyncContext.Send;
-            else dispatcher = SyncContext.Post;
+            if (isSyncContext) dispatcher = syncContext.Send;
+            else dispatcher = syncContext.Post;
 
             try
             {
@@ -440,10 +469,10 @@ namespace SpaceCG.Generic
                     if (state.GetType() == typeof(MessageEventArgs))
                     {
                         MessageEventArgs eventArgs = state as MessageEventArgs;
-                        eventArgs.Message.AddFirst(returnElement);
+                        eventArgs.Action.AddFirst(returnElement);
 
-                        (eventArgs.Sender as IAsyncClient)?.SendMessage(eventArgs.Message.ToString());
-                        (eventArgs.Sender as IAsyncServer)?.SendMessage(eventArgs.Message.ToString(), eventArgs.EndPoint);
+                        (eventArgs.Sender as IAsyncClient)?.SendMessage(eventArgs.Action.ToString());
+                        (eventArgs.Sender as IAsyncServer)?.SendMessage(eventArgs.Action.ToString(), eventArgs.EndPoint);
                     }
                 }, isReturnResult && internalEventArgs != null ? internalEventArgs : null);
             }
@@ -489,8 +518,8 @@ namespace SpaceCG.Generic
             bool isReturnResult = bool.TryParse(actionElement.Attribute(XReturn)?.Value, out bool booReturn) ? booReturn : DefaultReturnResult;
 
             Action<SendOrPostCallback, object> dispatcher = null;
-            if (isSyncContext) dispatcher = SyncContext.Send;
-            else dispatcher = SyncContext.Post;
+            if (isSyncContext) dispatcher = syncContext.Send;
+            else dispatcher = syncContext.Post;
 
             try
             {
@@ -506,10 +535,10 @@ namespace SpaceCG.Generic
                     if (state.GetType() == typeof(MessageEventArgs))
                     {
                         MessageEventArgs eventArgs = state as MessageEventArgs;
-                        eventArgs.Message.AddFirst(returnElement);
+                        eventArgs.Action.AddFirst(returnElement);
 
-                        (eventArgs.Sender as IAsyncClient)?.SendMessage(eventArgs.Message.ToString());
-                        (eventArgs.Sender as IAsyncServer)?.SendMessage(eventArgs.Message.ToString(), eventArgs.EndPoint);
+                        (eventArgs.Sender as IAsyncClient)?.SendMessage(eventArgs.Action.ToString());
+                        (eventArgs.Sender as IAsyncServer)?.SendMessage(eventArgs.Action.ToString(), eventArgs.EndPoint);
                     }
                 }, isReturnResult && internalEventArgs != null ? internalEventArgs : null);
             }
@@ -526,7 +555,7 @@ namespace SpaceCG.Generic
         /// <param name="objectElement"></param>
         protected void TryParseChangeValues(XElement objectElement)
         {
-            if (objectElement == null || !objectElement.HasAttributes) return;
+            if (objectElement == null) return;
             if (PropertyFilters.IndexOf("*.*") != -1) return;
 
             string objectName = objectElement.Name.LocalName;
@@ -554,8 +583,8 @@ namespace SpaceCG.Generic
             }
 
             Action<SendOrPostCallback, object> dispatcher;
-            if (isSyncContext) dispatcher = SyncContext.Send;
-            else dispatcher = SyncContext.Post;
+            if (isSyncContext) dispatcher = syncContext.Send;
+            else dispatcher = syncContext.Post;
 
             try
             {
@@ -585,7 +614,7 @@ namespace SpaceCG.Generic
             MessageGroups?.Clear();
             MessageGroups = null;
 
-            SyncContext = null;
+            syncContext = null;
         }
 
         /// <summary>

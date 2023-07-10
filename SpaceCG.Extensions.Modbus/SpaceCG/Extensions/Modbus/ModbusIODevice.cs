@@ -370,6 +370,9 @@ namespace SpaceCG.Extensions.Modbus
                 byte count = register.Count;
                 ushort startAddress = register.Address;
 
+                register.Value = long.MaxValue;
+                register.LastValue = long.MaxValue;
+
                 switch (register.Type)
                 {
                     case RegisterType.CoilsStatus:
@@ -405,13 +408,13 @@ namespace SpaceCG.Extensions.Modbus
             RawDiscreteInputsAddresses = SpliteAddresses(RawDiscreteInputs.Keys.ToArray());
             RawHoldingRegistersAddresses = SpliteAddresses(RawHoldingRegisters.Keys.ToArray());
             RawInputRegistersAddresses = SpliteAddresses(RawInputRegisters.Keys.ToArray());
-
-            foreach (var reg in Registers)
+#if false
+            foreach (Register reg in Registers)
             {
                 reg.Value = long.MaxValue;
                 reg.LastValue = long.MaxValue;
             }
-
+#endif
             SyncInputRegisters();
             SyncOutputRegisters();
             InitializeRegistersValues();
@@ -586,7 +589,6 @@ namespace SpaceCG.Extensions.Modbus
                         register.Value = value;
                         if(register.EnabledChangeEvent) OutputChangeHandler?.Invoke(this, register);
                     }
-                    continue;
                 }
                 //DiscreteInput
                 else if(register.Type == RegisterType.DiscreteInput && RawDiscreteInputs.Count > 0)
@@ -598,7 +600,6 @@ namespace SpaceCG.Extensions.Modbus
                         register.Value = value;
                         if (register.EnabledChangeEvent) InputChangeHandler?.Invoke(this, register);
                     }
-                    continue;
                 }
                 //HoldingRegisters
                 else if (register.Type == RegisterType.HoldingRegister && RawHoldingRegisters.Count > 0)
@@ -610,7 +611,6 @@ namespace SpaceCG.Extensions.Modbus
                         register.Value = value;
                         if (register.EnabledChangeEvent) OutputChangeHandler?.Invoke(this, register);
                     }
-                    continue;
                 }
                 //InputRegisters
                 else if (register.Type == RegisterType.InputRegister && RawInputRegisters.Count > 0)
@@ -622,7 +622,6 @@ namespace SpaceCG.Extensions.Modbus
                         register.Value = value;
                         if (register.EnabledChangeEvent) InputChangeHandler?.Invoke(this, register);
                     }
-                    continue;
                 }                
             }
         }
