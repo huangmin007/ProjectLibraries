@@ -401,6 +401,8 @@ namespace SpaceCG.Generic
 
             TryParseControlMessage(element, null);
         }
+
+#if false
         /// <summary>
         /// 解析执行方法消息
         /// </summary>
@@ -417,7 +419,8 @@ namespace SpaceCG.Generic
         /// <param name="value"></param>
         /// <param name="sync"></param>
         public void TryParseChangeValue(string target, string property, string value, bool sync = true) => TryParseControlMessage($"<{XAction} {XTarget}={target} {XProperty}={property} {XValue}={value} {XSync}={sync} />");
-        
+#endif
+
         /// <summary>
         /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典找实例对象，并调用实例对象的方法
         /// <para>XML 格式：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; </para>
