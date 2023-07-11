@@ -46,16 +46,15 @@ namespace SpaceCG.Extensions
             if (conversionType == null) return false;
 
             if (value == null) return true;
-            if (value.GetType() == typeof(string))
-            {
-                string valueString = value.ToString();
-                if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
-            }
-
             if (value.GetType() == conversionType)
             {
                 conversionValue = value;
                 return true;
+            }
+            if (value.GetType() == typeof(string))
+            {
+                string valueString = value.ToString();
+                if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
             }
 
             if (conversionType.IsValueType || conversionType.IsEnum)
@@ -102,8 +101,8 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"扩展函数 {ConvertChangeTypeExtension.Method.Name} 类型转换失败  Value:{value}  Type:{conversionType}");
-                    Logger.Error(ex);
+                    Logger.Warn($"扩展函数 {ConvertChangeTypeExtension.Method.Name} 类型转换失败  Value:{value}  Type:{conversionType}");
+                    Logger.Warn(ex);
                 }
             }
 
@@ -122,16 +121,16 @@ namespace SpaceCG.Extensions
             value = null;
             if (instanceObj == null || string.IsNullOrWhiteSpace(fieldName)) return false;
 
+            Type type = instanceObj.GetType();
+            FieldInfo fieldInfo = type.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+            if (fieldInfo == null)
+            {
+                Logger.Warn($"在实例对象 {type.Name} 中，未找到指定字段 {fieldName} 对象");
+                return false;
+            }
+
             try
             {
-                Type type = instanceObj.GetType();
-                FieldInfo fieldInfo = type.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-                if (fieldInfo == null)
-                {
-                    Logger.Warn($"在实例对象 {type.Name} 中，未找到指定字段 {fieldName} 对象");
-                    return false;
-                }
-
                 value = fieldInfo.GetValue(instanceObj);
                 return true;
             }
@@ -175,7 +174,6 @@ namespace SpaceCG.Extensions
 
             return false;
         }
-
 
         /// <summary>
         /// 动态的设置实例对象的字段 (公有字段或私有字段) 的多个属性 (公有) 值，跟据 XML 配置文件节点名称 (实例的公有字段或私有字段) 及节点属性 (字段对象的属性) 来个修改实例的字段属性

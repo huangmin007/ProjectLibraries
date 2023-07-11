@@ -17,7 +17,7 @@ namespace SpaceCG.Generic
     /// </summary>
     public class MessageEventArgs : EventArgs
     {
-        /// <summary> Action Element, 为 null 时则使用默认 <see cref="XElement.Parse(string)"/> 解析 </summary>
+        /// <summary> Action Element 默认为 null, 当为 null 时则使用默认 <see cref="XElement.Parse(string)"/> 解析 </summary>
         public XElement Action { get; set; } = null;
 
         /// <summary> 接收的原字节数据  </summary>
@@ -104,7 +104,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// Network Message Event Handler
         /// </summary>
-        public event EventHandler<MessageEventArgs> NetworkMessageEvent;
+        public event EventHandler<MessageEventArgs> NetworkMessage;
 
         /// <summary>
         /// 网络访问接口服务对象
@@ -280,7 +280,7 @@ namespace SpaceCG.Generic
         private void Network_DataReceived(object sender, AsyncDataEventArgs e)
         {
             MessageEventArgs eventArgs = new MessageEventArgs(sender, e.EndPoint, e.Bytes);
-            NetworkMessageEvent?.Invoke(this, eventArgs);
+            NetworkMessage?.Invoke(this, eventArgs);
             if (!eventArgs.Handle) return;
 
             if (eventArgs.Action == null)

@@ -64,30 +64,24 @@ namespace SpaceCG.Extensions
         /// <param name="numberString"></param>
         /// <param name="result"></param>
         /// <returns></returns>
-        public static bool TryParse<NumberType>(this String numberString, out NumberType result)
+        public static bool TryParse<NumberType>(this string numberString, out NumberType result)
             where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
         {
             result = default;
-            if (String.IsNullOrWhiteSpace(numberString)) return false;
+            if (string.IsNullOrWhiteSpace(numberString)) return false;
 
-            IEnumerable<MethodInfo> methods;
-            String methodName = $"To{typeof(NumberType).Name}";
-            if (typeof(NumberType) == typeof(double) || typeof(NumberType) == typeof(float))
-            {
-                methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                          where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == typeof(NumberType)
-                          let m_params = method.GetParameters()
-                          where m_params[0].ParameterType == typeof(String)
-                          select method;
-            }
-            else
-            {
-                methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                          where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
-                          let m_params = method.GetParameters()
-                          where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
-                          select method;
-            }
+            Type intType = typeof(int);
+            Type stringType = typeof(string);
+            Type numberType = typeof(NumberType);
+            string methodName = $"To{numberType.Name}";
+            int paramsLength = numberType == typeof(double) || numberType == typeof(float) ? 1 : 2;
+
+            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                              let m_params = method.GetParameters()
+                                              where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
+                                              where (paramsLength == 1 && m_params[0].ParameterType == stringType) ||
+                                                    (paramsLength == 2 && m_params[0].ParameterType == stringType && m_params[1].ParameterType == intType)
+                                              select method;
 
             if (methods?.Count() != 1) return false;
             MethodInfo ConvertToNumber = methods.First();
@@ -100,7 +94,7 @@ namespace SpaceCG.Extensions
             }
             catch (Exception ex)
             {
-                Logger.Error($"{ex.Message} {numberString}/{typeof(NumberType)}");
+                Logger.Warn($"{ex.Message} {numberString}/{numberType}");
                 return false;
             }
 
@@ -115,29 +109,22 @@ namespace SpaceCG.Extensions
         /// <param name="defaultValues"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool TryParse<NumberType>(this String numberString, ref NumberType[] defaultValues, char separator = ',')
+        public static bool TryParse<NumberType>(this string numberString, ref NumberType[] defaultValues, char separator = ',')
             where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
         {
-            if (String.IsNullOrWhiteSpace(numberString)) return false;
+            if (string.IsNullOrWhiteSpace(numberString)) return false;
 
-            IEnumerable<MethodInfo> methods;
-            String methodName = $"To{typeof(NumberType).Name}";
-            if (typeof(NumberType) == typeof(double) || typeof(NumberType) == typeof(float))
-            {
-                methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                          where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == typeof(NumberType)
-                          let m_params = method.GetParameters()
-                          where m_params[0].ParameterType == typeof(String)
-                          select method;
-            }
-            else
-            {
-                methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                          where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == typeof(NumberType)
-                          let m_params = method.GetParameters()
-                          where m_params[0].ParameterType == typeof(String) && m_params[1].ParameterType == typeof(int)
-                          select method;
-            }
+            Type intType = typeof(int);
+            Type stringType = typeof(string);
+            Type numberType = typeof(NumberType);
+            string methodName = $"To{numberType.Name}";
+            int paramsLength = numberType == typeof(double) || numberType == typeof(float) ? 1 : 2;
+            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                              let m_params = method.GetParameters()
+                                              where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
+                                              where (paramsLength == 1 && m_params[0].ParameterType == stringType) ||
+                                                    (paramsLength == 2 && m_params[0].ParameterType == stringType && m_params[1].ParameterType == intType)
+                                              select method;
 
             if (methods?.Count() != 1) return false;
             numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
@@ -162,7 +149,7 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"{ex.Message} {stringArray[i]}/{typeof(NumberType)}");
+                    Logger.Warn($"{ex.Message} {stringArray[i]}/{numberType}");
                     continue;
                 }
 
@@ -366,22 +353,29 @@ namespace SpaceCG.Extensions
                 throw new ArgumentException(nameof(conversionType), "需要转换的类型应为值类型参数");
 
             if (value == null) return true;
+            if (value.GetType() == conversionType)
+            {
+                conversionValue = value as ValueType;
+                return true;
+            }
             if (value.GetType() == typeof(string))
             {
                 string valueString = value.ToString();
                 if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
             }
 
-            if (value.GetType() == conversionType)
-            {
-                conversionValue = value as ValueType;
-                return true;
-            }
-
             //Enum
             if (conversionType.IsEnum)
             {
-                conversionValue = Enum.Parse(conversionType, value.ToString(), true) as ValueType;
+                try
+                {
+                    conversionValue = (ValueType)Enum.Parse(conversionType, value.ToString(), true);
+                }
+                catch(Exception ex) 
+                {
+                    Logger.Warn(ex.ToString());
+                    return false; 
+                }
                 return true;
             }
             //Boolean
@@ -402,12 +396,11 @@ namespace SpaceCG.Extensions
             {
                 string methodName = $"To{conversionType.Name}";
                 IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                                  where method.Name == methodName && method.GetParameters().Length == 2 && method.ReturnType == conversionType
                                                   let m_params = method.GetParameters()
+                                                  where method.Name == methodName && m_params.Length == 2 && method.ReturnType == conversionType
                                                   where m_params[0].ParameterType == typeof(string) && m_params[1].ParameterType == typeof(int)
                                                   select method;
 
-                conversionValue = value as ValueType;
                 if (methods?.Count() != 1) return false;
 
                 MethodInfo ConvertToNumber = methods.First();
@@ -420,7 +413,7 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex.ToString());
+                    Logger.Warn(ex.ToString());
                     return false;
                 }
             }
@@ -429,12 +422,11 @@ namespace SpaceCG.Extensions
             {
                 string methodName = $"To{conversionType.Name}";
                 IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                                  where method.Name == methodName && method.GetParameters().Length == 1 && method.ReturnType == conversionType
                                                   let m_params = method.GetParameters()
+                                                  where method.Name == methodName && m_params.Length == 1 && method.ReturnType == conversionType
                                                   where m_params[0].ParameterType == typeof(string)
                                                   select method;
 
-                conversionValue = value as ValueType;
                 if (methods?.Count() != 1) return false;
 
                 MethodInfo ConvertToNumber = methods.First();
@@ -447,7 +439,7 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex.ToString());
+                    Logger.Warn(ex.ToString());
                     return false;
                 }
             }
@@ -464,8 +456,8 @@ namespace SpaceCG.Extensions
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"值类型转换失败  Value:{value}  Type:{conversionType}");
-                    Logger.Error(ex);
+                    Logger.Warn($"值类型转换失败  Value:{value}  Type:{conversionType}");
+                    Logger.Warn(ex);
                 }
 
                 return false;
