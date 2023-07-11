@@ -665,16 +665,22 @@ namespace SpaceCG.Generic
     public class ReflectionSynchronizationContext : SynchronizationContext
     {
         /// <summary>
+        /// 当前线程的同步上下文
+        /// </summary>
+        private SynchronizationContext CurrentContext = SynchronizationContext.Current;
+
+        /// <summary>
         /// 创建 <see cref="ReflectionSynchronizationContext"/> 类的新实例
         /// </summary>
         public ReflectionSynchronizationContext()
         {
+            CurrentContext = SynchronizationContext.Current;
         }
 
         /// <inheritdoc/>
         public override void Send(SendOrPostCallback d, object state)
         {
-            if(Current != null) Current.Send(d, state);
+            if (CurrentContext != null) CurrentContext.Send(d, state);
             else base.Send(d, state);
         }
 
