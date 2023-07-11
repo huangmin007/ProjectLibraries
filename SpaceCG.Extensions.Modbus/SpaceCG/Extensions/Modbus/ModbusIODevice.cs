@@ -174,7 +174,7 @@ namespace SpaceCG.Extensions.Modbus
                 return false;
             }
 
-            if (StringExtensions.TryParse<ushort>(element.Attribute(nameof(Address))?.Value, out ushort address) &&
+            if (StringExtensions.ToNumber<ushort>(element.Attribute(nameof(Address))?.Value, out ushort address) &&
                 Enum.TryParse<RegisterType>(element.Attribute(nameof(Type))?.Value, true, out RegisterType type) && type != RegisterType.Unknown)
             {
                 bool result = byte.TryParse(element.Attribute(nameof(Count))?.Value, out byte count);
@@ -671,7 +671,7 @@ namespace SpaceCG.Extensions.Modbus
                 Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element}");
                 return false;
             }
-            if (!StringExtensions.TryParse<byte>(element.Attribute(nameof(Address)).Value, out byte address))
+            if (!StringExtensions.ToNumber<byte>(element.Attribute(nameof(Address)).Value, out byte address))
             {
                 Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element} 节点属性 Address 值错误");
                 return false;
@@ -684,7 +684,7 @@ namespace SpaceCG.Extensions.Modbus
                 if (String.IsNullOrWhiteSpace(element.Attribute(attributes[i])?.Value)) continue;
 
                 ushort[] args = null; //= new ushort[2] { 0, 0 }; //count|startAddress
-                StringExtensions.TryParse<ushort>(element.Attribute(attributes[i]).Value, ref args, ',');
+                StringExtensions.ToNumberArray<ushort>(element.Attribute(attributes[i]).Value, ref args, ',');
 
                 if (args?.Length == 0) continue;
 

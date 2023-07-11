@@ -20,7 +20,7 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="numberString"></param>
         /// <returns></returns>
-        internal static object[] GetNumberStringBase(String numberString)
+        internal static object[] GetNumberStringBase(string numberString)
         {
             if (string.IsNullOrWhiteSpace(numberString))
                 throw new ArgumentNullException(nameof(numberString), "参数不能为空");
@@ -48,6 +48,10 @@ namespace SpaceCG.Extensions
                 parameters[1] = 16;
                 parameters[0] = numberString.Substring(2);
             }
+            else if(numberString.IndexOf('.') != -1)
+            {
+                return new object[] { numberString };
+            }
             else
             {
                 parameters[1] = 10;
@@ -64,7 +68,7 @@ namespace SpaceCG.Extensions
         /// <param name="numberString"></param>
         /// <param name="result"></param>
         /// <returns></returns>
-        public static bool TryParse<NumberType>(this string numberString, out NumberType result)
+        public static bool ToNumber<NumberType>(this string numberString, out NumberType result)
             where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
         {
             result = default;
@@ -85,8 +89,7 @@ namespace SpaceCG.Extensions
 
             if (methods?.Count() != 1) return false;
             MethodInfo ConvertToNumber = methods.First();
-            numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
-            object[] parameters = ConvertToNumber.GetParameters().Length == 1 ? new object[] { numberString } : GetNumberStringBase(numberString);
+            object[] parameters = GetNumberStringBase(numberString);
 
             try
             {
@@ -102,6 +105,48 @@ namespace SpaceCG.Extensions
         }
 
         /// <summary>
+        /// 将数字字符类型转为数值类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)、Double、Float 字符串的转换。
+        /// </summary>
+        /// <param name="numberString"></param>
+        /// <param name="numberType"></param>
+        /// <param name="number"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException"></exception>
+        public static bool ToNumber(this string numberString, Type numberType, out ValueType number)
+        {
+            number = 0;
+            if (string.IsNullOrWhiteSpace(numberString)) return false;
+            if (!TypeExtensions.IsNumeric(numberType)) throw new ArgumentException(nameof(numberType), "只能解析数值类型");
+
+            Type intType = typeof(int);
+            Type stringType = typeof(string);
+            string methodName = $"To{numberType.Name}";
+            int paramsLength = TypeExtensions.IsFloat(numberType) ? 1 : 2;
+
+            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                              let m_params = method.GetParameters()
+                                              where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
+                                              where (paramsLength == 1 && m_params[0].ParameterType == stringType) ||
+                                                    (paramsLength == 2 && m_params[0].ParameterType == stringType && m_params[1].ParameterType == intType)
+                                              select method;
+
+            if (methods?.Count() != 1) return false;
+            MethodInfo ConvertToNumber = methods.First();
+            object[] parameters = GetNumberStringBase(numberString);
+
+            try
+            {
+                number = (ValueType)ConvertToNumber.Invoke(null, parameters);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"{ex.Message} {numberString}/{numberType}");
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
         /// 将多个数值字符类型(默认以 ',' 分割)型转为数值数组类型，支持二进制(0B)、八进制(O)、十进制(0D)、十六进制(0X)、double、float 字符串的转换。
         /// </summary>
         /// <typeparam name="NumberType"></typeparam>
@@ -109,7 +154,7 @@ namespace SpaceCG.Extensions
         /// <param name="defaultValues"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool TryParse<NumberType>(this string numberString, ref NumberType[] defaultValues, char separator = ',')
+        public static bool ToNumberArray<NumberType>(this string numberString, ref NumberType[] defaultValues, char separator = ',')
             where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
         {
             if (string.IsNullOrWhiteSpace(numberString)) return false;
@@ -141,7 +186,7 @@ namespace SpaceCG.Extensions
                 if (String.IsNullOrWhiteSpace(stringArray[i])) continue;
 
                 NumberType newValue = default;
-                object[] parameters = ParamsInfo.Length == 1 ? new object[] { stringArray[i] } : GetNumberStringBase(stringArray[i]);
+                object[] parameters = GetNumberStringBase(stringArray[i]);
 
                 try
                 {
@@ -166,7 +211,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool TryParseToSByteArray(this String value, ref sbyte[] array, char separator = ',') => TryParse<SByte>(value, ref array, separator);
+        public static bool ToSByteArray(this String value, ref sbyte[] array, char separator = ',') => ToNumberArray<SByte>(value, ref array, separator);
         /// <summary>
         /// 将多个 <see cref="System.Byte"/> 格式的字符串解析为 <see cref="System.Byte"/> 类型数组
         /// </summary>
@@ -174,7 +219,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool TryParseToByteArray(this String value, ref byte[] array, char separator = ',') => TryParse<Byte>(value, ref array, separator);
+        public static bool ToByteArray(this String value, ref byte[] array, char separator = ',') => ToNumberArray<Byte>(value, ref array, separator);
 
         /// <summary>
         /// 将多个 <see cref="System.Int16"/> 格式的字符串解析为 <see cref="System.Int16"/> 类型数组
@@ -183,7 +228,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool TryParseToInt16Array(this String value, ref Int16[] array, char separator = ',') => TryParse<Int16>(value, ref array, separator);
+        public static bool ToInt16Array(this String value, ref Int16[] array, char separator = ',') => ToNumberArray<Int16>(value, ref array, separator);
         /// <summary>
         /// 将多个 <see cref="System.UInt16"/> 格式的字符串解析为 <see cref="System.UInt16"/> 类型数组
         /// </summary>
@@ -191,7 +236,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool TryParseToUInt16Array(this String value, ref UInt16[] array, char separator = ',') => TryParse<UInt16>(value, ref array, separator);
+        public static bool ToUInt16Array(this String value, ref UInt16[] array, char separator = ',') => ToNumberArray<UInt16>(value, ref array, separator);
 
         /// <summary>
         /// 将多个 <see cref="System.Int32"/> 格式的字符串解析为 <see cref="System.Int32"/> 类型数组
@@ -200,7 +245,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool TryParseToInt32Array(this String value, ref Int32[] array, char separator = ',') => TryParse<Int32>(value, ref array, separator);
+        public static bool ToInt32Array(this String value, ref Int32[] array, char separator = ',') => ToNumberArray<Int32>(value, ref array, separator);
         /// <summary>
         /// 将多个 <see cref="System.UInt32"/> 格式的字符串解析为 <see cref="System.UInt32"/> 类型数组
         /// </summary>
@@ -208,7 +253,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool TryParseToUInt32Array(this String value, ref UInt32[] array, char separator = ',') => TryParse<UInt32>(value, ref array, separator);
+        public static bool ToUInt32Array(this String value, ref UInt32[] array, char separator = ',') => ToNumberArray<UInt32>(value, ref array, separator);
 
         /// <summary> 正则匹配 '~' | "~" </summary>
         private static readonly String pattern_string = @"\'([^\']+)\'|" + "\"([^\"]+)\"";
@@ -299,15 +344,15 @@ namespace SpaceCG.Extensions
         /// <para>示例：StringExtensions.ConvertChangeTypeToArrayType(new object[] { "0x45", "0x46", 0x47 }, typeof(Byte[]), out Array bytes);</para>
         /// </summary>
         /// <param name="value">需要转换的对象、字符串或字符串描述</param>
-        /// <param name="conversionType">要返回的对象的类型</param>
+        /// <param name="destinationType">要返回的对象的类型</param>
         /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
         /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
         /// <exception cref="ArgumentException"/>
-        public static bool ConvertChangeTypeToArrayType(Array value, Type conversionType, out Array conversionValue)
+        public static bool ConvertChangeTypeToArrayType(Array value, Type destinationType, out Array conversionValue)
         {
             conversionValue = null;
-            if (conversionType == null || !conversionType.IsArray || !conversionType.GetElementType().IsValueType)
-                throw new ArgumentException(nameof(conversionType), "需要转换的类型应为数组类型，且数组元素为值类型");
+            if (destinationType == null || !destinationType.IsArray || !destinationType.GetElementType().IsValueType)
+                throw new ArgumentException(nameof(destinationType), "需要转换的类型应为数组类型，且数组元素为值类型");
 
             if (value == null) return true;
             if (value.GetType() == typeof(string))
@@ -318,7 +363,7 @@ namespace SpaceCG.Extensions
 
             if (!value.GetType().IsArray) throw new ArgumentException(nameof(value), "需要转换的值对象也应该为数组类型");
 
-            Type elementType = conversionType.GetElementType();
+            Type elementType = destinationType.GetElementType();
             conversionValue = Array.CreateInstance(elementType, value.Length);
 
             for (int i = 0; i < value.Length; i++)
@@ -342,18 +387,18 @@ namespace SpaceCG.Extensions
         /// <para>示例：StringExtensions.ConvertChangeTypeToValueType("45", typeof(UInt32), out UInt32 cValue);</para>
         /// </summary>
         /// <param name="value">需要转换的对象、字符串或字符串描述</param>
-        /// <param name="conversionType">要返回的对象的类型</param>
+        /// <param name="destinationType">要返回的对象的类型</param>
         /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
         /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
         /// <exception cref="ArgumentException"/>
-        public static bool ConvertChangeTypeToValueType(object value, Type conversionType, out ValueType conversionValue)
+        public static bool ConvertChangeTypeToValueType(object value, Type destinationType, out ValueType conversionValue)
         {
             conversionValue = null;
-            if (conversionType == null || !conversionType.IsValueType)
-                throw new ArgumentException(nameof(conversionType), "需要转换的类型应为值类型参数");
+            if (destinationType == null || !destinationType.IsValueType)
+                throw new ArgumentException(nameof(destinationType), "需要转换的类型应为值类型参数");
 
             if (value == null) return true;
-            if (value.GetType() == conversionType)
+            if (value.GetType() == destinationType)
             {
                 conversionValue = value as ValueType;
                 return true;
@@ -365,11 +410,11 @@ namespace SpaceCG.Extensions
             }
 
             //Enum
-            if (conversionType.IsEnum)
+            if (destinationType.IsEnum)
             {
                 try
                 {
-                    conversionValue = (ValueType)Enum.Parse(conversionType, value.ToString(), true);
+                    conversionValue = (ValueType)Enum.Parse(destinationType, value.ToString(), true);
                 }
                 catch(Exception ex) 
                 {
@@ -379,7 +424,7 @@ namespace SpaceCG.Extensions
                 return true;
             }
             //Boolean
-            else if (conversionType == typeof(bool))
+            else if (destinationType == typeof(bool))
             {
                 if (bool.TryParse(value.ToString(), out bool result))
                 {
@@ -390,59 +435,10 @@ namespace SpaceCG.Extensions
                 conversionValue = pv == "1" || pv == "T";
                 return true;
             }
-            //Number
-            else if (conversionType == typeof(sbyte) || conversionType == typeof(byte) || conversionType == typeof(short) || conversionType == typeof(ushort) ||
-                conversionType == typeof(Int32) || conversionType == typeof(UInt32) || conversionType == typeof(Int64) || conversionType == typeof(UInt64))
+            else if(TypeExtensions.IsNumeric(destinationType))
             {
-                string methodName = $"To{conversionType.Name}";
-                IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                                  let m_params = method.GetParameters()
-                                                  where method.Name == methodName && m_params.Length == 2 && method.ReturnType == conversionType
-                                                  where m_params[0].ParameterType == typeof(string) && m_params[1].ParameterType == typeof(int)
-                                                  select method;
-
-                if (methods?.Count() != 1) return false;
-
-                MethodInfo ConvertToNumber = methods.First();
-                object[] parameters = GetNumberStringBase(value.ToString());
-
-                try
-                {
-                    conversionValue = ConvertToNumber.Invoke(null, parameters) as ValueType;
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn(ex.ToString());
-                    return false;
-                }
-            }
-            //Double,Float
-            else if (conversionType == typeof(double) || conversionType == typeof(float))
-            {
-                string methodName = $"To{conversionType.Name}";
-                IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                                  let m_params = method.GetParameters()
-                                                  where method.Name == methodName && m_params.Length == 1 && method.ReturnType == conversionType
-                                                  where m_params[0].ParameterType == typeof(string)
-                                                  select method;
-
-                if (methods?.Count() != 1) return false;
-
-                MethodInfo ConvertToNumber = methods.First();
-                object[] parameters = new object[] { value.ToString().Replace(" ", "").Replace("_", "") };
-
-                try
-                {
-                    conversionValue = ConvertToNumber.Invoke(null, parameters) as ValueType;
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn(ex.ToString());
-                    return false;
-                }
-            }
+                return ToNumber(value.ToString(), destinationType, out conversionValue);
+            }           
             //Other
             else
             {
@@ -450,13 +446,13 @@ namespace SpaceCG.Extensions
                 {
                     if (typeof(IConvertible).IsAssignableFrom(value.GetType()))
                     {
-                        conversionValue = Convert.ChangeType(value, conversionType) as ValueType;
+                        conversionValue = Convert.ChangeType(value, destinationType) as ValueType;
                         return true;
                     }
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn($"值类型转换失败  Value:{value}  Type:{conversionType}");
+                    Logger.Warn($"值类型转换失败  Value:{value}  Type:{destinationType}");
                     Logger.Warn(ex);
                 }
 

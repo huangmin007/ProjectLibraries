@@ -245,13 +245,13 @@ namespace SpaceCG.Extensions.Modbus
                 {
                     if (evt.Attribute(ReflectionController.XType)?.Value != eventType) continue;
                     
-                    if (!StringExtensions.TryParse(evt.Attribute(XDeviceAddress)?.Value, out byte deviceAddress)) continue;
+                    if (!StringExtensions.ToNumber(evt.Attribute(XDeviceAddress)?.Value, out byte deviceAddress)) continue;
                     if (deviceAddress != slaveAddress) continue;
                     
-                    if (!StringExtensions.TryParse(evt.Attribute($"{register.Type}Address")?.Value, out ushort regAddress)) continue;
+                    if (!StringExtensions.ToNumber(evt.Attribute($"{register.Type}Address")?.Value, out ushort regAddress)) continue;
                     if (regAddress != register.Address) continue;
 
-                    if (StringExtensions.TryParse(evt.Attribute(ReflectionController.XValue)?.Value, out long regValue) && regValue == register.Value)
+                    if (StringExtensions.ToNumber(evt.Attribute(ReflectionController.XValue)?.Value, out long regValue) && regValue == register.Value)
                     {
                         if (Logger.IsInfoEnabled)
                             Logger.Info($"{eventType} {transportName} > 0x{slaveAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
@@ -260,7 +260,7 @@ namespace SpaceCG.Extensions.Modbus
                         //ReflectionInterface.TryParseControlMessage(evt.Elements(ReflectionInterface.XAction));
                         continue;
                     }
-                    else if(StringExtensions.TryParse(evt.Attribute(XMinValue)?.Value, out long minValue) && StringExtensions.TryParse(evt.Attribute(XMaxValue)?.Value, out long maxValue))
+                    else if(StringExtensions.ToNumber(evt.Attribute(XMinValue)?.Value, out long minValue) && StringExtensions.ToNumber(evt.Attribute(XMaxValue)?.Value, out long maxValue))
                     {
                         if (maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && (register.LastValue < minValue || register.LastValue > maxValue))
                         {
