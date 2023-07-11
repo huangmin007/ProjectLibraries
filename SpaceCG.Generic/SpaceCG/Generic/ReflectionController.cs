@@ -32,7 +32,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 默认 true 处理反射控制, 为 false 时将拦截消息, 不处理、分析、控制反射
         /// </summary>
-        public bool Handle { get; set; } = true;
+        public bool Handled { get; set; } = true;
 
         /// <summary>
         /// 网络消息事件参数
@@ -281,7 +281,7 @@ namespace SpaceCG.Generic
         {
             MessageEventArgs eventArgs = new MessageEventArgs(sender, e.EndPoint, e.Bytes);
             NetworkMessage?.Invoke(this, eventArgs);
-            if (!eventArgs.Handle) return;
+            if (!eventArgs.Handled) return;
 
             if (eventArgs.Action == null)
             {
