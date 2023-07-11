@@ -9,13 +9,14 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.ComponentModel;
 
 namespace SpaceCG.Generic
 {
     /// <summary>
     /// 网络消息事件参数
     /// </summary>
-    public class MessageEventArgs : EventArgs
+    public class MessageEventArgs : HandledEventArgs
     {
         /// <summary> Action Element 默认为 null, 当为 null 时则使用默认 <see cref="XElement.Parse(string)"/> 解析 </summary>
         public XElement Action { get; set; } = null;
@@ -28,11 +29,6 @@ namespace SpaceCG.Generic
 
         /// <summary> Remote EndPoint </summary>
         public EndPoint EndPoint { get; internal set; }
-
-        /// <summary>
-        /// 默认 true 处理反射控制, 为 false 时将拦截消息, 不处理、分析、控制反射
-        /// </summary>
-        public bool Handled { get; set; } = true;
 
         /// <summary>
         /// 网络消息事件参数
