@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using SpaceCG.Generic;
 
@@ -17,15 +18,29 @@ namespace SpaceCG.Extensions
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(TypeExtensions));
 
         /// <summary>
+        /// 封装一个方法，该方法输出一个指定类型的对象, 该对象的值等效于指定的对象
+        /// </summary>
+        /// <param name="value">需要转换的对象、字符串或是字符串描述</param>
+        /// <param name="destinationType">要返回的对象的类型</param>
+        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
+        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        public delegate bool TypeConverterDelegate(object value, Type destinationType, out object conversionValue);
+
+        /// <summary>
+        /// 扩展类型转换代理函数, 输出一个指定类型的对象, 该对象的值等效于指定的对象。
+        /// <para>当通过调用反射来设置属性值或是调用反射带参的函数时，值类型转换失败或异常时，调用该代理函数进行扩展类型转换，完善动态反射功能</para>
+        /// </summary>
+        public static TypeConverterDelegate CustomConvertFromExtension;
+
+        /// <summary>
         /// 指示其参数是否为数字类型
         /// </summary>
         /// <param name="value"></param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsNumeric(object value)
         {
-            if (value == null) return false;
-
-            Type valueType = value is Type ? (Type)value : value.GetType();
+            Type valueType = value is Type ? (Type)value : value?.GetType();
             return valueType == typeof(SByte) || valueType == typeof(Byte) || valueType == typeof(Int16) || valueType == typeof(UInt16) ||
                    valueType == typeof(Int32) || valueType == typeof(UInt32) || valueType == typeof(Int64) || valueType == typeof(UInt64) ||
                    valueType == typeof(Single) || valueType == typeof(Double) || valueType == typeof(Decimal);// || valueType == typeof(BigInteger);
@@ -36,11 +51,10 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="value"></param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsInteger(object value)
         {
-            if (value == null) return false;
-
-            Type valueType = value is Type ? (Type)value : value.GetType();
+            Type valueType = value is Type ? (Type)value : value?.GetType();
             return valueType == typeof(SByte) || valueType == typeof(Byte) || valueType == typeof(Int16) || valueType == typeof(UInt16) ||
                    valueType == typeof(Int32) || valueType == typeof(UInt32) || valueType == typeof(Int64) || valueType == typeof(UInt64);// || valueType == typeof(BigInteger);
         }
@@ -50,37 +64,33 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="value"></param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsFloat(object value)
         {
-            if (value == null) return false;
-
-            Type valueType = value is Type ? (Type)value : value.GetType();
+            Type valueType = value is Type ? (Type)value : value?.GetType();
             return valueType == typeof(Single) || valueType == typeof(Double) || valueType == typeof(Decimal);
         }
 
         /// <summary>
-        /// 
+        /// 将给定的值转换为目标类型对象。
         /// </summary>
-        /// <param name="value">需要转换的对象、字符串或字符串描述</param>
-        /// <param name="destinationType">需要转换的目标类型，非数组类型</param>
-        /// <param name="conversionValue">转换后的对象</param>
-        /// <returns> 输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
-        public static bool ConvertTo(object value, Type destinationType, out object conversionValue)
+        /// <param name="value">需要转换的对象，字符串或字符串描述</param>
+        /// <param name="destinationType">表示希望转换为的类型</param>
+        /// <param name="conversionValue">输出一个转换后的对象，其类型为 destinationType，并且其值等效于 value </param>
+        /// <returns>输出类型的值 conversionValue 为有效对象时，返回 true, 否则返回 false </returns>
+        public static bool ConvertFrom(object value, Type destinationType, out object conversionValue)
         {
             conversionValue = null;
             if (value == null) return true;
-            if (destinationType == null || destinationType.IsArray)
-                throw new ArgumentException(nameof(destinationType), "需要转换的类型不能为空，或不能为数组类型");
+            if (destinationType == null) return false;
 
             Type valueType = value.GetType();
-            if (valueType == destinationType)
+            if (!destinationType.IsArray && valueType == destinationType)
             {
                 conversionValue = value;
                 return true;
             }
-
-            Type stringType = typeof(string);
-            if (valueType == stringType)
+            else if (!destinationType.IsArray && valueType == typeof(string))
             {
                 string valueString = value.ToString();
                 if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
@@ -95,10 +105,9 @@ namespace SpaceCG.Extensions
                     catch (Exception ex)
                     {
                         Logger.Warn(ex.ToString());
-                        return false;
                     }
                 }
-                else if(destinationType == typeof(bool))
+                else if (destinationType == typeof(bool))
                 {
                     if (bool.TryParse(valueString, out bool result))
                     {
@@ -109,27 +118,81 @@ namespace SpaceCG.Extensions
                     conversionValue = pv == "1" || pv == "T";
                     return true;
                 }
-                else if(IsNumeric(destinationType))
+                else if (IsNumeric(destinationType))
                 {
-                    
+                    if (valueString.ToNumber(destinationType, out ValueType cValue))
+                    {
+                        conversionValue = cValue;
+                        return true;
+                    }
                 }
                 else
-                {                    
+                {
                 }
+            }
+            else if (destinationType.IsArray && valueType.IsArray && destinationType.GetElementType() != valueType.GetElementType())
+            {
+                Array valueArray = (Array)value;
+                Type elementType = destinationType.GetElementType();
+                Array instanceValue = Array.CreateInstance(elementType, valueArray.Length);
+
+                for (int i = 0; i < valueArray.Length; i++)
+                {
+                    if (!ConvertFrom(valueArray.GetValue(i), elementType, out object cValue)) continue;
+
+                    instanceValue.SetValue(cValue, i);
+                }
+                conversionValue = instanceValue;
+                return true;
+            }
+            else
+            {
             }
 
             try
             {
+#if false
+                if (typeof(IConvertible).IsAssignableFrom(destinationType))
+                {
+                    conversionValue = Convert.ChangeType(value, destinationType);
+                    return true;
+                }
+#endif
                 TypeConverter converter = TypeDescriptor.GetConverter(destinationType);
-                conversionValue = valueType == stringType ? converter.ConvertFromString(value.ToString()) : converter.ConvertFrom(value);
-                return true;
+                if (converter != null && converter.CanConvertFrom(valueType))
+                {
+                    conversionValue = valueType == typeof(string) ? converter.ConvertFromString(value.ToString()) : converter.ConvertFrom(value);
+                    return true;
+                }
             }
             catch (Exception ex)
             {
-                Logger.Warn($"{ex.ToString()}");
-                return false;
+                Logger.Warn($"{ex}");
             }
+
+            if (CustomConvertFromExtension != null)
+                return CustomConvertFromExtension.Invoke(value, destinationType, out conversionValue);
+
+            Logger.Warn($"类型转换失败  Value:{value}  Type:{destinationType}");
+            return false;
         }
 
+        /// <summary>
+        /// 将给定的值转换为目标类型对象。
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="value"></param>
+        /// <param name="conversionValue"></param>
+        /// <returns></returns>
+        public static bool ConvertFrom<T>(object value, out T conversionValue)
+        {
+            conversionValue = default;
+            Type destinationType = typeof(T);
+
+            bool result = ConvertFrom(value, destinationType, out object convertValue);
+            if (result) conversionValue = (T)convertValue;
+
+            return result;
+        }
     }
 }

@@ -20,134 +20,6 @@ namespace SpaceCG.Extensions
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(InstanceExtensions));
 
         /// <summary>
-        /// 封装一个方法，该方法输出一个指定类型的对象, 该对象的值等效于指定的对象
-        /// </summary>
-        /// <param name="value">需要转换的对象、字符串或是字符串描述</param>
-        /// <param name="conversionType">要返回的对象的类型</param>
-        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
-        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
-        public delegate bool ConvertChangeTypeDelegate(object value, Type conversionType, out object conversionValue);
-
-        /// <summary>
-        /// 扩展类型转换代理函数, 输出一个指定类型的对象, 该对象的值等效于指定的对象。
-        /// <para>当通过调用反射来设置属性值或是调用反射带参的函数时，值类型转换失败或异常时，调用该代理函数进行扩展类型转换，完善动态反射功能</para>
-        /// </summary>
-        public static ConvertChangeTypeDelegate ConvertChangeTypeExtension;
-
-        /// <summary>
-        /// 输出一个指定类型的对象, 该对象的值等效于指定的对象。
-        /// </summary>
-        /// <param name="value">需要转换的对象、字符串或是字符串描述</param>
-        /// <param name="destinationType">要返回的对象的类型</param>
-        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
-        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
-        public static bool ConvertChangeType(object value, Type destinationType, out object conversionValue)
-        {
-            conversionValue = null;
-            if (destinationType == null) return false;
-
-            if (value == null) return true;
-            if (value.GetType() == destinationType)
-            {
-                conversionValue = value;
-                return true;
-            }
-            if (value.GetType() == typeof(string))
-            {
-                string valueString = value.ToString();
-                if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
-            }
-
-            //TypeConverter converter = TypeDescriptor.GetConverter(conversionType);
-            //converter.ConvertFromString(value.ToString());
-
-            if (destinationType.IsValueType || destinationType.IsEnum)
-            {
-                bool result = StringExtensions.ConvertChangeTypeToValueType(value, destinationType, out ValueType cValue);
-                if (result) conversionValue = cValue;
-                return result;
-            }
-            else if (destinationType.IsArray && destinationType.HasElementType && destinationType.GetElementType().IsValueType)
-            {
-                bool result = StringExtensions.ConvertChangeTypeToArrayType(value as Array, destinationType, out Array cValue);
-                if (result) conversionValue = cValue;
-                return result;
-            }
-            else
-            {
-#if false
-                try
-                {
-                    if (typeof(IConvertible).IsAssignableFrom(value.GetType()))
-                    {
-                        conversionValue = Convert.ChangeType(value, conversionType);
-                        return true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (ConvertChangeTypeExtension == null)
-                    {
-                        Logger.Error($"类型转换失败  Value:{value}  Type:{conversionType}");
-                        Logger.Error(ex);
-                        return false;
-                    }
-                }
-#endif
-                //使用扩展函数，进行转换
-                try
-                {
-                    if (ConvertChangeTypeExtension != null)
-                    {
-                        bool result = ConvertChangeTypeExtension.Invoke(value, destinationType, out conversionValue);
-                        return result;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"扩展函数 {ConvertChangeTypeExtension.Method.Name} 类型转换失败  Value:{value}  Type:{destinationType}");
-                    Logger.Warn(ex);
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="value"></param>
-        /// <param name="destinationType"></param>
-        /// <param name="conversionValue"></param>
-        /// <returns></returns>
-        public static bool TypeConverterFrom(object value, Type destinationType, out object conversionValue)
-        {
-            conversionValue = null;
-            if (value == null) return true;
-            if (destinationType == null) return false;
-
-            Type valueType = value.GetType();
-            if (valueType == destinationType)
-            {
-                conversionValue = value;
-                return true;
-            }
-            if (valueType == typeof(string))
-            {
-                string valueString = value.ToString();
-                if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
-
-                if(destinationType == typeof(Enum))
-                {
-
-                }
-            }
-                
-            Logger.Warn($"扩展函数 {ConvertChangeTypeExtension.Method.Name} 类型转换失败  Value:{value}  Type:{destinationType}");
-            return false;
-        }
-
-        /// <summary>
         /// 试图动态的获取实例的字段对象。注意：包括私有对象
         /// </summary>
         /// <param name="instanceObj"></param>
@@ -197,7 +69,7 @@ namespace SpaceCG.Extensions
                 return false;
             }
 
-            if (ConvertChangeType(value, fieldInfo.FieldType, out object convertValue))
+            if (TypeExtensions.ConvertFrom(value, fieldInfo.FieldType, out object convertValue))
             {
                 try
                 {
@@ -288,7 +160,7 @@ namespace SpaceCG.Extensions
                 return false;
             }
 
-            if (ConvertChangeType(newValue, property.PropertyType, out object convertValue))
+            if (TypeExtensions.ConvertFrom(newValue, property.PropertyType, out object convertValue))
             {
                 try
                 {
@@ -491,7 +363,7 @@ namespace SpaceCG.Extensions
             //参数解析、转换
             for (int i = 0; i < _parameters?.Length; i++)
             {
-                if (!ConvertChangeType(_parameters[i], parameterInfos[i].ParameterType, out object convertValue)) return false;
+                if (!TypeExtensions.ConvertFrom(_parameters[i], parameterInfos[i].ParameterType, out object convertValue)) return false;
                 arguments[i] = convertValue;
             }
 

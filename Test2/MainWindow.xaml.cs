@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using SpaceCG.Extensions;
@@ -43,9 +44,35 @@ namespace Test2
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            controller = new ReflectionController(2023);
+            //controller = new ReflectionController(2023);
             //controller.SynchronizationContext = new ReflectionSynchronizationContext();
-            controller.AccessObjects.Add("Window", this);
+            //controller.AccessObjects.Add("Window", this);
+
+            if(TypeExtensions.ConvertFrom("#ffaa00FF", typeof(Color), out object color))
+            {
+                this.Background = new SolidColorBrush((Color)color);
+            }
+
+            if (TypeExtensions.ConvertFrom(new string[] {"12", "0x12", "0B1101_1111" }, typeof(Array), out object result))
+            {
+                Console.WriteLine(result);
+                Array array = (Array)result;
+                for(int i = 0; i < array.Length; i ++)
+                {
+                    Console.WriteLine($"{i}:{array.GetValue(i)} {array.GetValue(i).GetType()}");
+                }
+            }
+
+            if(TypeExtensions.ConvertFrom("D:\\Desktop\\big\\IMG_ (8).jpg", typeof(ImageSource), out object source))
+            {
+                Image_Test.Source = (ImageSource)source;
+            }
+
+
+            object arg = null;
+            Type type = arg?.GetType();
+            Console.WriteLine(type);
+            Console.WriteLine(arg is Type);
         }
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)

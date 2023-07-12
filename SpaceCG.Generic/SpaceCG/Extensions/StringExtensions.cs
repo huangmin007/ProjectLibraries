@@ -66,19 +66,20 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <typeparam name="NumberType"></typeparam>
         /// <param name="numberString"></param>
-        /// <param name="result"></param>
+        /// <param name="number"></param>
         /// <returns></returns>
-        public static bool ToNumber<NumberType>(this string numberString, out NumberType result)
+        public static bool ToNumber<NumberType>(this string numberString, out NumberType number)
             where NumberType : struct, IComparable, IFormattable, IConvertible, IComparable<NumberType>, IEquatable<NumberType>
         {
-            result = default;
+            number = default;
             if (string.IsNullOrWhiteSpace(numberString)) return false;
+            Type numberType = typeof(NumberType);
+            if (!TypeExtensions.IsNumeric(numberType)) throw new ArgumentException(nameof(numberType), "类型错误");
 
             Type intType = typeof(int);
             Type stringType = typeof(string);
-            Type numberType = typeof(NumberType);
             string methodName = $"To{numberType.Name}";
-            int paramsLength = numberType == typeof(double) || numberType == typeof(float) ? 1 : 2;
+            int paramsLength = TypeExtensions.IsFloat(numberType) ? 1 : 2;
 
             IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                               let m_params = method.GetParameters()
@@ -93,14 +94,13 @@ namespace SpaceCG.Extensions
 
             try
             {
-                result = (NumberType)ConvertToNumber.Invoke(null, parameters);
+                number = (NumberType)ConvertToNumber.Invoke(null, parameters);
             }
             catch (Exception ex)
             {
                 Logger.Warn($"{ex.Message} {numberString}/{numberType}");
                 return false;
             }
-
             return true;
         }
 
@@ -116,7 +116,7 @@ namespace SpaceCG.Extensions
         {
             number = 0;
             if (string.IsNullOrWhiteSpace(numberString)) return false;
-            if (!TypeExtensions.IsNumeric(numberType)) throw new ArgumentException(nameof(numberType), "只能解析数值类型");
+            if (!TypeExtensions.IsNumeric(numberType)) throw new ArgumentException(nameof(numberType), "类型错误");
 
             Type intType = typeof(int);
             Type stringType = typeof(string);
@@ -163,7 +163,7 @@ namespace SpaceCG.Extensions
             Type stringType = typeof(string);
             Type numberType = typeof(NumberType);
             string methodName = $"To{numberType.Name}";
-            int paramsLength = numberType == typeof(double) || numberType == typeof(float) ? 1 : 2;
+            int paramsLength = TypeExtensions.IsFloat(numberType) ? 1 : 2;
             IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                               let m_params = method.GetParameters()
                                               where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
@@ -183,7 +183,7 @@ namespace SpaceCG.Extensions
 
             for (int i = 0; i < length; i++)
             {
-                if (String.IsNullOrWhiteSpace(stringArray[i])) continue;
+                if (string.IsNullOrWhiteSpace(stringArray[i])) continue;
 
                 NumberType newValue = default;
                 object[] parameters = GetNumberStringBase(stringArray[i]);
@@ -211,7 +211,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool ToSByteArray(this String value, ref sbyte[] array, char separator = ',') => ToNumberArray<SByte>(value, ref array, separator);
+        public static bool ToSByteArray(this string value, ref sbyte[] array, char separator = ',') => ToNumberArray<SByte>(value, ref array, separator);
         /// <summary>
         /// 将多个 <see cref="System.Byte"/> 格式的字符串解析为 <see cref="System.Byte"/> 类型数组
         /// </summary>
@@ -219,7 +219,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool ToByteArray(this String value, ref byte[] array, char separator = ',') => ToNumberArray<Byte>(value, ref array, separator);
+        public static bool ToByteArray(this string value, ref byte[] array, char separator = ',') => ToNumberArray<Byte>(value, ref array, separator);
 
         /// <summary>
         /// 将多个 <see cref="System.Int16"/> 格式的字符串解析为 <see cref="System.Int16"/> 类型数组
@@ -228,7 +228,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool ToInt16Array(this String value, ref Int16[] array, char separator = ',') => ToNumberArray<Int16>(value, ref array, separator);
+        public static bool ToInt16Array(this string value, ref Int16[] array, char separator = ',') => ToNumberArray<Int16>(value, ref array, separator);
         /// <summary>
         /// 将多个 <see cref="System.UInt16"/> 格式的字符串解析为 <see cref="System.UInt16"/> 类型数组
         /// </summary>
@@ -236,7 +236,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool ToUInt16Array(this String value, ref UInt16[] array, char separator = ',') => ToNumberArray<UInt16>(value, ref array, separator);
+        public static bool ToUInt16Array(this string value, ref UInt16[] array, char separator = ',') => ToNumberArray<UInt16>(value, ref array, separator);
 
         /// <summary>
         /// 将多个 <see cref="System.Int32"/> 格式的字符串解析为 <see cref="System.Int32"/> 类型数组
@@ -245,7 +245,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool ToInt32Array(this String value, ref Int32[] array, char separator = ',') => ToNumberArray<Int32>(value, ref array, separator);
+        public static bool ToInt32Array(this string value, ref Int32[] array, char separator = ',') => ToNumberArray<Int32>(value, ref array, separator);
         /// <summary>
         /// 将多个 <see cref="System.UInt32"/> 格式的字符串解析为 <see cref="System.UInt32"/> 类型数组
         /// </summary>
@@ -253,7 +253,7 @@ namespace SpaceCG.Extensions
         /// <param name="array"></param>
         /// <param name="separator"></param>
         /// <returns></returns>
-        public static bool ToUInt32Array(this String value, ref UInt32[] array, char separator = ',') => ToNumberArray<UInt32>(value, ref array, separator);
+        public static bool ToUInt32Array(this string value, ref UInt32[] array, char separator = ',') => ToNumberArray<UInt32>(value, ref array, separator);
 
         /// <summary> 正则匹配 '~' | "~" </summary>
         private static readonly String pattern_string = @"\'([^\']+)\'|" + "\"([^\"]+)\"";
@@ -280,10 +280,10 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="parameters"></param>
         /// <returns></returns>
-        public static object[] SplitParameters(string parameters)
+        public static object[] SplitToObjectArray(this string parameters)
         {
-            if (String.IsNullOrWhiteSpace(parameters)) return new object[] { }; // null
-
+            if (string.IsNullOrWhiteSpace(parameters)) return new object[] { }; // null
+            
 #if false
             String pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //匹配'~',"~"
             String pattern_array    = @"\[([^\[\]]+)\]";                    //匹配[~]
@@ -300,7 +300,7 @@ namespace SpaceCG.Extensions
             {
                 if (!match.Success) continue;
 #if true
-                String trimValue = match.Value.Trim();
+                string trimValue = match.Value.Trim();
                 if ((trimValue.IndexOf('\'') == 0 && trimValue.LastIndexOf('\'') == trimValue.Length - 1) ||
                    (trimValue.IndexOf('\"') == 0 && trimValue.LastIndexOf('\"') == trimValue.Length - 1))
                 {
@@ -308,7 +308,7 @@ namespace SpaceCG.Extensions
                 }
                 else if (trimValue.IndexOf('[') == 0 && trimValue.LastIndexOf(']') == trimValue.Length - 1)
                 {
-                    args.Add(SplitParameters(trimValue.Substring(1, trimValue.Length - 2)));
+                    args.Add(SplitToObjectArray(trimValue.Substring(1, trimValue.Length - 2)));
                 }
                 else if (trimValue.LastIndexOf(',') == trimValue.Length - 1)
                 {
@@ -348,6 +348,7 @@ namespace SpaceCG.Extensions
         /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
         /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
         /// <exception cref="ArgumentException"/>
+        [Obsolete("弃用", true)]
         public static bool ConvertChangeTypeToArrayType(Array value, Type destinationType, out Array conversionValue)
         {
             conversionValue = null;
@@ -391,6 +392,7 @@ namespace SpaceCG.Extensions
         /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
         /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
         /// <exception cref="ArgumentException"/>
+        [Obsolete("弃用", true)]
         public static bool ConvertChangeTypeToValueType(object value, Type destinationType, out ValueType conversionValue)
         {
             conversionValue = null;

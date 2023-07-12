@@ -25,5 +25,7 @@
             <Button x:Name="Button_Send" Content="Button_Send"  Click="Button_btn_Click" Margin="2"/>
 
         </StackPanel>
+
+        <Image Grid.Row="0" Grid.Column="1" Name="Image_Test"/>
     </Grid>
 </Window>

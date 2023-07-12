@@ -459,7 +459,7 @@ namespace SpaceCG.Generic
             {
                 dispatcher.Invoke((state) =>
                 {
-                    object[] parameters = StringExtensions.SplitParameters(actionElement.Attribute(XParams)?.Value);
+                    object[] parameters = StringExtensions.SplitToObjectArray(actionElement.Attribute(XParams)?.Value);
                     bool result = InstanceExtensions.CallInstanceMethod(targetObject, methodName, parameters, out object value);
 
                     if (state == null) return;

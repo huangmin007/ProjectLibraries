@@ -230,7 +230,7 @@ namespace SpaceCG.Generic
                 }
                 if (!string.IsNullOrWhiteSpace(bytes))
                 {
-                    if (StringExtensions.ConvertChangeTypeToArrayType(bytes.Split(','), typeof(byte[]), out Array conversionValue))
+                    if (TypeExtensions.ConvertFrom(bytes.Split(','), typeof(byte[]), out object conversionValue))
                     {
                         dataArgs.Bytes = (byte[])conversionValue;
                     }
