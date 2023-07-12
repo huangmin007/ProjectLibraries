@@ -19,52 +19,62 @@ namespace SpaceCG.Extensions
         /// <para>可解析示例：十六进制字符串 "0x45", 二进制字符串 "0B1101_1101", 八进制字符串 "O12", 十进制字符串 "0D12.5"或"12.5"</para>
         /// </summary>
         /// <param name="numberString"></param>
+        /// <param name="numberType"></param>
         /// <returns></returns>
-        internal static object[] GetNumberStringBase(string numberString)
+        internal static object[] GetNumberStringBase(string numberString, Type numberType)
         {
             if (string.IsNullOrWhiteSpace(numberString))
                 throw new ArgumentNullException(nameof(numberString), "参数不能为空");
 
-            object[] parameters = new object[2];
+            object[] parameters = null;
             numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
 
-            if (numberString.StartsWith("0B"))
+            if (TypeExtensions.IsFloat(numberType))
             {
-                parameters[1] = 2;
-                parameters[0] = numberString.Substring(2);
+                parameters = new object[1];
+                if (numberString.EndsWith("F") || numberString.EndsWith("D"))
+                {
+                    parameters[0] = numberString.Substring(0, numberString.Length - 1);
+                }
+                else
+                {
+                    parameters[0] = numberString;
+                }
+                return parameters;
             }
-            else if (numberString.StartsWith("O"))
+            else if (TypeExtensions.IsInteger(numberType))
             {
-                parameters[1] = 8;
-                parameters[0] = numberString.Substring(1);
-            }
-            else if (numberString.StartsWith("#"))
-            {
-                parameters[1] = 16;
-                parameters[0] = numberString.Substring(1);
-            }
-            else if (numberString.StartsWith("0D"))
-            {
-                parameters[1] = 10;
-                parameters[0] = numberString.Substring(2);
-            }
-            else if (numberString.StartsWith("0X") || numberString.StartsWith("&H"))
-            {
-                parameters[1] = 16;
-                parameters[0] = numberString.Substring(2);
-            }
-            else if (numberString.EndsWith("F") || numberString.EndsWith("D"))
-            {
-                return new object[] { numberString.Substring(0, numberString.Length - 1) };
-            }
-            else if (numberString.IndexOf('.') != -1)
-            {
-                return new object[] { numberString };
-            }
-            else
-            {
-                parameters[1] = 10;
-                parameters[0] = numberString;
+                parameters = new object[2];
+                if (numberString.StartsWith("0B"))
+                {
+                    parameters[1] = 2;
+                    parameters[0] = numberString.Substring(2);
+                }
+                else if (numberString.StartsWith("O"))
+                {
+                    parameters[1] = 8;
+                    parameters[0] = numberString.Substring(1);
+                }
+                else if (numberString.StartsWith("#"))
+                {
+                    parameters[1] = 16;
+                    parameters[0] = numberString.Substring(1);
+                }
+                else if (numberString.StartsWith("0D"))
+                {
+                    parameters[1] = 10;
+                    parameters[0] = numberString.Substring(2);
+                }
+                else if (numberString.StartsWith("0X") || numberString.StartsWith("&H"))
+                {
+                    parameters[1] = 16;
+                    parameters[0] = numberString.Substring(2);
+                }               
+                else
+                {
+                    parameters[1] = 10;
+                    parameters[0] = numberString;
+                }
             }
 
             return parameters;
@@ -99,7 +109,7 @@ namespace SpaceCG.Extensions
 
             if (methods?.Count() != 1) return false;
             MethodInfo ConvertToNumber = methods.First();
-            object[] parameters = GetNumberStringBase(numberString);
+            object[] parameters = GetNumberStringBase(numberString, numberType);
 
             try
             {
@@ -141,7 +151,7 @@ namespace SpaceCG.Extensions
 
             if (methods?.Count() != 1) return false;
             MethodInfo ConvertToNumber = methods.First();
-            object[] parameters = GetNumberStringBase(numberString);
+            object[] parameters = GetNumberStringBase(numberString, numberType);
 
             try
             {
@@ -195,7 +205,7 @@ namespace SpaceCG.Extensions
                 if (string.IsNullOrWhiteSpace(stringArray[i])) continue;
 
                 NumberType newValue = default;
-                object[] parameters = GetNumberStringBase(stringArray[i]);
+                object[] parameters = GetNumberStringBase(stringArray[i], numberType);
 
                 try
                 {

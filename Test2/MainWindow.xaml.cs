@@ -76,6 +76,7 @@ namespace Test2
             object boo = TypeDescriptor.GetConverter(typeof(bool)).ConvertFrom("True");
             Console.WriteLine(boo);
 
+            StringExtensions.ToNumber<Double>("1280", out double number);
         }
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)
