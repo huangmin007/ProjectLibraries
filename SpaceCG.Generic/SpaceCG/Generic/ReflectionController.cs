@@ -261,7 +261,7 @@ namespace SpaceCG.Generic
         {
             Task.Run(() =>
             {
-                Thread.Sleep(1000);
+                Thread.Sleep(2000);
                 IAsyncClient client = (IAsyncClient)sender;
                 client.Connect((IPEndPoint)e.EndPoint);
 
@@ -297,24 +297,6 @@ namespace SpaceCG.Generic
             }
 
             this.TryParseControlMessage(eventArgs.Action, eventArgs);
-        }
-
-        /// <summary>
-        /// 安装键盘控制接口服务
-        /// </summary>
-        /// <param name="enabled"></param>
-        /// <returns></returns>
-        public bool InstallKeyboardService(bool enabled)
-        {
-            return false;
-        }
-        /// <summary>
-        /// 卸载键盘控制接口服务
-        /// </summary>
-        /// <returns></returns>
-        public bool UnistallKeyboardServices()
-        {
-            return false;
         }
 
         /// <summary>
@@ -397,25 +379,6 @@ namespace SpaceCG.Generic
 
             TryParseControlMessage(element, null);
         }
-
-#if false
-        /// <summary>
-        /// 解析执行方法消息
-        /// </summary>
-        /// <param name="target"></param>
-        /// <param name="method"></param>
-        /// <param name="args"></param>
-        /// <param name="sync"></param>
-        public void TryParseCallMethod(string target, string method, string args, bool sync = true) => TryParseControlMessage($"<{XAction} {XTarget}={target} {XMethod}={method} {XParams}={args} {XSync}={sync} />");
-        /// <summary>
-        /// 解析执行属性消息
-        /// </summary>
-        /// <param name="target"></param>
-        /// <param name="property"></param>
-        /// <param name="value"></param>
-        /// <param name="sync"></param>
-        public void TryParseChangeValue(string target, string property, string value, bool sync = true) => TryParseControlMessage($"<{XAction} {XTarget}={target} {XProperty}={property} {XValue}={value} {XSync}={sync} />");
-#endif
 
         /// <summary>
         /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典找实例对象，并调用实例对象的方法

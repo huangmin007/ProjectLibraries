@@ -85,6 +85,7 @@ namespace SpaceCG.Extensions
             return false;
         }
 
+
         /// <summary>
         /// 动态的设置实例对象的字段 (公有字段或私有字段) 的多个属性 (公有) 值，跟据 XML 配置文件节点名称 (实例的公有字段或私有字段) 及节点属性 (字段对象的属性) 来个修改实例的字段属性
         /// <para>例如：&lt;Window Left="100" Width="100"/&gt; </para>

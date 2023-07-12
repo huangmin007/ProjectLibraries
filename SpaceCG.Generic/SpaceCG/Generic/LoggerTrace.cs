@@ -15,9 +15,9 @@ namespace SpaceCG.Generic
     /// </summary>
     public sealed class LoggerTrace : IDisposable
     {
-        private static readonly string mainModuleName = "trace";
-        private static readonly TextFileStreamTraceListener consoleListener;
-        private static readonly TextFileStreamTraceListener textFileListener;
+        private static readonly string MainModuleName = "trace";
+        private static readonly TextFileStreamTraceListener ConsoleListener;
+        private static readonly TextFileStreamTraceListener TextFileListener;
 
         /// <summary>
         /// 默认文本文件记录源开关和事件类型筛选器筛选的跟踪消息的级别
@@ -25,8 +25,8 @@ namespace SpaceCG.Generic
         /// </summary>
         public static SourceLevels FileTraceLevels
         {
-            get { return ((EventTypeFilter)textFileListener.Filter).EventType; }
-            set { ((EventTypeFilter)textFileListener.Filter).EventType = value; }
+            get { return ((EventTypeFilter)TextFileListener.Filter).EventType; }
+            set { ((EventTypeFilter)TextFileListener.Filter).EventType = value; }
         }
         /// <summary>
         /// 默认文本文件记录源跟踪事件
@@ -39,8 +39,8 @@ namespace SpaceCG.Generic
         /// </summary>
         public static SourceLevels ConsoleTraceLevels
         {
-            get { return ((EventTypeFilter)consoleListener.Filter).EventType; }
-            set { ((EventTypeFilter)consoleListener.Filter).EventType = value; }
+            get { return ((EventTypeFilter)ConsoleListener.Filter).EventType; }
+            set { ((EventTypeFilter)ConsoleListener.Filter).EventType = value; }
         }
         /// <summary>
         /// 默认控制台消息源跟踪事件
@@ -57,47 +57,47 @@ namespace SpaceCG.Generic
             if (!String.IsNullOrEmpty(moduleFileName))
             {
                 FileInfo info = new FileInfo(moduleFileName);
-                mainModuleName = info.Name.Replace(info.Extension, "");
+                MainModuleName = info.Name.Replace(info.Extension, "");
             }
 
             string path = "logs";
             if (!Directory.Exists(path)) Directory.CreateDirectory(path);
-            String defaultFileName = $"{path}/{mainModuleName}.{DateTime.Today.ToString("yyyy-MM-dd")}.log";
+            String defaultFileName = $"{path}/{MainModuleName}.{DateTime.Today.ToString("yyyy-MM-dd")}.log";
 
             Trace.AutoFlush = true;
-            textFileListener = new TextFileStreamTraceListener(defaultFileName, "FileTrace");
-            textFileListener.Filter = new EventTypeFilter(SourceLevels.Information);
-            textFileListener.TraceSourceEvent += (s, e) => FileTraceEvent?.Invoke(s, e);
-            textFileListener.WriteLine(Environment.NewLine);
+            TextFileListener = new TextFileStreamTraceListener(defaultFileName, "FileTrace");
+            TextFileListener.Filter = new EventTypeFilter(SourceLevels.Information);
+            TextFileListener.TraceSourceEvent += (s, e) => FileTraceEvent?.Invoke(s, e);
+            TextFileListener.WriteLine(Environment.NewLine);
 
-            consoleListener = new TextFileStreamTraceListener(Console.Out, "ConsoleTrace");
-            consoleListener.Filter = new EventTypeFilter(SourceLevels.All);
-            consoleListener.TraceSourceEvent += (s, e) => ConsoleTraceEvent?.Invoke(s, e);
+            ConsoleListener = new TextFileStreamTraceListener(Console.Out, "ConsoleTrace");
+            ConsoleListener.Filter = new EventTypeFilter(SourceLevels.All);
+            ConsoleListener.TraceSourceEvent += (s, e) => ConsoleTraceEvent?.Invoke(s, e);
 
             OperatingSystem os = Environment.OSVersion;
             TraceEventCache eventCache = new TraceEventCache();
 
-            consoleListener.WriteLine($"[Header] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
-            textFileListener.WriteLine($"[Header] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
+            ConsoleListener.WriteLine($"[Header] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
+            TextFileListener.WriteLine($"[Header] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
 
             String systemInfo = $"[{os} ({os.Platform})]({(Environment.Is64BitOperatingSystem ? "64" : "32")} 位操作系统 / 逻辑处理器: {Environment.ProcessorCount})";
             String moduleInfo = $"[{moduleFileName}]({(Environment.Is64BitProcess ? "64" : "32")} 位进程 / 进程 ID: {Process.GetCurrentProcess().Id})";
 
-            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, systemInfo);
-            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, moduleInfo);
+            ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, systemInfo);
+            ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, moduleInfo);
 
-            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, systemInfo);
-            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, moduleInfo);
+            TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, systemInfo);
+            TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, moduleInfo);
 
             if (processModule != null)
             {
-                consoleListener.Write(processModule.FileVersionInfo.ToString());
-                textFileListener.Write(processModule.FileVersionInfo.ToString());
+                ConsoleListener.Write(processModule.FileVersionInfo.ToString());
+                TextFileListener.Write(processModule.FileVersionInfo.ToString());
             }
             
-            consoleListener.Flush();
-            textFileListener.Flush();
-            FileExtensions.ReserveFileDays(30, path, $"{mainModuleName}.*.log");
+            ConsoleListener.Flush();
+            TextFileListener.Flush();
+            FileExtensions.ReserveFileDays(30, path, $"{MainModuleName}.*.log");
 
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
@@ -107,24 +107,24 @@ namespace SpaceCG.Generic
         {
             AppDomain.CurrentDomain.FirstChanceException -= CurrentDomain_FirstChanceException;
 
-            consoleListener.WriteLine($"[Footer] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
-            textFileListener.WriteLine($"[Footer] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
+            ConsoleListener.WriteLine($"[Footer] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
+            TextFileListener.WriteLine($"[Footer] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
 
-            consoleListener.Flush();
-            textFileListener.Flush();
+            ConsoleListener.Flush();
+            TextFileListener.Flush();
         }
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             TraceEventCache eventCache = new TraceEventCache();
             TraceEventType eventType = e.IsTerminating ? TraceEventType.Critical : TraceEventType.Error;
 
-            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"公共语言运行时是否即将终止: {e.IsTerminating}");
-            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"未处理的异常对象: {e.ExceptionObject}");
-            textFileListener.Flush();
+            TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"公共语言运行时是否即将终止: {e.IsTerminating}");
+            TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"未处理的异常对象: {e.ExceptionObject}");
+            TextFileListener.Flush();
 
-            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"公共语言运行时是否即将终止: {e.IsTerminating}");
-            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"未处理的异常对象: {e.ExceptionObject}");
-            consoleListener.Flush();
+            ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"公共语言运行时是否即将终止: {e.IsTerminating}");
+            ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"未处理的异常对象: {e.ExceptionObject}");
+            ConsoleListener.Flush();
 
             if (e.IsTerminating)
             {
@@ -135,11 +135,11 @@ namespace SpaceCG.Generic
         private static void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
         {
             TraceEventCache eventCache = new TraceEventCache();
-            consoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");
-            textFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");
+            ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");
+            TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");
 
-            consoleListener.Flush();
-            textFileListener.Flush();
+            ConsoleListener.Flush();
+            TextFileListener.Flush();
         }
         
 
@@ -245,9 +245,9 @@ namespace SpaceCG.Generic
             TraceSource.Switch = new SourceSwitch($"{name}_Switch", defaultLevel.ToString());
             TraceSource.Switch.Level = defaultLevel;
 
-            if (consoleListener != null) TraceSource.Listeners.Add(consoleListener);
-            if (textFileListener != null) TraceSource.Listeners.Add(textFileListener);
-            if (consoleListener != null && textFileListener != null) TraceSource.Listeners.Remove("Default");
+            if (ConsoleListener != null) TraceSource.Listeners.Add(ConsoleListener);
+            if (TextFileListener != null) TraceSource.Listeners.Add(TextFileListener);
+            if (ConsoleListener != null && TextFileListener != null) TraceSource.Listeners.Remove("Default");
         }
 
         /// <inheritdoc/>

@@ -1,11 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Numerics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
 using SpaceCG.Generic;
 
 namespace SpaceCG.Extensions
@@ -21,9 +16,9 @@ namespace SpaceCG.Extensions
         /// 封装一个方法，该方法输出一个指定类型的对象, 该对象的值等效于指定的对象
         /// </summary>
         /// <param name="value">需要转换的对象、字符串或是字符串描述</param>
-        /// <param name="destinationType">要返回的对象的类型</param>
-        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
-        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
+        /// <param name="destinationType">表示希望转换为的类型</param>
+        /// <param name="conversionValue">输出一个转换后的对象，其类型为 destinationType，并且其值等效于 value </param>
+        /// <returns> 输出类型的值 conversionValue 为有效对象时，返回 true, 否则返回 false </returns>
         public delegate bool TypeConverterDelegate(object value, Type destinationType, out object conversionValue);
 
         /// <summary>
@@ -33,7 +28,7 @@ namespace SpaceCG.Extensions
         public static TypeConverterDelegate CustomConvertFromExtension;
 
         /// <summary>
-        /// 指示其参数是否为数字类型
+        /// 指示其参数是否为数值类型
         /// </summary>
         /// <param name="value"></param>
         /// <returns></returns>
@@ -95,19 +90,7 @@ namespace SpaceCG.Extensions
                 string valueString = value.ToString();
                 if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
 
-                if (destinationType.IsEnum)
-                {
-                    try
-                    {
-                        conversionValue = Enum.Parse(destinationType, valueString, true);
-                        return true;
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warn(ex.ToString());
-                    }
-                }
-                else if (destinationType == typeof(bool))
+                if (destinationType == typeof(bool))
                 {
                     if (bool.TryParse(valueString, out bool result))
                     {
@@ -125,10 +108,7 @@ namespace SpaceCG.Extensions
                         conversionValue = cValue;
                         return true;
                     }
-                }
-                else
-                {
-                }
+                }                
             }
             else if (destinationType.IsArray && valueType.IsArray && destinationType.GetElementType() != valueType.GetElementType())
             {
@@ -139,25 +119,14 @@ namespace SpaceCG.Extensions
                 for (int i = 0; i < valueArray.Length; i++)
                 {
                     if (!ConvertFrom(valueArray.GetValue(i), elementType, out object cValue)) continue;
-
                     instanceValue.SetValue(cValue, i);
                 }
                 conversionValue = instanceValue;
                 return true;
             }
-            else
-            {
-            }
 
             try
             {
-#if false
-                if (typeof(IConvertible).IsAssignableFrom(destinationType))
-                {
-                    conversionValue = Convert.ChangeType(value, destinationType);
-                    return true;
-                }
-#endif
                 TypeConverter converter = TypeDescriptor.GetConverter(destinationType);
                 if (converter != null && converter.CanConvertFrom(valueType))
                 {
@@ -180,11 +149,11 @@ namespace SpaceCG.Extensions
         /// <summary>
         /// 将给定的值转换为目标类型对象。
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="value"></param>
-        /// <param name="conversionValue"></param>
-        /// <returns></returns>
-        public static bool ConvertFrom<T>(object value, out T conversionValue)
+        /// <typeparam name="T">表示希望转换为的类型</typeparam>
+        /// <param name="value">需要转换的对象，字符串或字符串描述</param>
+        /// <param name="conversionValue">输出一个转换后的对象，其类型为 destinationType，并且其值等效于 value </param>
+        /// <returns>输出类型的值 conversionValue 为有效对象时，返回 true, 否则返回 false </returns>
+        public static bool ConvertFrom<T>(object value, out T conversionValue) // where T : notnull
         {
             conversionValue = default;
             Type destinationType = typeof(T);

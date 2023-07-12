@@ -53,7 +53,7 @@ namespace Test2
                 this.Background = new SolidColorBrush((Color)color);
             }
 
-            if (TypeExtensions.ConvertFrom(new string[] {"12", "0x12", "0B1101_1111" }, typeof(Array), out object result))
+            if (TypeExtensions.ConvertFrom(new string[] {"12", "0x12", "0B1101_1111" }, typeof(byte[]), out object result))
             {
                 Console.WriteLine(result);
                 Array array = (Array)result;
@@ -68,11 +68,14 @@ namespace Test2
                 Image_Test.Source = (ImageSource)source;
             }
 
+            if (TypeExtensions.ConvertFrom("80", out Thickness margin))
+            {
+                Image_Test.Margin = margin;
+            }
 
-            object arg = null;
-            Type type = arg?.GetType();
-            Console.WriteLine(type);
-            Console.WriteLine(arg is Type);
+            object boo = TypeDescriptor.GetConverter(typeof(bool)).ConvertFrom("True");
+            Console.WriteLine(boo);
+
         }
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)

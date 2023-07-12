@@ -28,27 +28,36 @@ namespace SpaceCG.Extensions
             object[] parameters = new object[2];
             numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
 
-            if (numberString.IndexOf("0B") == 0)
+            if (numberString.StartsWith("0B"))
             {
                 parameters[1] = 2;
                 parameters[0] = numberString.Substring(2);
             }
-            else if (numberString.IndexOf("O") == 0)
+            else if (numberString.StartsWith("O"))
             {
                 parameters[1] = 8;
                 parameters[0] = numberString.Substring(1);
             }
-            else if (numberString.IndexOf("0D") == 0)
+            else if (numberString.StartsWith("#"))
+            {
+                parameters[1] = 16;
+                parameters[0] = numberString.Substring(1);
+            }
+            else if (numberString.StartsWith("0D"))
             {
                 parameters[1] = 10;
                 parameters[0] = numberString.Substring(2);
             }
-            else if (numberString.IndexOf("0X") == 0)
+            else if (numberString.StartsWith("0X") || numberString.StartsWith("&H"))
             {
                 parameters[1] = 16;
                 parameters[0] = numberString.Substring(2);
             }
-            else if(numberString.IndexOf('.') != -1)
+            else if (numberString.EndsWith("F") || numberString.EndsWith("D"))
+            {
+                return new object[] { numberString.Substring(0, numberString.Length - 1) };
+            }
+            else if (numberString.IndexOf('.') != -1)
             {
                 return new object[] { numberString };
             }
@@ -255,12 +264,29 @@ namespace SpaceCG.Extensions
         /// <returns></returns>
         public static bool ToUInt32Array(this string value, ref UInt32[] array, char separator = ',') => ToNumberArray<UInt32>(value, ref array, separator);
 
+        /// <summary>
+        /// 将多个 <see cref="System.Int64"/> 格式的字符串解析为 <see cref="System.Int64"/> 类型数组
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="array"></param>
+        /// <param name="separator"></param>
+        /// <returns></returns>
+        public static bool ToInt64Array(this string value, ref Int64[] array, char separator = ',') => ToNumberArray<Int64>(value, ref array, separator);
+        /// <summary>
+        /// 将多个 <see cref="System.UInt64"/> 格式的字符串解析为 <see cref="System.UInt64"/> 类型数组
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="array"></param>
+        /// <param name="separator"></param>
+        /// <returns></returns>
+        public static bool ToUInt64Array(this string value, ref UInt64[] array, char separator = ',') => ToNumberArray<UInt64>(value, ref array, separator);
+
         /// <summary> 正则匹配 '~' | "~" </summary>
         private static readonly String pattern_string = @"\'([^\']+)\'|" + "\"([^\"]+)\"";
-        /// <summary> 正则匹配 [~] </summary>
+        /// <summary> 正则匹配 '['~']' </summary>
         private static readonly String pattern_array = @"\[([^\[\]]+)\]";
 #pragma warning disable CS0414
-        /// <summary> 正则匹配 (~) </summary>
+        /// <summary> 正则匹配 '('~')' </summary>
         private static readonly String pattern_parent = @"\(([^\(\)]+)\)";
 #pragma warning restore CS0414
         /// <summary> 正则匹配 ',' 分割, 或结尾部份 </summary>
@@ -273,10 +299,13 @@ namespace SpaceCG.Extensions
 
         /// <summary>
         /// 将字符串参数集，分割转换为字符串数组
-        /// <para>示例字符串："0x01,True,32,False"，输出数组：["0x01","True","32","False"]</para>
-        /// <para>示例字符串："0x01,3,[True,True,False]"，输出数组：["0x01","3",["True","True","False"]]</para>
-        /// <para>示例字符串："0x01,[0,3,4,7],[True,True,False,True]"，输出数组：["0x01",["0","3","4","7"],["True","True","False","True"]]</para>
-        /// <para>示例字符串：" 'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15"，输出数组：["hello,world","0x01","3","ni?,hao,[aa,bb]",["True","True","False","True"],["aaa,bb,c","ni,hao"],"15","aa,aaa","15"]</para>
+        /// <code>示例：
+        /// 输入字符串："0x01,True,32,False"，输出数组：["0x01","True","32","False"]
+        /// 输入字符串："0x01,3,[True,True,False]"，输出数组：["0x01","3",["True","True","False"]]
+        /// 输入字符串："0x01,[0,3,4,7],[True,True,False,True]"，输出数组：["0x01",["0","3","4","7"],["True","True","False","True"]]
+        /// 输入字符串："'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15"
+        ///   输出数组：["hello,world","0x01","3","ni?,hao,[aa,bb]",["True","True","False","True"],["aaa,bb,c","ni,hao"],"15","aa,aaa","15"]
+        /// </code>
         /// </summary>
         /// <param name="parameters"></param>
         /// <returns></returns>
@@ -336,130 +365,6 @@ namespace SpaceCG.Extensions
             }
 
             return args.ToArray();
-        }
-
-        /// <summary>
-        /// 数组类型参数转换
-        /// <para>输出一个指定类型的对象, 该对象的值等效于指定的对象</para>
-        /// <para>示例：StringExtensions.ConvertChangeTypeToArrayType(new object[] { "0x45", "0x46", 0x47 }, typeof(Byte[]), out Array bytes);</para>
-        /// </summary>
-        /// <param name="value">需要转换的对象、字符串或字符串描述</param>
-        /// <param name="destinationType">要返回的对象的类型</param>
-        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
-        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
-        /// <exception cref="ArgumentException"/>
-        [Obsolete("弃用", true)]
-        public static bool ConvertChangeTypeToArrayType(Array value, Type destinationType, out Array conversionValue)
-        {
-            conversionValue = null;
-            if (destinationType == null || !destinationType.IsArray || !destinationType.GetElementType().IsValueType)
-                throw new ArgumentException(nameof(destinationType), "需要转换的类型应为数组类型，且数组元素为值类型");
-
-            if (value == null) return true;
-            if (value.GetType() == typeof(string))
-            {
-                string valueString = value.ToString();
-                if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
-            }
-
-            if (!value.GetType().IsArray) throw new ArgumentException(nameof(value), "需要转换的值对象也应该为数组类型");
-
-            Type elementType = destinationType.GetElementType();
-            conversionValue = Array.CreateInstance(elementType, value.Length);
-
-            for (int i = 0; i < value.Length; i++)
-            {
-                if (ConvertChangeTypeToValueType(value.GetValue(i), elementType, out ValueType cValue))
-                {
-                    conversionValue.SetValue(cValue, i);
-                }
-                else
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// 值类型参数转换
-        /// <para>输出一个指定类型的对象, 该对象的值等效于指定的对象</para>
-        /// <para>示例：StringExtensions.ConvertChangeTypeToValueType("45", typeof(UInt32), out UInt32 cValue);</para>
-        /// </summary>
-        /// <param name="value">需要转换的对象、字符串或字符串描述</param>
-        /// <param name="destinationType">要返回的对象的类型</param>
-        /// <param name="conversionValue">返回一个对象，其类型为 conversionType，并且其值等效于 value </param>
-        /// <returns>输出类型的值 conversionValue 为有效对象返回 true, 否则返回 false </returns>
-        /// <exception cref="ArgumentException"/>
-        [Obsolete("弃用", true)]
-        public static bool ConvertChangeTypeToValueType(object value, Type destinationType, out ValueType conversionValue)
-        {
-            conversionValue = null;
-            if (destinationType == null || !destinationType.IsValueType)
-                throw new ArgumentException(nameof(destinationType), "需要转换的类型应为值类型参数");
-
-            if (value == null) return true;
-            if (value.GetType() == destinationType)
-            {
-                conversionValue = value as ValueType;
-                return true;
-            }
-            if (value.GetType() == typeof(string))
-            {
-                string valueString = value.ToString();
-                if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
-            }
-
-            //Enum
-            if (destinationType.IsEnum)
-            {
-                try
-                {
-                    conversionValue = (ValueType)Enum.Parse(destinationType, value.ToString(), true);
-                }
-                catch(Exception ex) 
-                {
-                    Logger.Warn(ex.ToString());
-                    return false; 
-                }
-                return true;
-            }
-            //Boolean
-            else if (destinationType == typeof(bool))
-            {
-                if (bool.TryParse(value.ToString(), out bool result))
-                {
-                    conversionValue = result;
-                    return true;
-                }
-                string pv = value.ToString().Replace(" ", "");
-                conversionValue = pv == "1" || pv == "T";
-                return true;
-            }
-            else if(TypeExtensions.IsNumeric(destinationType))
-            {
-                return ToNumber(value.ToString(), destinationType, out conversionValue);
-            }           
-            //Other
-            else
-            {
-                try
-                {
-                    if (typeof(IConvertible).IsAssignableFrom(value.GetType()))
-                    {
-                        conversionValue = Convert.ChangeType(value, destinationType) as ValueType;
-                        return true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"值类型转换失败  Value:{value}  Type:{destinationType}");
-                    Logger.Warn(ex);
-                }
-
-                return false;
-            }
         }
 
     }
