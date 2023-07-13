@@ -41,15 +41,26 @@ namespace SpaceCG.Extensions.Modbus
         public bool Running => IOThreadRunning;
 
         /// <summary>
+        /// Input/Output Change Delegate
+        /// </summary>
+        /// <param name="modbusSyncMaster"></param>
+        /// <param name="modbusDevice"></param>
+        /// <param name="register"></param>
+        /// <returns></returns>
+        public delegate void IOChangeDelegate(ModbusSyncMaster modbusSyncMaster, ModbusDevice modbusDevice, Register register);
+
+        /// <summary>
         /// Read Only 寄存器数据 Change 处理
         /// <para>(ModbusTransportDevice transport, ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        public event Action<ModbusSyncMaster, ModbusDevice, Register> InputChangeEvent;
+        public event IOChangeDelegate InputChangeEvent;
+        //public event Action<ModbusSyncMaster, ModbusDevice, Register> InputChangeEvent;
         /// <summary>
         /// Read Write 寄存器数据 Change 处理
         /// <para>(ModbusTransportDevice transport, ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        public event Action<ModbusSyncMaster, ModbusDevice, Register> OutputChangeEvent;
+        public event IOChangeDelegate OutputChangeEvent;
+        //public event Action<ModbusSyncMaster, ModbusDevice, Register> OutputChangeEvent;
 
         /// <summary>
         /// 当前总线上的 Modbus IO 设备集合
@@ -187,7 +198,7 @@ namespace SpaceCG.Extensions.Modbus
         public void Dispose()
         {
             Stop();
-            EventTimer.Dispose();
+            EventTimer?.Dispose();
 
             if (ModbusDevices != null)
             {

@@ -37,6 +37,7 @@ namespace SpaceCG.Generic
         /// <param name="endPoint"></param>
         public MessageEventArgs(XElement message, EndPoint endPoint)
         {
+            this.Handled = true;
             this.Action = message;
             this.EndPoint = endPoint;
         }

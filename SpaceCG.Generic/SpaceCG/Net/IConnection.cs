@@ -28,22 +28,19 @@ namespace SpaceCG.Net
         /// <summary> <see cref="UdpServer"/> 类型 </summary>
         UdpServer,
 
-        /// <summary> <see cref="ModbusRtu"/> 类型, RTU协议 </summary>
+        /// <summary> <see cref="ModbusRtu"/> 类型, SerialPort Modbus RTU 协议 </summary>
         ModbusRtu,
 
-        /// <summary> <see cref="SerialPortRtu"/> 类型, RTU协议 </summary>
-        SerialPortRtu = ModbusRtu,
-
-        /// <summary> <see cref="ModbusTcp"/> 类型, RTU协议 </summary>
+        /// <summary> <see cref="ModbusTcp"/> 类型, Modbus TCP 协议 </summary>
         ModbusTcp,
 
-        /// <summary> <see cref="ModbusUdp"/> 类型, RTU协议 </summary>
+        /// <summary> <see cref="ModbusUdp"/> 类型, Modbus UDP 协议 </summary>
         ModbusUdp,
 
-        /// <summary> <see cref="ModbusUdp"/> 类型, RTU协议 </summary>
+        /// <summary> <see cref="ModbusUdp"/> 类型, Modbus TCP RTU 协议 </summary>
         ModbusTcpRtu,
 
-        /// <summary> <see cref="ModbusUdpRtu"/> 类型, RTU协议 </summary>
+        /// <summary> <see cref="ModbusUdpRtu"/> 类型, Modbus UDP RTU 协议 </summary>
         ModbusUdpRtu,
 
     }

@@ -16,13 +16,10 @@ namespace SpaceCG.Extensions.Modbus
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusDeviceManagement));
 
-        /// <summary> <see cref="XModbus"/> Name </summary>
-        public const string XModbus = "Modbus";
+        /// <summary> <see cref="XConnection"/> Name </summary>
+        public const string XConnection = "Connection";
         /// <summary> <see cref="XDevices"/> Name </summary>
-        public const string XDevices = "Devices";
-
-        /// <summary> <see cref="XConnectionName"/> Name </summary>
-        public const string XConnectionName = "ConnectionName";
+        //public const string XDevices = "Devices";
 
         /// <summary> <see cref="XDisposed"/> Name </summary>
         public const string XDisposed = "Disposed";
@@ -125,22 +122,22 @@ namespace SpaceCG.Extensions.Modbus
         /// &lt;Modbus Name="Bus.#01" Type="ModbusRtu" Parameters="COM7,115200" WriteTimeout="30" &gt; ...
         /// </code>
         /// </summary>
-        /// <param name="modbusElements"></param>
-        public void TryParseElements(IEnumerable<XElement> modbusElements)
+        /// <param name="connectionElements"></param>
+        public void TryParseElements(IEnumerable<XElement> connectionElements)
         {
             if (string.IsNullOrWhiteSpace(Name) || Controller == null)
                 throw new InvalidOperationException($"未配置管理对象，不可操作");
 
-            if (modbusElements?.Count() <= 0) return;
+            if (connectionElements?.Count() <= 0) return;
 
             RemoveAll();
-            this.ModbusElements = modbusElements;
+            this.ModbusElements = connectionElements;
 
-            foreach (XElement modbusElement in modbusElements)
+            foreach (XElement modbusElement in connectionElements)
             {
-                if (modbusElement.Name.LocalName != XModbus) continue;
+                if (modbusElement.Name.LocalName != XConnection) continue;
 
-                String name = modbusElement.Attribute(ReflectionController.XName)?.Value;
+                string name = modbusElement.Attribute(ReflectionController.XName)?.Value;
                 if (string.IsNullOrWhiteSpace(name))
                 {
                     Logger.Warn($"配置格式错误, 属性 {ReflectionController.XName} 不能为空, {modbusElement}");
@@ -158,8 +155,16 @@ namespace SpaceCG.Extensions.Modbus
                 if (!ConnectionManagement.CreateConnection(modbusElement, out object master))
                 {
                     transport.Dispose();
-                    Logger.Warn($"创建 {XModbus} 的连接对象失败 {modbusElement}");
+                    Logger.Warn($"创建 {XConnection} 的连接对象失败 {modbusElement}");
                     continue;
+                }
+
+                foreach (XElement deviceElement in modbusElement.Descendants(nameof(ModbusDevice)))
+                {
+                    if (ModbusDevice.TryParse(deviceElement, out ModbusDevice device))
+                    {
+                        transport.ModbusDevices.Add(device);
+                    }
                 }
 
                 if (master != null && typeof(IModbusMaster).IsAssignableFrom(master.GetType()))
@@ -186,22 +191,22 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// 总线 Input 事件处理
         /// </summary>
-        /// <param name="transportDevice"></param>
-        /// <param name="ioDevice"></param>
+        /// <param name="modbusSyncMaster"></param>
+        /// <param name="modbusDevice"></param>
         /// <param name="register"></param>
-        private void Transport_OutputChangeEvent(ModbusSyncMaster transportDevice, ModbusDevice ioDevice, Register register)
+        private void Transport_OutputChangeEvent(ModbusSyncMaster modbusSyncMaster, ModbusDevice modbusDevice, Register register)
         {
-            CallEventType(XOutputChanged, transportDevice.Name, ioDevice.Address, register);
+            CallEventType(XOutputChanged, modbusSyncMaster.Name, modbusDevice.Address, register);
         }
         /// <summary>
         /// 总线 Output 事件处理
         /// </summary>
-        /// <param name="transportDevice"></param>
-        /// <param name="ioDevice"></param>
+        /// <param name="modbusSyncMaster"></param>
+        /// <param name="modbusDevice"></param>
         /// <param name="register"></param>
-        private void Transport_InputChangeEvent(ModbusSyncMaster transportDevice, ModbusDevice ioDevice, Register register)
+        private void Transport_InputChangeEvent(ModbusSyncMaster modbusSyncMaster, ModbusDevice modbusDevice, Register register)
         {
-            CallEventType(XInputChanged, transportDevice.Name, ioDevice.Address, register);
+            CallEventType(XInputChanged, modbusSyncMaster.Name, modbusDevice.Address, register);
         }
 
         /// <summary>

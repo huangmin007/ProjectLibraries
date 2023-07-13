@@ -12,6 +12,7 @@ using Modbus.Device;
 using SpaceCG.Extensions;
 using SpaceCG.Net;
 using SpaceCG.Extensions.Modbus;
+using ModbusDevice = SpaceCG.Extensions.Modbus.ModbusDevice;
 
 namespace SpaceCG.Generic
 {
@@ -31,15 +32,30 @@ namespace SpaceCG.Generic
 
         /// <summary> <see cref="XData"/> Name </summary>
         public const string XData = "Data";
+        /// <summary> <see cref="XDisposed"/> Name </summary>
+        public const string XDisposed = "Disposed";
+        /// <summary> <see cref="XInitialized"/> Name </summary>
+        public const string XInitialized = "Initialized";
+        /// <summary> <see cref="XInputChanged"/> Name </summary>
+        public const string XInputChanged = "InputChanged";
+        /// <summary> <see cref="XOutputChanged"/> Name </summary>
+        public const string XOutputChanged = "OutputChanged";
+
         /// <summary> <see cref="XBytes"/> Name </summary>
         public const string XBytes = "Bytes";
         /// <summary> <see cref="XMessage"/> Name </summary>
         public const string XMessage = "Message";
+        /// <summary> <see cref="XMinValue"/> Name </summary>
+        public const string XMinValue = "MinValue";
+        /// <summary> <see cref="XMaxValue"/> Name </summary>
+        public const string XMaxValue = "MaxValue";
+        /// <summary> <see cref="XDeviceAddress"/> Name </summary>
+        public const string XDeviceAddress = "DeviceAddress";
 
         /// <summary>
         /// Connection Management Name
         /// </summary>
-        public String Name { get; private set;} = null;
+        public string Name { get; private set;} = null;
         /// <summary>
         /// Connection Management Reflection Controller
         /// </summary>
@@ -69,6 +85,8 @@ namespace SpaceCG.Generic
         {
             if (instance != null)
             {
+                instance.RemoveAll();
+
                 if (!string.IsNullOrWhiteSpace(instance.Name) && instance.Controller != null)
                     instance.Controller.AccessObjects.Remove(instance.Name);
 
@@ -96,7 +114,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="controller"></param>
         /// <param name="name"></param>
-        public void Configuration(ReflectionController controller, string name)
+        public void Configuration(ReflectionController controller, string name = nameof(ConnectionManagement))
         {            
             if (controller == null)
                 throw new ArgumentNullException(nameof(controller), "参数不能为空");
@@ -138,13 +156,12 @@ namespace SpaceCG.Generic
         /// <param name="connectionElements">至少具有 Name, Type, Parameters 属性的 Connection 节点集合 </param>
         public void TryParseElements(IEnumerable<XElement> connectionElements)
         {
-            if (string.IsNullOrWhiteSpace(Name) || Controller == null)
-                throw new InvalidOperationException($"未配置管理对象，不可操作");
-
-            if (connectionElements?.Count() <= 0) return;
+            if (connectionElements == null) throw new ArgumentNullException(nameof(connectionElements), "参数不能为空");
+            if (string.IsNullOrWhiteSpace(Name) || Controller == null) throw new InvalidOperationException($"未配置管理对象，不可操作");
 
             RemoveAll();
-            this.ConnectionElements = connectionElements;
+            if (connectionElements?.Count() <= 0) return;
+
             foreach (XElement connectionElement in connectionElements)
             {
                 if (connectionElement.Name.LocalName != XConnection) continue;
@@ -155,19 +172,16 @@ namespace SpaceCG.Generic
                     Logger.Warn($"配置格式错误, 属性 {ReflectionController.XName} 不能为空, {connectionElement}");
                     continue;
                 }
-
-                if (!CreateConnection(connectionElement, out object connectionObject)) continue;
                 if (this.Controller.AccessObjects.ContainsKey(name))
                 {
-                    Logger.Warn($"配置格式错误, 访问对象名称 {name} 已存在, {connectionElement}");
-                    if (typeof(IDisposable).IsAssignableFrom(connectionObject.GetType())) (connectionObject as IDisposable)?.Dispose();
+                    Logger.Warn($"配置错误, 访问对象名称 {name} 已存在, {connectionElement}");
                     continue;
                 }
 
+                if (!CreateConnection(connectionElement, out object connectionObject)) continue;
+
                 Controller.AccessObjects.Add(name, connectionObject);
                 IReadOnlyCollection<DataEventParams> dataEvents = GetConnectionDataEvents(connectionElement.Elements(ReflectionController.XEvent));
-
-                if (dataEvents?.Count <= 0) continue;
                 ConnectionType connectionType = (ConnectionType)Enum.Parse(typeof(ConnectionType), connectionElement.Attribute(ReflectionController.XType).Value, true);
 
                 switch (connectionType)
@@ -177,12 +191,32 @@ namespace SpaceCG.Generic
                     case ConnectionType.ModbusUdp:
                     case ConnectionType.ModbusTcpRtu:
                     case ConnectionType.ModbusUdpRtu:
+                        IEnumerable<XElement> deviceElements = connectionElement.Elements(nameof(ModbusDevice));
+                        IEnumerable<XElement> deviceEventElements = connectionElement.Elements(ReflectionController.XEvent);
+                        if (deviceElements?.Count() <= 0 || deviceEventElements?.Count() <= 0) continue;
                         {
-                            //Devices
+                            IModbusMaster master = connectionObject as IModbusMaster;
+                            ModbusSyncMaster transport = new ModbusSyncMaster(master);
+                            transport.Name = name;
+
+                            foreach (XElement deviceElement in deviceElements)
+                            {
+                                if (ModbusDevice.TryParse(deviceElement, out ModbusDevice device))
+                                {
+                                    transport.ModbusDevices.Add(device);
+                                }
+                            }
+
+                            transport.InputChangeEvent += ModbusSyncMaster_InputChangeEvent;
+                            transport.OutputChangeEvent += ModbusSyncMaster_OutputChangeEvent;
+
+                            transport.Start();
+                            Controller.AccessObjects[name] = transport;
                         }
                         break;
 
                     case ConnectionType.SerialPort:
+                        if (dataEvents?.Count <= 0) continue;
                         {
                             SerialPort serialPort = connectionObject as SerialPort;
                             serialPort.DataReceived += SerialPort_DataReceived;
@@ -192,6 +226,7 @@ namespace SpaceCG.Generic
 
                     case ConnectionType.TcpClient:
                     case ConnectionType.UdpClient:
+                        if (dataEvents?.Count <= 0) continue;
                         {
                             IAsyncClient client = connectionObject as IAsyncClient;
                             client.Name = name;
@@ -202,6 +237,7 @@ namespace SpaceCG.Generic
 
                     case ConnectionType.TcpServer:
                     case ConnectionType.UdpServer:
+                        if (dataEvents?.Count <= 0) continue;
                         {
                             IAsyncServer server = connectionObject as IAsyncServer;
                             server.Name = name;
@@ -211,6 +247,167 @@ namespace SpaceCG.Generic
                         break;
                 }
             }
+
+            //XInitialized
+            CallEventType(XInitialized);
+        }
+
+        private void ModbusSyncMaster_OutputChangeEvent(ModbusSyncMaster modbusSyncMaster, ModbusDevice modbusDevice, Register register)
+        {
+            CallEventType(modbusSyncMaster.Name, XOutputChanged, modbusDevice.Address, register);
+        }
+        private void ModbusSyncMaster_InputChangeEvent(ModbusSyncMaster modbusSyncMaster, ModbusDevice modbusDevice, Register register)
+        {
+            CallEventType(modbusSyncMaster.Name, XInputChanged, modbusDevice.Address, register);
+        }
+        private void Network_DataReceived(object sender, AsyncDataEventArgs e)
+        {
+            IConnection connection = sender as IConnection;
+            CallEventData(connection.Name, e.Bytes);
+        }
+        private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        {
+            if (e.EventType != SerialData.Eof) return;
+
+            SerialPort serialPort = (SerialPort)sender;
+            string objName = $"{serialPort.PortName}_{serialPort.BaudRate}";
+
+            byte[] buffer = null;
+            try
+            {
+                buffer = new byte[serialPort.BytesToRead];
+                serialPort.Read(buffer, 0, buffer.Length);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return;
+            }
+
+            CallEventData(objName, buffer);
+        }
+
+        /// <summary>
+        /// 在所有连接配置中，跟据连接名称和事件类型调用事件集合
+        /// </summary>
+        /// <param name="eventType"></param>
+        protected void CallEventType(string eventType)
+        {
+            if (ConnectionElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventType)) return;
+
+            IEnumerable<XElement> events = from evt in ConnectionElements.Descendants(ReflectionController.XEvent)
+                                           where evt.Attribute(ReflectionController.XType)?.Value == eventType
+                                           select evt;
+
+            Controller.TryParseControlMessage(events.Elements());
+        }
+        /// <summary>
+        /// 在所有连接配置中，跟据连接名称、事件类型和其它多个参数调用事件集合
+        /// </summary>
+        /// <param name="eventType"></param>
+        /// <param name="connectionName"></param>
+        /// <param name="deviceAddress"></param>
+        /// <param name="register"></param>
+        protected void CallEventType(string connectionName, string eventType, byte deviceAddress, Register register)
+        {
+            if (ConnectionElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventType) || string.IsNullOrWhiteSpace(connectionName)) return;
+
+            if (Logger.IsDebugEnabled)
+                Logger.Debug($"{eventType} {connectionName} > 0x{deviceAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+
+            foreach (XElement connection in ConnectionElements)
+            {
+                if (connection.Attribute(ReflectionController.XName)?.Value != connectionName) continue;
+
+                IEnumerable<XElement> events = connection.Descendants(ReflectionController.XEvent);
+                foreach (XElement evt in events)
+                {
+                    if (evt.Attribute(ReflectionController.XType)?.Value != eventType) continue;
+
+                    if (!StringExtensions.ToNumber(evt.Attribute(XDeviceAddress)?.Value, out byte devAddress)) continue;
+                    if (devAddress != deviceAddress) continue;
+
+                    if (!StringExtensions.ToNumber(evt.Attribute($"{register.Type}Address")?.Value, out ushort regAddress)) continue;
+                    if (regAddress != register.Address) continue;
+
+                    if (StringExtensions.ToNumber(evt.Attribute(ReflectionController.XValue)?.Value, out long regValue) && regValue == register.Value)
+                    {
+                        if (Logger.IsInfoEnabled)
+                            Logger.Info($"{eventType} {connectionName} > 0x{deviceAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+
+                        Controller.TryParseControlMessage(evt.Elements());
+                        continue;
+                    }
+                    else if (StringExtensions.ToNumber(evt.Attribute(XMinValue)?.Value, out long minValue) && StringExtensions.ToNumber(evt.Attribute(XMaxValue)?.Value, out long maxValue))
+                    {
+                        if (maxValue > minValue && register.Value <= maxValue && register.Value >= minValue && (register.LastValue < minValue || register.LastValue > maxValue))
+                        {
+                            if (Logger.IsInfoEnabled)
+                                Logger.Info($"{eventType} {connectionName} > 0x{deviceAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
+
+                            Controller.TryParseControlMessage(evt.Elements());
+                        }
+                    }
+                }//End for                
+            }//End for
+        }
+        /// <summary>
+        /// 在所有连接配置中，跟据连接名称和数据参数调用事件集合
+        /// </summary>
+        /// <param name="connectionName"></param>
+        /// <param name="bytes"></param>
+        public void CallEventData(string connectionName, byte[] bytes)
+        {
+            if (string.IsNullOrWhiteSpace(connectionName) || bytes?.Length <= 0 || ConnectionDataEvents.Count <= 0) return;
+
+            if (ConnectionDataEvents.TryGetValue(connectionName, out IReadOnlyCollection<DataEventParams> dataEvents))
+            {
+                foreach (DataEventParams dataEvent in dataEvents)
+                {
+                    if ((dataEvent.Message != null && bytes.SequenceEqual(dataEvent.Message)) ||
+                        (dataEvent.Bytes != null && bytes.SequenceEqual(dataEvent.Bytes)))
+                    {
+                        this.Controller.TryParseControlMessage(dataEvent.Actions);
+                    }
+                }
+            }
+        }
+        /// <summary>
+        /// 在所有连接配置中，跟据连接名称和数据参数调用事件集合
+        /// </summary>
+        /// <param name="connectionName"></param>
+        /// <param name="message"></param>
+        public void CallEventData(string connectionName, string message) => CallEventData(connectionName, Encoding.UTF8.GetBytes(message));
+        /// <summary>
+        /// 在所有连接配置中，跟据事件名称，调用事件集合
+        /// </summary>
+        /// <param name="eventName"></param>
+        public void CallEventName(string eventName)
+        {
+            if (ConnectionElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventName)) return;
+
+            IEnumerable<XElement> events = from evt in ConnectionElements.Descendants(ReflectionController.XEvent)
+                                           where evt.Attribute(ReflectionController.XName)?.Value == eventName
+                                           select evt;
+
+            Controller.TryParseControlMessage(events.Elements());
+        }
+        /// <summary>
+        /// 在所有连接配置中，跟据连接名称和事件名称调用事件集合
+        /// </summary>
+        /// <param name="connectionName"></param>
+        /// <param name="eventName"></param>
+        public void CallEventName(string connectionName, string eventName)
+        {
+            if (ConnectionElements?.Count() <= 0 || string.IsNullOrWhiteSpace(connectionName) || string.IsNullOrWhiteSpace(eventName)) return;
+
+            IEnumerable<XElement> events = from connection in ConnectionElements
+                                           where connection.Attribute(ReflectionController.XName)?.Value == connectionName
+                                           from evt in connection.Descendants(ReflectionController.XEvent)
+                                           where evt.Attribute(ReflectionController.XName)?.Value == eventName
+                                           select evt;
+
+            Controller.TryParseControlMessage(events.Elements());
         }
 
         /// <summary>
@@ -253,91 +450,14 @@ namespace SpaceCG.Generic
         }
 
         /// <summary>
-        /// 跟据事件名称、参数调用配置功能
-        /// </summary>
-        /// <param name="connectionName"></param>
-        /// <param name="bytes"></param>
-        public void CallConnectionEvent(string connectionName, byte[] bytes)
-        {
-            if (string.IsNullOrWhiteSpace(connectionName) || bytes?.Length <= 0 || ConnectionDataEvents.Count <= 0) return;
-
-            if (ConnectionDataEvents.TryGetValue(connectionName, out IReadOnlyCollection<DataEventParams> dataEvents))
-            {
-                foreach (DataEventParams dataEvent in dataEvents)
-                {
-                    if ((dataEvent.Message != null && bytes.SequenceEqual(dataEvent.Message)) ||
-                        (dataEvent.Bytes != null && bytes.SequenceEqual(dataEvent.Bytes)))
-                    {
-                        this.Controller.TryParseControlMessage(dataEvent.Actions);
-                    }
-                }
-            }
-        }
-        /// <summary>
-        /// 跟据事件名称、参数调用配置功能
-        /// </summary>
-        /// <param name="connectionName"></param>
-        /// <param name="message"></param>
-        public void CallConnectionEvent(string connectionName, string message) => CallConnectionEvent(connectionName, Encoding.UTF8.GetBytes(message));
-
-        /// <inheritdoc/>
-        public void CallEventName(string eventName)
-        {
-            if (ConnectionElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventName)) return;
-
-            IEnumerable<XElement> events = from evt in ConnectionElements.Descendants(ReflectionController.XEvent)
-                                           where evt.Attribute(ReflectionController.XName)?.Value == eventName
-                                           select evt;
-
-            Controller.TryParseControlMessage(events.Elements());
-        }
-        /// <inheritdoc/>
-        public void CallEventName(string eventName, string connectionName)
-        {
-            if (ConnectionElements?.Count() <= 0 || string.IsNullOrWhiteSpace(eventName) || string.IsNullOrWhiteSpace(connectionName)) return;
-
-            IEnumerable<XElement> events = from connection in ConnectionElements
-                                           where connection.Attribute(ReflectionController.XName)?.Value == connectionName
-                                           from evt in connection.Descendants(ReflectionController.XEvent)
-                                           where evt.Attribute(ReflectionController.XName)?.Value == eventName
-                                           select evt;
-
-            Controller.TryParseControlMessage(events.Elements());
-        }
-
-        private void Network_DataReceived(object sender, AsyncDataEventArgs e)
-        {
-            IConnection connection = sender as IConnection;
-            CallConnectionEvent(connection.Name, e.Bytes);
-        }
-        private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
-        {
-            if (e.EventType != SerialData.Eof) return;
-
-            SerialPort serialPort = (SerialPort)sender;
-            string objName = $"{serialPort.PortName}_{serialPort.BaudRate}";
-
-            byte[] buffer = null;
-            try
-            {
-                buffer = new byte[serialPort.BytesToRead];
-                serialPort.Read(buffer, 0, buffer.Length);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex);
-                return;
-            }
-
-            CallConnectionEvent(objName, buffer);
-        }
-
-        /// <summary>
         /// 移除并断开所有连接对象，并从 <see cref="ReflectionController.AccessObjects"/> 集合中移除
         /// </summary>
         public void RemoveAll()
         {
             if (ConnectionElements == null || ConnectionElements.Count() <= 0) return;
+
+            CallEventType(XDisposed);
+            Thread.Sleep(100);
 
             ConnectionDataEvents?.Clear();
             Type DisposableType = typeof(IDisposable);
@@ -558,7 +678,7 @@ namespace SpaceCG.Generic
                 Logger.Warn($"配置格式错误, 属性 {XParameters} 不能为空, {connectionElement}");
                 return false;
             }
-            String[] args = parameters.Split(',');
+            string[] args = parameters.Split(',');
             if (args.Length < 2)
             {
                 Logger.Warn($"配置格式错误, 属性 {XParameters} 值 {parameters} 错误, 其参数值不能少于 2 个, {connectionElement}");
