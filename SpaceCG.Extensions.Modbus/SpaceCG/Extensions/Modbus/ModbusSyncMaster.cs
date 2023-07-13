@@ -1,27 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Threading;
 using System.Xml.Linq;
 using Modbus.Device;
 using SpaceCG.Generic;
+using SpaceCG.Net;
 
 namespace SpaceCG.Extensions.Modbus
 {
     /// <summary>
-    /// Modbus Transport 总线对象
+    /// Modbus Synchronize Master
     /// </summary>
-    public partial class ModbusTransport : IDisposable
+    public partial class ModbusSyncMaster : IDisposable
     {
-        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusTransport));
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusSyncMaster));
 
-        /// <summary> <see cref="XModbus"/> Name </summary>
-        public const string XModbus = "Modbus";
+        /// <summary> <see cref="XConnectin"/> Name </summary>
+        public const string XConnectin = "Connection";
         
         /// <summary>
         /// 传输对象名称
         /// </summary>
-        public String Name { get; private set; }
+        public String Name { get; set; }
 
         /// <summary>
         /// 获取当前传输总线实时 获取输入寄存器 测量得出的总运行时间（一个轮寻周期，以毫秒为单位）。
@@ -42,54 +44,36 @@ namespace SpaceCG.Extensions.Modbus
         /// Read Only 寄存器数据 Change 处理
         /// <para>(ModbusTransportDevice transport, ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        public event Action<ModbusTransport, ModbusIODevice, Register> InputChangeEvent;
+        public event Action<ModbusSyncMaster, ModbusDevice, Register> InputChangeEvent;
         /// <summary>
         /// Read Write 寄存器数据 Change 处理
         /// <para>(ModbusTransportDevice transport, ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        public event Action<ModbusTransport, ModbusIODevice, Register> OutputChangeEvent;
+        public event Action<ModbusSyncMaster, ModbusDevice, Register> OutputChangeEvent;
 
         /// <summary>
         /// 当前总线上的 Modbus IO 设备集合
         /// </summary>
-        public List<ModbusIODevice> ModbusDevices { get; private set; } = new List<ModbusIODevice>(8);
+        public List<ModbusDevice> ModbusDevices { get; private set; } = new List<ModbusDevice>(8);
 
         /// <summary>
-        /// Modbus Transport 总线对象
+        /// Modbus 同步主机对象
         /// </summary>
-        /// <param name="name"></param>
-        public ModbusTransport(string name)
+        /// <param name="master"></param>
+        public ModbusSyncMaster(IModbusMaster master)
         {
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentNullException(nameof(name), "参数不能为空");
-
-            this.Name = name;
+            this.ModbusMaster = master;
+            this.Name = this.Name = $"{nameof(ModbusMaster)}#{master}";
             this.EventTimer = new Timer(SyncRegisterChangeEvents, this, Timeout.Infinite, Timeout.Infinite);
-        }
-
-        /// <summary>
-        /// 从当前总线上获取指定地址的设备
-        /// </summary>
-        /// <param name="deviceAddress"></param>
-        /// <returns></returns>
-        public ModbusIODevice GetDevice(byte deviceAddress)
-        {
-            foreach(var device in ModbusDevices) 
-            {
-                if(device.Address == deviceAddress) return device;
-            }
-
-            return null;
         }
 
         /// <summary>
         /// 启动同步传输
         /// </summary>
-        /// <param name="master"></param>
-        public void StartTransport(IModbusMaster master)
+        public void Start()
         {
-            if (master == null || master.Transport == null)
-                throw new ArgumentNullException(nameof(master), "参数不能为空");
+            if (ModbusMaster == null) 
+                throw new InvalidOperationException($"{nameof(ModbusMaster)} 不能为空");
 
             if (IOThreadRunning) return;
             if(CancelToken != null)
@@ -98,7 +82,6 @@ namespace SpaceCG.Extensions.Modbus
                 CancelToken = null;
             }
 
-            Master = master;
             DeviceCount = 0;
             IOThreadRunning = true;
             ElapsedMilliseconds = 0;
@@ -113,7 +96,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// 停止同步传输
         /// </summary>
-        public void StopTransport()
+        public void Stop()
         {
             if (!IOThreadRunning) return;
 
@@ -132,15 +115,15 @@ namespace SpaceCG.Extensions.Modbus
             Logger.Info($"传输总线 ({this}) 停止同步传输");
         }
 
-        private void ModbusDevice_InputChangeHandler(ModbusIODevice device, Register register) => InputChangeEvent?.Invoke(this, device, register);
-        private void ModbusDevice_OutputChangeHandler(ModbusIODevice device, Register register) => OutputChangeEvent?.Invoke(this, device, register);
+        private void ModbusDevice_InputChangeHandler(ModbusDevice device, Register register) => InputChangeEvent?.Invoke(this, device, register);
+        private void ModbusDevice_OutputChangeHandler(ModbusDevice device, Register register) => OutputChangeEvent?.Invoke(this, device, register);
             
         /// <summary>
         /// 同步寄存器描述状态
         /// </summary>
         private void SyncRegisterChangeEvents(object modbusTransport)
         {
-            foreach(ModbusIODevice device in ModbusDevices)
+            foreach(ModbusDevice device in ModbusDevices)
             {
                 device.SyncRegisterChangeEvents();
             }
@@ -160,7 +143,7 @@ namespace SpaceCG.Extensions.Modbus
                     break;
                 }
 
-                if (Master?.Transport == null) break;
+                if (ModbusMaster?.Transport == null) break;
 
                 //全部重新初使化一次
                 if(DeviceCount !=  ModbusDevices.Count) 
@@ -175,7 +158,7 @@ namespace SpaceCG.Extensions.Modbus
                         device.InputChangeHandler -= ModbusDevice_InputChangeHandler;
                         device.OutputChangeHandler -= ModbusDevice_OutputChangeHandler;
 
-                        device.InitializeDevice(Master);
+                        device.InitializeDevice(ModbusMaster);
                         device.InputChangeHandler += ModbusDevice_InputChangeHandler;
                         device.OutputChangeHandler += ModbusDevice_OutputChangeHandler;
                     }
@@ -184,7 +167,7 @@ namespace SpaceCG.Extensions.Modbus
                 }
 
                 stopwatch.Restart();
-                foreach (ModbusIODevice device in ModbusDevices)
+                foreach (ModbusDevice device in ModbusDevices)
                 {
                     if (!IOThreadRunning) break;
 
@@ -200,45 +183,15 @@ namespace SpaceCG.Extensions.Modbus
             this.ElapsedMilliseconds = 0;
         }
 
-        /// <summary>
-        /// 解析 XML 协议格式
-        /// </summary>
-        /// <param name="element"></param>
-        /// <param name="transport"></param>
-        /// <returns></returns>
-        public static bool TryParse(XElement element, out ModbusTransport transport)
-        {
-            transport = null;
-            if (element?.Name.LocalName != XModbus || !element.HasElements) return false;
-
-            string modbusName = element.Attribute(nameof(Name))?.Value;
-            if (String.IsNullOrWhiteSpace(modbusName))
-            {
-                Logger.Warn($"({nameof(ModbusTransport)}) 配置格式存在错误, 属性 {nameof(Name)} 不能为空, {element}");
-                return false;
-            }
-
-            transport = new ModbusTransport(modbusName);
-            foreach (XElement deviceElement in element.Descendants(ModbusIODevice.XDevice))
-            {
-                if(ModbusIODevice.TryParse(deviceElement, out ModbusIODevice device))
-                {
-                    transport.ModbusDevices.Add(device);
-                }
-            }
-
-            return transport.ModbusDevices.Count > 0;
-        }
-
         /// <inheritdoc/>
         public void Dispose()
         {
-            StopTransport();
+            Stop();
             EventTimer.Dispose();
 
             if (ModbusDevices != null)
             {
-                foreach (ModbusIODevice device in ModbusDevices)
+                foreach (ModbusDevice device in ModbusDevices)
                     device.Dispose();
 
                 ModbusDevices.Clear();
@@ -248,14 +201,13 @@ namespace SpaceCG.Extensions.Modbus
             InputChangeEvent = null;
             OutputChangeEvent = null;
 
-            Master?.Dispose();
-            Master = null;
-
+            ModbusMaster?.Dispose();
+            ModbusMaster = null;
         }
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(ModbusTransport)}] {nameof(Name)}:{Name} {nameof(ModbusDevices)}:{ModbusDevices.Count}";
+            return $"[{nameof(ModbusSyncMaster)}] {nameof(Name)}:{Name} {nameof(ModbusDevices)}:{ModbusDevices.Count}";
         }
 
 

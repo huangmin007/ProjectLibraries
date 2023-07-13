@@ -39,7 +39,6 @@ namespace SpaceCG.Extensions.Modbus
         InputRegister,
     }
 
-
     /// <summary>
     /// 寄存器描述对象
     /// </summary>
@@ -70,12 +69,12 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// 寄存器名称
         /// </summary>
-        public String Name { get; set; } = null;
+        public string Name { get; set; } = null;
 
         /// <summary>
         /// 寄存器单位描述，暂时保留
         /// </summary>
-        public String Units { get; set; } = null;
+        public string Units { get; set; } = null;
 
         /// <summary>
         /// 字节顺序(Endianness)，低地址数据在后，高地址数据在前
@@ -136,29 +135,6 @@ namespace SpaceCG.Extensions.Modbus
         }
 
         /// <summary>
-        /// 创建 <see cref="Register"/> 对象
-        /// </summary>
-        /// <param name="address"></param>
-        /// <param name="type"></param>
-        /// <param name="count"></param>
-        /// <param name="isLittleEndian"></param>
-        /// <param name="offset"></param>
-        /// <param name="name"></param>
-        /// <param name="units"></param>
-        /// <param name="enabledChangeEvent"></param>
-        /// <returns></returns>
-        public static Register Create(ushort address, RegisterType type, byte count = 1, bool isLittleEndian = true, byte offset = 0, string name = null, string units = null, bool enabledChangeEvent = true)
-        {
-            Register register = new Register(address, type, count, isLittleEndian);
-            register.Name = name;
-            register.Units = units;
-            register.Offset = offset;
-            register.EnabledChangeEvent = enabledChangeEvent;
-
-            return register;
-        }
-
-        /// <summary>
         /// 解析 XML 协议格式
         /// </summary>
         /// <param name="element"></param>
@@ -174,8 +150,8 @@ namespace SpaceCG.Extensions.Modbus
                 return false;
             }
 
-            if (StringExtensions.ToNumber<ushort>(element.Attribute(nameof(Address))?.Value, out ushort address) &&
-                Enum.TryParse<RegisterType>(element.Attribute(nameof(Type))?.Value, true, out RegisterType type) && type != RegisterType.Unknown)
+            if (StringExtensions.ToNumber(element.Attribute(nameof(Address))?.Value, out ushort address) &&
+                Enum.TryParse(element.Attribute(nameof(Type))?.Value, true, out RegisterType type) && type != RegisterType.Unknown)
             {
                 bool result = byte.TryParse(element.Attribute(nameof(Count))?.Value, out byte count);
                 register = new Register(address, type, result ? count : (byte)0x01);
@@ -196,43 +172,31 @@ namespace SpaceCG.Extensions.Modbus
         }
     }
 
-
     /// <summary>
     /// Modbus Input/Output Device 对象
     /// </summary>
-    public class ModbusIODevice : IDisposable
+    public class ModbusDevice : IDisposable
     {
-        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusIODevice));
-
-        /// <summary> <see cref="XDevice"/> Name </summary>
-        public const string XDevice = "Device";
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(ModbusDevice));
 
         /// <summary>
         /// Read Only 寄存器数据 Change 处理
         /// <para>(ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        internal event Action<ModbusIODevice, Register> InputChangeHandler;
+        internal event Action<ModbusDevice, Register> InputChangeHandler;
         /// <summary>
         /// Read Write 寄存器数据 Change 处理
         /// <para>(ModbusIODevice ioDevice, Register register)</para>
         /// </summary>
-        internal event Action<ModbusIODevice, Register> OutputChangeHandler;
+        internal event Action<ModbusDevice, Register> OutputChangeHandler;
 
-        /// <summary>
-        /// 设备名称
-        /// </summary>
-        public String Name { get; private set; } = null;
-        /// <summary>
-        /// 设备地址
-        /// </summary>
+        /// <summary> 设备名称 </summary>
+        public String Name { get; set; }
+        /// <summary> 设备地址  </summary>
         public byte Address { get; private set; } = 0x01;
-        /// <summary>
-        /// 当前设备上的寄存器集合，用于描述寄存器及数据
-        /// </summary>
+        /// <summary> 当前设备上的寄存器集合，用于描述寄存器及数据  </summary>
         public List<Register> Registers { get; private set; } = new List<Register>(32);
-        /// <summary>
-        /// 寄存器数量
-        /// </summary>
+        /// <summary> 寄存器数量  </summary>
         internal int RegistersCount { get; private set; } = 0;
 
         /// <summary> 线圈状态，原始数据存储对象，数据类型为 bool 类型，RW-ReadWrite </summary>
@@ -264,14 +228,10 @@ namespace SpaceCG.Extensions.Modbus
         /// Modbus Input/Output Device 构造函数
         /// </summary>
         /// <param name="address"></param>
-        /// <param name="name"></param>
-        public ModbusIODevice(byte address, String name = null)
+        public ModbusDevice(byte address)
         {
-            this.Name = name;
             this.Address = address;
-
-            if (String.IsNullOrWhiteSpace(Name))
-                this.Name = String.Format("Device#{0:00}", this.Address);
+            this.Name = $"{nameof(ModbusDevice)}#{Address:00}";
         }
 
         /// <summary>
@@ -437,7 +397,7 @@ namespace SpaceCG.Extensions.Modbus
                         //if (Master?.Transport == null) break;
                         bool[] result = Master?.ReadCoils(Address, kv.Key, kv.Value);
                         if (result != null) UpdateRawRegisterValues(kv.Key, RegisterType.CoilsStatus, result);
-                        else break;                        
+                        else break;
                     }
                 }
                 catch (Exception ex)
@@ -522,7 +482,7 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         private void InitializeRegistersValues()
         {
-            foreach(Register register in Registers)
+            foreach (Register register in Registers)
             {
                 //CoilsStatus
                 if (register.Type == RegisterType.CoilsStatus && RawCoilsStatus.Count > 0)
@@ -576,7 +536,7 @@ namespace SpaceCG.Extensions.Modbus
         /// </summary>
         internal void SyncRegisterChangeEvents()
         {
-            foreach(Register register in Registers)
+            foreach (Register register in Registers)
             {
                 //CoilsStatus
                 if (register.Type == RegisterType.CoilsStatus && RawCoilsStatus.Count > 0)
@@ -587,11 +547,11 @@ namespace SpaceCG.Extensions.Modbus
                     {
                         register.LastValue = register.Value;
                         register.Value = value;
-                        if(register.EnabledChangeEvent) OutputChangeHandler?.Invoke(this, register);
+                        if (register.EnabledChangeEvent) OutputChangeHandler?.Invoke(this, register);
                     }
                 }
                 //DiscreteInput
-                else if(register.Type == RegisterType.DiscreteInput && RawDiscreteInputs.Count > 0)
+                else if (register.Type == RegisterType.DiscreteInput && RawDiscreteInputs.Count > 0)
                 {
                     long value = GetRegisterValue(RawDiscreteInputs, register);
                     if (register.Value != value)
@@ -622,7 +582,7 @@ namespace SpaceCG.Extensions.Modbus
                         register.Value = value;
                         if (register.EnabledChangeEvent) InputChangeHandler?.Invoke(this, register);
                     }
-                }                
+                }
             }
         }
 
@@ -653,7 +613,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"[{nameof(ModbusIODevice)}] {nameof(Name)}:{Name} {nameof(Address)}:0x{Address:X2}";
+            return $"[{nameof(ModbusDevice)}] {nameof(Name)}:{Name} {nameof(Address)}:0x{Address:X2}";
         }
 
         /// <summary>
@@ -662,43 +622,43 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="element"></param>
         /// <param name="device"></param>
         /// <returns></returns>
-        public static bool TryParse(XElement element, out ModbusIODevice device)
+        public static bool TryParse(XElement element, out ModbusDevice device)
         {
             device = null;
             if (element == null) return false;
-            if (element.Name != XDevice || String.IsNullOrWhiteSpace(element.Attribute(nameof(Address))?.Value))
+            if (element.Name.LocalName != nameof(ModbusDevice) || string.IsNullOrWhiteSpace(element.Attribute(nameof(Address))?.Value))
             {
-                Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element}");
+                Logger.Warn($"({nameof(ModbusDevice)}) 配置格式存在错误, {element}");
                 return false;
             }
-            if (!StringExtensions.ToNumber<byte>(element.Attribute(nameof(Address)).Value, out byte address))
+            if (!StringExtensions.ToNumber(element.Attribute(nameof(Address)).Value, out byte address))
             {
-                Logger.Warn($"({nameof(ModbusIODevice)}) 配置格式存在错误, {element} 节点属性 Address 值错误");
+                Logger.Warn($"({nameof(ModbusDevice)}) 配置格式存在错误, {element} 节点属性 Address 值错误");
                 return false;
             }
 
-            device = new ModbusIODevice(address, element.Attribute(nameof(Name))?.Value);
-            String[] attributes = new String[] { nameof(RegisterType.Unknown), $"{nameof(RegisterType.CoilsStatus)}Count", $"{nameof(RegisterType.DiscreteInput)}Count", $"{nameof(RegisterType.HoldingRegister)}Count", $"{nameof(RegisterType.InputRegister)}Count" };
+            device = new ModbusDevice(address);
+            device.Name = element.Attribute(nameof(Name))?.Value;
+            string[] attributes = new string[] { nameof(RegisterType.Unknown), $"{nameof(RegisterType.CoilsStatus)}Count", $"{nameof(RegisterType.DiscreteInput)}Count", $"{nameof(RegisterType.HoldingRegister)}Count", $"{nameof(RegisterType.InputRegister)}Count" };
             for (int i = 1; i < attributes.Length; i++)
             {
-                if (String.IsNullOrWhiteSpace(element.Attribute(attributes[i])?.Value)) continue;
+                if (string.IsNullOrWhiteSpace(element.Attribute(attributes[i])?.Value)) continue;
 
                 ushort[] args = null; //= new ushort[2] { 0, 0 }; //count|startAddress
-                StringExtensions.ToNumberArray<ushort>(element.Attribute(attributes[i]).Value, ref args, ',');
+                StringExtensions.ToNumberArray(element.Attribute(attributes[i]).Value, ref args, ',');
 
                 if (args?.Length == 0) continue;
 
                 ushort count = 0;
                 ushort startAddress = 0x0000;
-
                 if (args.Length == 1)
                 {
                     count = args[0];
                 }
                 else if (args.Length == 2)
                 {
-                    count = args[1];
                     startAddress = args[0];
+                    count = args[1];
                 }
                 else
                 {
@@ -706,20 +666,21 @@ namespace SpaceCG.Extensions.Modbus
                     continue;
                 }
 
+                RegisterType type = (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true);
                 for (ushort j = 0; j < count; j++, startAddress++)
                 {
-                    RegisterType type = (RegisterType)Enum.Parse(typeof(RegisterType), i.ToString(), true);
                     device.Registers.Add(new Register(startAddress, type));
                 }
             }
 
-            if (!element.HasElements) return true;
+            if (!element.HasElements) return device.Registers.Count > 0;
 
             //Registers
-            IEnumerable<XElement> regElements = element.Elements(nameof(Register));
-            foreach(var regElement in regElements)
+            IEnumerable<XElement> registerElements = element.Elements(nameof(Register));
+            foreach (XElement reggisterElement in registerElements)
             {
-                if (!Register.TryParse(regElement, out Register register)) device.Registers.Add(register);
+                if (!Register.TryParse(reggisterElement, out Register register))
+                    device.Registers.Add(register);
             }
 
             return device.Registers.Count > 0;
@@ -778,16 +739,16 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="description"></param>
         /// <returns></returns>
         internal static long GetRegisterValue(IReadOnlyDictionary<ushort, ushort> rawRegisters, Register description)
-        {            
+        {
             long longValue = (long)0;
             if (description.Count <= 0 || description.Count > 4) return longValue;
 
             int i = 0;
 
-            for (ushort address = description.Address; address < description.Address + description.Count; address++, i ++)
+            for (ushort address = description.Address; address < description.Address + description.Count; address++, i++)
             {
                 long value = rawRegisters.ContainsKey(address) ? rawRegisters[address] : (ushort)0x0000;
-                
+
                 //BitConverter
                 int bitOffset = description.IsLittleEndian ? i * 16 : (description.Count - 1 - i) * 16;
                 longValue |= (long)(value << bitOffset);
@@ -820,5 +781,4 @@ namespace SpaceCG.Extensions.Modbus
             return longValue;
         }
     }
-
 }

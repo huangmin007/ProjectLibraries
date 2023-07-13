@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Resources;
 using System.Text.RegularExpressions;
 using SpaceCG.Generic;
 
@@ -377,5 +378,30 @@ namespace SpaceCG.Extensions
             return args.ToArray();
         }
 
+#if false
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="hex"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="FormatException"></exception>
+        public static byte[] HexToBytes(this string hex)
+        {
+            if (string.IsNullOrWhiteSpace(hex))            
+                throw new ArgumentNullException(nameof(hex), "参数不能为空");
+
+            if (hex.Length % 2 != 0)            
+                throw new FormatException("格式错误");
+            
+            byte[] array = new byte[hex.Length / 2];
+            for (int i = 0; i < array.Length; i++)
+            {
+                array[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+            }
+
+            return array;
+        }
+#endif
     }
 }

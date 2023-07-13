@@ -76,10 +76,10 @@ namespace ModbusDevicesManagerServices
                 Logger.Error($"连接配置不存在");
                 return;
             }
-            IEnumerable<XElement> ModbusElements = Configuration.Descendants(ModbusTransport.XModbus);
+            IEnumerable<XElement> ModbusElements = Configuration.Descendants(ModbusSyncMaster.XModbus);
             if (Connections == null)
             {
-                Logger.Error($"{ModbusTransport.XModbus} 设备配置不存在");
+                Logger.Error($"{ModbusSyncMaster.XModbus} 设备配置不存在");
                 return;
             }
 

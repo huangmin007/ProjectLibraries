@@ -177,28 +177,37 @@ namespace SpaceCG.Generic
                     case ConnectionType.ModbusUdp:
                     case ConnectionType.ModbusTcpRtu:
                     case ConnectionType.ModbusUdpRtu:
+                        {
+                            //Devices
+                        }
                         break;
 
                     case ConnectionType.SerialPort:
-                        SerialPort serialPort = connectionObject as SerialPort;
-                        serialPort.DataReceived += SerialPort_DataReceived;
-                        ConnectionDataEvents.TryAdd($"{serialPort.PortName}_{serialPort.BaudRate}", dataEvents);
+                        {
+                            SerialPort serialPort = connectionObject as SerialPort;
+                            serialPort.DataReceived += SerialPort_DataReceived;
+                            ConnectionDataEvents.TryAdd($"{serialPort.PortName}_{serialPort.BaudRate}", dataEvents);
+                        }
                         break;
 
                     case ConnectionType.TcpClient:
                     case ConnectionType.UdpClient:
-                        IAsyncClient client = connectionObject as IAsyncClient;
-                        client.Name = name;
-                        client.DataReceived += Network_DataReceived;
-                        ConnectionDataEvents.TryAdd(client.Name, dataEvents);
+                        {
+                            IAsyncClient client = connectionObject as IAsyncClient;
+                            client.Name = name;
+                            client.DataReceived += Network_DataReceived;
+                            ConnectionDataEvents.TryAdd(client.Name, dataEvents);
+                        }
                         break;
 
                     case ConnectionType.TcpServer:
                     case ConnectionType.UdpServer:
-                        IAsyncServer server = connectionObject as IAsyncServer;
-                        server.Name = name;
-                        server.ClientDataReceived += Network_DataReceived;
-                        ConnectionDataEvents.TryAdd(server.Name, dataEvents);
+                        {
+                            IAsyncServer server = connectionObject as IAsyncServer;
+                            server.Name = name;
+                            server.ClientDataReceived += Network_DataReceived;
+                            ConnectionDataEvents.TryAdd(server.Name, dataEvents);
+                        }
                         break;
                 }
             }

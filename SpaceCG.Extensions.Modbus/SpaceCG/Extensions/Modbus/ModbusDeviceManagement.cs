@@ -146,48 +146,29 @@ namespace SpaceCG.Extensions.Modbus
                     Logger.Warn($"配置格式错误, 属性 {ReflectionController.XName} 不能为空, {modbusElement}");
                     continue;
                 }
-                
+
                 if (this.Controller.AccessObjects.ContainsKey(name))
                 {
                     Logger.Warn($"配置格式错误, 访问对象名称 {name} 已存在, {modbusElement}");
                     continue;
                 }
 
-                if (!ModbusTransport.TryParse(modbusElement, out ModbusTransport transport))
+                ModbusSyncMaster transport = new ModbusSyncMaster(null);
+                transport.Name = name;
+                if (!ConnectionManagement.CreateConnection(modbusElement, out object master))
                 {
-                    Logger.Warn($"解析/创建 传输总线 设备失败: {modbusElement}");
+                    transport.Dispose();
+                    Logger.Warn($"创建 {XModbus} 的连接对象失败 {modbusElement}");
                     continue;
-                }
-
-                object master = null;
-                string connectionName = modbusElement.Attribute(XConnectionName)?.Value;
-                if (!string.IsNullOrWhiteSpace(connectionName))
-                {
-                    if (this.Controller.AccessObjects.ContainsKey(connectionName))
-                        master = this.Controller.AccessObjects[connectionName];
-                    else
-                    {
-                        transport.Dispose();
-                        Logger.Warn($"{XModbus} 对象指定的连接 {XConnectionName} 对象 {name} 不存在, {modbusElement}");
-                        continue;
-                    }
-                }
-                else
-                {
-                    if (!ConnectionManagement.CreateConnection(modbusElement, out master))
-                    {
-                        transport.Dispose();
-                        Logger.Warn($"创建 {XModbus} 的连接对象失败 {modbusElement}");
-                        continue;
-                    }
                 }
 
                 if (master != null && typeof(IModbusMaster).IsAssignableFrom(master.GetType()))
                 {
+                    transport.ModbusMaster = master as IModbusMaster;
                     transport.InputChangeEvent += Transport_InputChangeEvent;
                     transport.OutputChangeEvent += Transport_OutputChangeEvent;
 
-                    transport.StartTransport(master as IModbusMaster);
+                    transport.Start();
                     Controller.AccessObjects.Add(transport.Name, transport);
                 }
                 else
@@ -208,7 +189,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="transportDevice"></param>
         /// <param name="ioDevice"></param>
         /// <param name="register"></param>
-        private void Transport_OutputChangeEvent(ModbusTransport transportDevice, ModbusIODevice ioDevice, Register register)
+        private void Transport_OutputChangeEvent(ModbusSyncMaster transportDevice, ModbusDevice ioDevice, Register register)
         {
             CallEventType(XOutputChanged, transportDevice.Name, ioDevice.Address, register);
         }
@@ -218,7 +199,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <param name="transportDevice"></param>
         /// <param name="ioDevice"></param>
         /// <param name="register"></param>
-        private void Transport_InputChangeEvent(ModbusTransport transportDevice, ModbusIODevice ioDevice, Register register)
+        private void Transport_InputChangeEvent(ModbusSyncMaster transportDevice, ModbusDevice ioDevice, Register register)
         {
             CallEventType(XInputChanged, transportDevice.Name, ioDevice.Address, register);
         }
@@ -342,7 +323,7 @@ namespace SpaceCG.Extensions.Modbus
                 if (string.IsNullOrWhiteSpace(name) || name == this.Name) continue;
                 if (!Controller.AccessObjects.ContainsKey(name)) continue;
 
-                ModbusTransport transport = Controller.AccessObjects[name] as ModbusTransport;
+                ModbusSyncMaster transport = Controller.AccessObjects[name] as ModbusSyncMaster;
                 if (transport == null)
                 {
                     Controller.AccessObjects.Remove(name);
@@ -351,7 +332,7 @@ namespace SpaceCG.Extensions.Modbus
 
                 try
                 {
-                    transport.StopTransport();
+                    transport.Stop();
                     transport.Dispose();
                 }
                 catch (Exception ex)
