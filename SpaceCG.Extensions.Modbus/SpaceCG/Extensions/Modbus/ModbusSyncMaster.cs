@@ -93,6 +93,11 @@ namespace SpaceCG.Extensions.Modbus
                 CancelToken = null;
             }
 
+            while (MethodQueues.TryDequeue(out ModbusMethod result))
+            {
+                ;
+            }
+
             DeviceCount = 0;
             IOThreadRunning = true;
             ElapsedMilliseconds = 0;
@@ -116,11 +121,6 @@ namespace SpaceCG.Extensions.Modbus
             IOThreadRunning = false;
             ElapsedMilliseconds = 0;
             EventTimer.Change(Timeout.Infinite, Timeout.Infinite);
-
-            while (MethodQueues.TryDequeue(out ModbusMethod result))
-            {
-                ;
-            }
             
             Thread.Sleep(32);
             Logger.Info($"传输总线 ({this}) 停止同步传输");

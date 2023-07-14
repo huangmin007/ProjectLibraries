@@ -42,7 +42,6 @@ namespace SpaceCG.Net
 
         /// <summary> <see cref="ModbusUdpRtu"/> 类型, Modbus UDP RTU 协议 </summary>
         ModbusUdpRtu,
-
     }
 
     /// <summary>

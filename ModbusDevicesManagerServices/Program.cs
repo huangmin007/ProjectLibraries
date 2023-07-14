@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Threading;
@@ -20,10 +21,16 @@ namespace ModbusDevicesManagerServices
         private static ReflectionController ControlInterface;
         
         private static string DefaultConfigFile = "ModbusDevices.Config";
-        private static string Title = "Modbus Device Manager Server v2.1.230703";
+        private static string Title = "Modbus Device Manager Server";
 
         static void Main(string[] args)
         {
+            ProcessModule processModule = Process.GetCurrentProcess().MainModule;
+            if (processModule != null && !string.IsNullOrWhiteSpace(processModule.FileVersionInfo.FileVersion)) 
+            {
+                Title = $"{Title} v{processModule.FileVersionInfo.FileVersion}";
+            }
+
             Console.Title = Title;
             Logger.Info($"{Title}");
             Logger.Info("串口名称列表：");
@@ -64,36 +71,19 @@ namespace ModbusDevicesManagerServices
             XmlReader reader = XmlReader.Create(configFile, settings);
             XElement Configuration = XElement.Load(reader, LoadOptions.None);
 
-            string modbusMName = Configuration.Attribute(nameof(ModbusDeviceManagement))?.Value;
-            if (string.IsNullOrWhiteSpace(modbusMName))
-            {
-                Logger.Error($"需要配置 {nameof(ModbusDeviceManagement)} 名称");
-                return;
-            }
+            ushort localPort = ushort.TryParse(Configuration.Attribute("LocalPort")?.Value, out ushort port) && port >= 1024 ? port : (ushort)2023;
+            if (ControlInterface == null)  ControlInterface = new ReflectionController(localPort);
+
             XElement Connections = Configuration.Element(ConnectionManagement.XConnections);
             if (Connections == null)
             {
                 Logger.Error($"连接配置不存在");
                 return;
             }
-            IEnumerable<XElement> ModbusElements = Configuration.Descendants(ModbusSyncMaster.XModbus);
-            if (Connections == null)
-            {
-                Logger.Error($"{ModbusSyncMaster.XModbus} 设备配置不存在");
-                return;
-            }
-
-            ushort localPort = ushort.TryParse(Configuration.Attribute("LocalPort")?.Value, out ushort port) && port >= 1024 ? port : (ushort)2023;
-            if(ControlInterface == null)
-                ControlInterface = new ReflectionController(localPort);
-
-            ConnectionManagement.Dispose();
-            ConnectionManagement.Instance.Configuration(ControlInterface, Connections.Attribute(ReflectionController.XName)?.Value);
-            ConnectionManagement.Instance.TryParseElements(Connections.Descendants(ConnectionManagement.XConnection));
-
-            ModbusDeviceManagement.Dispose();
-            ModbusDeviceManagement.Instance.Configuration(ControlInterface, modbusMName);
-            ModbusDeviceManagement.Instance.TryParseElements(ModbusElements);
+            
+            ConnectionManagement.Instance.Disconnections();
+            ConnectionManagement.Instance.ReflectionController = ControlInterface;
+            ConnectionManagement.Instance.TryParseConnectionConfiguration(Connections);
         }
         
         private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
@@ -133,8 +123,7 @@ namespace ModbusDevicesManagerServices
         {
             Running = false;
 
-            ConnectionManagement.Dispose();
-            ModbusDeviceManagement.Dispose();
+            ConnectionManagement.Instance.Disconnections();
             ControlInterface?.Dispose();
 
             Environment.Exit(0);
