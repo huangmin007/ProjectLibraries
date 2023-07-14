@@ -25,7 +25,7 @@ namespace SpaceCG.Extensions
 
             string XName = "Name";
             //获取有效的模板元素集合
-            var templates = from template in rootElement.Elements(templateXName)
+            var templates = from template in rootElement.Descendants(templateXName)
                             let tempName = template.Attribute(XName)?.Value
                             where !string.IsNullOrWhiteSpace(tempName)
                             where !(from refTemplate in template.Descendants(refTemplateXName)
