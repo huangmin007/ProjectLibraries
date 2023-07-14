@@ -45,6 +45,8 @@ namespace SpaceCG.Generic
         public const string XBytes = "Bytes";
         /// <summary> <see cref="XMessage"/> Name </summary>
         public const string XMessage = "Message";
+        /// <summary> <see cref="XValue"/> Name </summary>
+        public const string XValue = "Value";
         /// <summary> <see cref="XMinValue"/> Name </summary>
         public const string XMinValue = "MinValue";
         /// <summary> <see cref="XMaxValue"/> Name </summary>
@@ -289,7 +291,7 @@ namespace SpaceCG.Generic
                     if (!StringExtensions.ToNumber(evt.Attribute($"{register.Type}Address")?.Value, out ushort regAddress)) continue;
                     if (regAddress != register.Address) continue;
 
-                    if (StringExtensions.ToNumber(evt.Attribute(ReflectionController.XValue)?.Value, out long regValue) && regValue == register.Value)
+                    if (StringExtensions.ToNumber(evt.Attribute(XValue)?.Value, out long regValue) && regValue == register.Value)
                     {
                         if (Logger.IsInfoEnabled)
                             Logger.Info($"{eventType} {connectionName} > 0x{deviceAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");

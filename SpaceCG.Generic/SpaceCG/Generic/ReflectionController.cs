@@ -106,7 +106,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 网络访问接口服务对象
         /// </summary>
-        private Dictionary<String, IDisposable> NetworkServices = new Dictionary<String, IDisposable>(8);
+        private Dictionary<String, IConnection> NetworkServices = new Dictionary<String, IConnection>(8);
 
         /// <summary>
         /// 组合访问消息的集合，调用方式 <see cref="CallMessageGroup(int)"/>
@@ -252,6 +252,27 @@ namespace SpaceCG.Generic
 
             NetworkServices?.Clear();
         }
+
+        /// <summary>
+        /// 向所有连接对象发送字节数据
+        /// </summary>
+        /// <param name="bytes"></param>
+        /// <returns></returns>
+        public bool SendBytes(byte[] bytes)
+        {
+            if (bytes?.Length <= 0) return false;
+            foreach(IConnection connection in NetworkServices.Values)
+            {
+                if(connection.IsConnected) connection.SendBytes(bytes);
+            }
+            return true;
+        }
+        /// <summary>
+        /// 向所有连接对象发送消息
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
 
         /// <summary>
         /// On Client Disconnected Event Handler
