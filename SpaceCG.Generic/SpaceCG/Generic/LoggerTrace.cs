@@ -71,6 +71,7 @@ namespace SpaceCG.Generic
             TextFileListener.WriteLine(Environment.NewLine);
 
             ConsoleListener = new TextFileStreamTraceListener(Console.Out, "ConsoleTrace");
+            ConsoleListener.UseConsoleColored = true;
             ConsoleListener.Filter = new EventTypeFilter(SourceLevels.All);
             ConsoleListener.TraceSourceEvent += (s, e) => ConsoleTraceEvent?.Invoke(s, e);
 
@@ -112,6 +113,10 @@ namespace SpaceCG.Generic
 
             ConsoleListener.Flush();
             TextFileListener.Flush();
+
+            ConsoleListener.Dispose();
+            TextFileListener.Dispose();
+            AppDomain.CurrentDomain.ProcessExit -= CurrentDomain_ProcessExit;
         }
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
@@ -128,6 +133,7 @@ namespace SpaceCG.Generic
 
             if (e.IsTerminating)
             {
+                AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_UnhandledException;
                 AppDomain.CurrentDomain.FirstChanceException -= CurrentDomain_FirstChanceException;
                 Environment.Exit(System.Runtime.InteropServices.Marshal.GetHRForException((Exception)e.ExceptionObject));
             }
@@ -400,6 +406,11 @@ namespace SpaceCG.Generic
         /// </summary>
         public event EventHandler<TraceEventArgs> TraceSourceEvent;
 
+        /// <summary>
+        /// 使用控制台颜色区分
+        /// </summary>
+        public bool UseConsoleColored { get; set; } = false;
+
         #region Constructors
         /// <inheritdoc/>
         public TextFileStreamTraceListener(Stream stream) : base(stream)
@@ -433,7 +444,7 @@ namespace SpaceCG.Generic
         /// <param name="eventType"></param>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected static ConsoleColor GetConsoleColor(TraceEventType eventType)
+        public static ConsoleColor GetConsoleColor(TraceEventType eventType)
         {
             return eventType == TraceEventType.Verbose ? ConsoleColor.Green :
                 eventType == TraceEventType.Information ? ConsoleColor.Gray :
@@ -473,30 +484,22 @@ namespace SpaceCG.Generic
         {
             if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, message, null, null, null))
             {
-                Console.ForegroundColor = GetConsoleColor(eventType);
+                if(UseConsoleColored) Console.ForegroundColor = GetConsoleColor(eventType);
 
                 WriteHeader(source, eventType, id);
                 WriteMessage(message);
                 WriteFooter(eventCache);
 
-                Console.ResetColor();
+                if (UseConsoleColored) Console.ResetColor();
                 TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, null));
             }
         }
         /// <inheritdoc/>
-        public override void TraceEvent(TraceEventCache eventCache, string source, TraceEventType eventType, int id, string format, params object[] args)
+        public override void TraceEvent(TraceEventCache eventCache, string source, TraceEventType eventType, int id, string format, params object[] args) 
         {
             if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, format, args, null, null))
             {
-                Console.ForegroundColor = GetConsoleColor(eventType);
-                string message = args.Length <= 0 ? format : string.Format(format, args);
-
-                WriteHeader(source, eventType, id);
-                WriteMessage(message);
-                WriteFooter(eventCache);
-
-                Console.ResetColor();
-                TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, null));
+                TraceEvent(eventCache, source, eventType, id, args.Length <= 0 ? format : string.Format(format, args));
             }
         }
 
@@ -505,39 +508,33 @@ namespace SpaceCG.Generic
         {
             if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, null, null, data, null))
             {
-                Console.ForegroundColor = GetConsoleColor(eventType);
+                if (UseConsoleColored) Console.ForegroundColor = GetConsoleColor(eventType);
                 string message = data != null ? data.ToString() : string.Empty;
 
                 WriteHeader(source, eventType, id);
                 WriteMessage(message);
                 WriteFooter(eventCache);
 
-                Console.ResetColor();
+                if (UseConsoleColored) Console.ResetColor();
                 TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, message, new object[] { data }));
             }
         }
         /// <inheritdoc/>
         public override void TraceData(TraceEventCache eventCache, string source, TraceEventType eventType, int id, params object[] data)
         {
-            if (Filter != null && !Filter.ShouldTrace(eventCache, source, eventType, id, null, null, null, data)) return;
-
-            Console.ForegroundColor = GetConsoleColor(eventType);
-            StringBuilder messageBuilder = new StringBuilder();
-            if (data.Length > 0)
+            if (Filter == null || Filter.ShouldTrace(eventCache, source, eventType, id, null, null, null, data))
             {
-                for (int i = 0; i < data.Length; i++)
+                StringBuilder messageBuilder = new StringBuilder();
+                if (data.Length > 0)
                 {
-                    if (i != 0) messageBuilder.Append(", ");
-                    if (data[i] != null) messageBuilder.Append(data[i].ToString());
+                    for (int i = 0; i < data.Length; i++)
+                    {
+                        if (i != 0) messageBuilder.Append(", ");
+                        if (data[i] != null) messageBuilder.Append(data[i].ToString());
+                    }
                 }
+                TraceData(eventCache, source, eventType, id, messageBuilder.ToString());
             }
-
-            WriteHeader(source, eventType, id);
-            WriteMessage(messageBuilder.ToString());
-            WriteFooter(eventCache);
-
-            Console.ResetColor();
-            TraceSourceEventInvoke(new TraceEventArgs(eventType, source, id, messageBuilder.ToString(), data));
         }
 
         #region Protected Write Header/Message/Footer
@@ -690,7 +687,7 @@ namespace SpaceCG.Generic
                 File.Move(sourceFileName, destFileName);
                 FileExtensions.ReserveFileDays(30, curLogFile.DirectoryName, $"{headName}*{curLogFile.Extension}");
 
-#if false
+#if true
                 //解决过 24点 后文件名上的日期问题，但无法彻底解决，因为父类的属性 fileName 是私有的, 得继承 TraceListener 重写才可行
                 Encoding encoding = new UTF8Encoding(false);
                 encoding.EncoderFallback = EncoderFallback.ReplacementFallback;

@@ -378,7 +378,7 @@ namespace SpaceCG.Extensions
             return args.ToArray();
         }
 
-#if false
+#if true
         /// <summary>
         /// 
         /// </summary>
@@ -386,11 +386,11 @@ namespace SpaceCG.Extensions
         /// <returns></returns>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="FormatException"></exception>
-        public static byte[] HexToBytes(this string hex)
+        public static byte[] FromHexString(this string hex)
         {
             if (string.IsNullOrWhiteSpace(hex))            
                 throw new ArgumentNullException(nameof(hex), "参数不能为空");
-
+            
             if (hex.Length % 2 != 0)            
                 throw new FormatException("格式错误");
             

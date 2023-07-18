@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -76,7 +77,9 @@ namespace Test2
             object boo = TypeDescriptor.GetConverter(typeof(bool)).ConvertFrom("True");
             Console.WriteLine(boo);
 
-            StringExtensions.ToNumber<Double>("1280", out double number);
+            StringExtensions.ToNumber("1280", out double number);
+            Console.WriteLine(Console.Out);
+            Console.WriteLine(Console.Out is TextWriter);
         }
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)

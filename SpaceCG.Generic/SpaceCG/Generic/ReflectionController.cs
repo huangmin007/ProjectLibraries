@@ -176,9 +176,8 @@ namespace SpaceCG.Generic
         /// //网络消息返回格式
         /// &lt;Return Result="True/False" Value="value" /&gt;
         /// </code>
-        /// <param name="localPort">是否启用网络服务访问，小于 1024 则不启动服务接口</param>
         /// </summary>
-        public ReflectionController(ushort localPort = 2023)
+        public ReflectionController()
         {
             syncContext = SynchronizationContext.Current;
             if (syncContext == null)
@@ -186,7 +185,23 @@ namespace SpaceCG.Generic
                 Logger.Warn($"当前线程的同步上下文为空，重新创建 SynchronizationContext");
                 syncContext = new SynchronizationContext();
             }
-            
+        }
+
+        /// <summary>
+        /// 应用程序反射控制接口, 用于网络、键盘、代码、配置、或是其它方式的反射控制访问对象的方法或属性
+        /// <code>//消息协议 (XML) 示例：
+        /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" /&gt;              //跟据调用的 Method 决定 Params 可选属性值
+        /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" Sync="True" /&gt;  //可选属性 Sync 是指同步执行还是异步执行
+        /// &lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="False" Sync="True"/&gt; //可选属性 Return 只针对网络消息有效
+        /// &lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="True" Sync="False"/&gt; //如果属性 Value 不存在，则表示获取属性的值
+        /// &lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt;       //特殊格式，同时修改对象的多个属性值
+        /// //网络消息返回格式
+        /// &lt;Return Result="True/False" Value="value" /&gt;
+        /// </code>
+        /// <param name="localPort">是否启用网络服务访问，小于 1024 则不启动服务接口</param>
+        /// </summary>
+        public ReflectionController(ushort localPort):this()
+        {           
             InstallNetworkService(localPort);
         }
 
@@ -197,7 +212,7 @@ namespace SpaceCG.Generic
         /// <param name="port">端口不得小于 1024 否则返回 false</param>
         /// <param name="address"></param>
         /// <returns></returns>
-        public bool InstallNetworkService(ushort port, String address = null)
+        protected bool InstallNetworkService(ushort port, String address = null)
         {
             if (port <= 1024) return false;
 
@@ -236,7 +251,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 卸载所有网络服务接口
         /// </summary>
-        public void UninstallNetworkServices()
+        protected void UninstallNetworkServices()
         {
             if (NetworkServices == null || NetworkServices.Count() == 0) return;
 
@@ -258,6 +273,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="bytes"></param>
         /// <returns></returns>
+        [Obsolete("弃用", true)]
         public bool SendBytes(byte[] bytes)
         {
             if (bytes?.Length <= 0) return false;
@@ -272,6 +288,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
+        [Obsolete("弃用", true)]
         public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
 
         /// <summary>

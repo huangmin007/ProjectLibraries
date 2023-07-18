@@ -92,11 +92,9 @@ namespace SpaceCG.Extensions.Modbus
                 CancelToken.Dispose();
                 CancelToken = null;
             }
-
-            while (MethodQueues.TryDequeue(out ModbusMethod result))
-            {
-                ;
-            }
+            MethodQueues.Clear();
+            //while (MethodQueues.TryDequeue(out ModbusMethod result))
+            //{;}
 
             DeviceCount = 0;
             IOThreadRunning = true;
@@ -159,11 +157,9 @@ namespace SpaceCG.Extensions.Modbus
                 //全部重新初使化一次
                 if(DeviceCount !=  ModbusDevices.Count) 
                 {
-                    while (MethodQueues.TryDequeue(out ModbusMethod result))
-                    {
-                        ;
-                    }
-
+                    MethodQueues.Clear();
+                    //while (MethodQueues.TryDequeue(out ModbusMethod result))
+                    //{; }
                     foreach (var device in ModbusDevices)
                     {
                         device.InputChangeHandler -= ModbusDevice_InputChangeHandler;

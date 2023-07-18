@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -65,6 +66,7 @@ namespace SpaceCG.Extensions.Modbus
         /// <summary>
         /// Modbus Write 方法参数队列
         /// </summary>
+        //private Queue<ModbusMethod> MethodQueues = new Queue<ModbusMethod>();
         private ConcurrentQueue<ModbusMethod> MethodQueues = new ConcurrentQueue<ModbusMethod>();
 
         /// <summary>
@@ -324,6 +326,8 @@ namespace SpaceCG.Extensions.Modbus
         private void SyncOutputMethodQueues()
         {
             if (MethodQueues.Count() <= 0 || !IOThreadRunning || ModbusMaster?.Transport == null) return;
+            //if (MethodQueues.Count <= 0) return;
+            //ModbusMethod method = MethodQueues.Dequeue();
             if (!MethodQueues.TryDequeue(out ModbusMethod method)) return;
 
             if (method.Name == "Sleep")

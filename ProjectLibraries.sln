@@ -22,6 +22,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModbusDevicesManagerService
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceCG.Extensions.NETFramework", "SpaceCG.Extensions.NETFramework\SpaceCG.Extensions.NETFramework.csproj", "{72EAED11-5DEE-4EF6-A93F-6E70204A732B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test.ConsoleApp.NET", "Test.ConsoleApp.NET\Test.ConsoleApp.NET.csproj", "{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -112,6 +114,18 @@ Global
 		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Release|x64.Build.0 = Release|Any CPU
 		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Release|x86.ActiveCfg = Release|Any CPU
 		{72EAED11-5DEE-4EF6-A93F-6E70204A732B}.Release|x86.Build.0 = Release|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Debug|x64.Build.0 = Debug|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Debug|x86.Build.0 = Debug|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Release|x64.ActiveCfg = Release|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Release|x64.Build.0 = Release|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Release|x86.ActiveCfg = Release|Any CPU
+		{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
