@@ -415,6 +415,7 @@ namespace SpaceCG.Generic
         /// </summary>
         public void Disconnections()
         {
+            if (!string.IsNullOrWhiteSpace(Name) && ReflectionController.AccessObjects.ContainsKey(Name)) ReflectionController.AccessObjects.Remove(Name);
             if (ReflectionController == null || ConnectionElements == null || ConnectionElements.Count() <= 0) return;
 
             CallEventType(XDisposed);
@@ -422,7 +423,6 @@ namespace SpaceCG.Generic
 
             ConnectionDataEvents?.Clear();
             Instance.ConnectionDataEvents.Clear();
-            ReflectionController.AccessObjects.Remove(Name);
 
             Type DisposableType = typeof(IDisposable);
             foreach (XElement connection in ConnectionElements)
