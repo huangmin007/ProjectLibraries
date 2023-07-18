@@ -277,7 +277,7 @@ namespace SpaceCG.Extensions
         /// <param name="parameters"></param>
         private static void MoveOutMethodInfo(ref List<MethodInfo> methods, object[] parameters)
         {
-            if (methods?.Count <= 1) return;
+            if (methods?.Count <= 1 || parameters?.Length <= 0) return;
 
             for (int i = 0; i < methods.Count; i++)
             {
@@ -404,18 +404,17 @@ namespace SpaceCG.Extensions
             if (instanceObj == null || string.IsNullOrWhiteSpace(methodName)) return false;
 
             Type type = instanceObj.GetType();
-            int paramLength = parameters == null ? 0 : parameters.Length;
+            int paramsLength = parameters == null ? 0 : parameters.Length;
             List<MethodInfo> methods = (from method in type.GetMethods()
-                                        where method.Name == methodName
-                                        where method.GetParameters().Length == paramLength
-                                        select method)?.ToList();
+                                        where method.Name == methodName && method.GetParameters().Length == paramsLength
+                                        select method).ToList();
 
             MoveOutMethodInfo(ref methods, parameters);
             int methodCount = methods == null ? 0 : methods.Count();
 
             if (methodCount != 1)
             {
-                Logger.Info($"在实例对象 {type.Name} 中，找到匹配的函数 {methodName}/{paramLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
+                Logger.Info($"在实例对象 {type.Name} 中，找到匹配的函数 {methodName}/{paramsLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
                 return CallInstanceExtensionMethod(instanceObj, methodName, parameters, out returnValue);
             }
 
@@ -440,7 +439,7 @@ namespace SpaceCG.Extensions
 
             Type instanceType = instanceObj.GetType();
             Type extensionType = typeof(ExtensionAttribute);
-            int paramsLength = parameters == null ? 1 : parameters.Length + 1;
+            int paramsLength = (parameters == null ? 0 : parameters.Length) + 1;
 
             List<MethodInfo> methods = (from assembly in AppDomain.CurrentDomain.GetAssemblies()
                                         where !assembly.GlobalAssemblyCache
@@ -473,18 +472,17 @@ namespace SpaceCG.Extensions
         /// <param name="parameters"></param>
         /// <param name="returnValue">函数的返回值</param>
         /// <returns>方法调用成功返回 true, 否则返回 false</returns>
-        public static bool CallClassStaticMethod(String classFullName, string methodName, object[] parameters, out object returnValue)
+        public static bool CallClassStaticMethod(string classFullName, string methodName, object[] parameters, out object returnValue)
         {
             returnValue = null;
             if (string.IsNullOrWhiteSpace(classFullName) || string.IsNullOrWhiteSpace(methodName)) return false;
 
+            int paramsLength = parameters == null ? 0 : parameters.Length;
             List<MethodInfo> methods = (from assembly in AppDomain.CurrentDomain.GetAssemblies()
                                         let type = assembly.GetType(classFullName)
                                         where type != null
                                         from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                        where method.Name == methodName && method.GetParameters().Length == parameters.Length
-                                        from paramInfo in method.GetParameters()
-                                        where paramInfo.ParameterType.IsValueType || paramInfo.ParameterType.IsArray || paramInfo.ParameterType.IsEnum
+                                        where method.Name == methodName && method.GetParameters().Length == paramsLength
                                         select method).ToList();
 
             MoveOutMethodInfo(ref methods, parameters);
