@@ -424,7 +424,8 @@ namespace SpaceCG.Extensions
 
 
         /// <summary>
-        /// 动态调用 对象扩展 的方法
+        /// 动态调用 对象扩展 的方法 (非嵌套的、非泛型静态类内部定义的)
+        /// <para>参考：https://learn.microsoft.com/zh-cn/dotnet/csharp/programming-guide/classes-and-structs/extension-methods </para>
         /// <para>按顺序查找方法：(实例)扩展方法 </para>
         /// </summary>
         /// <param name="instanceObj"></param>
@@ -437,10 +438,18 @@ namespace SpaceCG.Extensions
             returnValue = null;
             if (instanceObj == null || string.IsNullOrWhiteSpace(methodName)) return false;
 
-            List<MethodInfo> methods = (from type in typeof(InstanceExtensions).Assembly.GetTypes()
-                                        where type.IsSealed && !type.IsGenericType && !type.IsNested
-                                        from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                                        where method.Name == methodName && method.IsDefined(typeof(ExtensionAttribute), false) && method.GetParameters()[0].ParameterType == instanceObj.GetType()
+            Type instanceType = instanceObj.GetType();
+            Type extensionType = typeof(ExtensionAttribute);
+            int paramsLength = parameters == null ? 1 : parameters.Length + 1;
+
+            List<MethodInfo> methods = (from assembly in AppDomain.CurrentDomain.GetAssemblies()
+                                        where !assembly.GlobalAssemblyCache
+                                        from type in assembly.GetExportedTypes()
+                                        where (type.IsSealed && !type.IsGenericType && !type.IsNested) && type.IsAbstract
+                                        from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly)
+                                        where method.Name == methodName && method.IsDefined(extensionType, false)
+                                        let methodParams = method.GetParameters()
+                                        where methodParams?.Length == paramsLength && methodParams[0].ParameterType == instanceType
                                         select method).ToList();
 
             MoveOutMethodInfo(ref methods, parameters);
@@ -448,7 +457,7 @@ namespace SpaceCG.Extensions
 
             if (methodCount != 1)
             {
-                Logger.Warn($"在实例对象 {instanceObj.GetType().Name} 中，找到匹配的扩展函数 {methodName} 有 {methodCount} 个，取消执行");
+                Logger.Warn($"在实例对象 {instanceType.Name} 中，找到匹配的扩展函数 {methodName} 有 {methodCount} 个，取消执行");
                 return false;
             }
 
