@@ -43,6 +43,8 @@ namespace Test2
 
         ReflectionController controller;
 
+        InputHook inputHook;
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             //controller = new ReflectionController(2023);
@@ -80,6 +82,14 @@ namespace Test2
             StringExtensions.ToNumber("1280", out double number);
             Console.WriteLine(Console.Out);
             Console.WriteLine(Console.Out is TextWriter);
+
+            inputHook = new InputHook();
+            inputHook.KeydbEvent += InputHook_KeydbEvent;
+        }
+
+        private void InputHook_KeydbEvent(KEYBDDATA e)
+        {
+            Console.WriteLine($"KeyboardEvent::{e.dwFlags}:{e.wVk}");
         }
 
         private void Button_btn_Click(object sender, RoutedEventArgs e)

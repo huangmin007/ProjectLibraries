@@ -526,7 +526,7 @@ namespace SpaceCG.Generic
                     try
                     {
                         object[] otherArgs = new object[args.Length - 2];
-                        for (int i = 2; i < args.Length; i++) otherArgs[i] = args[i];
+                        for (int i = 0; i < otherArgs.Length; i++) otherArgs[i] = args[i + 2];
 
                         NModbus4SerialPortAdapter serialPortAdapter = new NModbus4SerialPortAdapter(args[0].ToString(), portOrRate, otherArgs);
                         IModbusMaster master = ModbusSerialMaster.CreateRtu(serialPortAdapter);
