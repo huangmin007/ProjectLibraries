@@ -75,7 +75,7 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="localIPAddress"></param>
         /// <param name="listenPort"></param>
-        public AsyncUdpServer(String localIPAddress, ushort listenPort) : this(IPAddress.Parse(localIPAddress), listenPort)
+        public AsyncUdpServer(string localIPAddress, ushort listenPort) : this(IPAddress.Parse(localIPAddress), listenPort)
         {
         }
 
@@ -85,7 +85,7 @@ namespace SpaceCG.Net
             if (IsListening) return true;
 
             udpClient?.Dispose();
-            udpClient = new UdpClient();
+            udpClient = new UdpClient(localEndPoint);
             udpClient.EnableBroadcast = true;
 
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
