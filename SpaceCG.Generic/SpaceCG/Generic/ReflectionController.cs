@@ -106,7 +106,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 网络访问接口服务对象
         /// </summary>
-        private Dictionary<String, IConnection> NetworkServices = new Dictionary<String, IConnection>(8);
+        private Dictionary<string, IConnection> NetworkServices = new Dictionary<string, IConnection>(8);
 
         /// <summary>
         /// 组合访问消息的集合，调用方式 <see cref="CallMessageGroup(int)"/>
@@ -119,19 +119,19 @@ namespace SpaceCG.Generic
         /// 可控制、访问的对象集合，就是可以通过反射技术访问的对象集合
         /// <para>值键对 &lt;name, object&gt; name 表示唯一的对象名称</para>
         /// </summary>
-        public Dictionary<String, Object> AccessObjects { get; private set; } = new Dictionary<String, Object>(16);
+        public Dictionary<string, object> AccessObjects { get; private set; } = new Dictionary<string, object>(16);
 
         /// <summary>
         /// 可控制、访问的对象的方法过滤集合，指定对象的方法不在访问范围内；字符格式为：objectName.methodName, objectName 支持通配符 '*'
         /// <para>例如："*.Dispose" 禁止反射访问所有对象的 Dispose 方法，默认已添加</para>
         /// </summary>
-        public List<String> MethodFilters { get; } = new List<String>(16) { "*.Dispose" };
+        public List<string> MethodFilters { get; } = new List<string>(16) { "*.Dispose" };
 
         /// <summary>
         /// 可控制、访问的对象的属性过滤集合，指定对象的属性不在访问范围内；字符格式为：objectName.propertyName, objectName 支持通配符 '*'
         /// <para>例如："*.Name" 禁止反射访问所有对象的 Name 属性，默认已添加</para>
         /// </summary>
-        public List<String> PropertyFilters { get; } = new List<String>(16) { "*.Name" };
+        public List<string> PropertyFilters { get; } = new List<string>(16) { "*.Name" };
         
         /// <summary>
         /// 默认情况下, 使用同步上下文执行控制或是访问对象, 默认为 true
@@ -212,19 +212,19 @@ namespace SpaceCG.Generic
         /// <param name="port">端口不得小于 1024 否则返回 false</param>
         /// <param name="address"></param>
         /// <returns></returns>
-        protected bool InstallNetworkService(ushort port, String address = null)
+        public bool InstallNetworkService(ushort port, string address = null)
         {
             if (port <= 1024) return false;
 
             try
             {
-                if (!String.IsNullOrWhiteSpace(address) && IPAddress.TryParse(address, out IPAddress ipAddress) && ipAddress.ToString() != "0.0.0.0")
+                if (!string.IsNullOrWhiteSpace(address) && IPAddress.TryParse(address, out IPAddress ipAddress) && ipAddress.ToString() != "0.0.0.0")
                 {
                     IAsyncClient Client = new AsyncTcpClient();
                     if (Client.Connect(ipAddress, port) && !NetworkServices.ContainsKey($"{ipAddress}:{port}"))
                     {
-                        Client.DataReceived += Network_DataReceived;
                         Client.Disconnected += Client_Disconnected;
+                        Client.DataReceived += Network_DataReceived;
                         NetworkServices.Add($"{ipAddress}:{port}", Client);
                         return true;
                     }
@@ -251,9 +251,9 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 卸载所有网络服务接口
         /// </summary>
-        protected void UninstallNetworkServices()
+        public void UninstallNetworkServices()
         {
-            if (NetworkServices == null || NetworkServices.Count() == 0) return;
+            if (NetworkServices?.Count() == 0) return;
 
             Type disposeableType = typeof(IDisposable);
             foreach (var obj in NetworkServices)
@@ -273,7 +273,6 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="bytes"></param>
         /// <returns></returns>
-        [Obsolete("弃用", true)]
         public bool SendBytes(byte[] bytes)
         {
             if (bytes?.Length <= 0) return false;
@@ -288,7 +287,6 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        [Obsolete("弃用", true)]
         public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
 
         /// <summary>
