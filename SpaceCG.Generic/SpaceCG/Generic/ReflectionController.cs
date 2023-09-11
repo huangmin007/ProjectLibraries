@@ -313,8 +313,12 @@ namespace SpaceCG.Generic
         private void Network_DataReceived(object sender, AsyncDataEventArgs e)
         {
             MessageEventArgs eventArgs = new MessageEventArgs(sender, e.EndPoint, e.Bytes);
-            NetworkMessage?.Invoke(this, eventArgs);
-            if (!eventArgs.Handled) return;
+            
+            if(NetworkMessage != null)
+            {
+                NetworkMessage.Invoke(this, eventArgs);
+                if (eventArgs.Handled) return;
+            }
 
             if (eventArgs.Action == null)
             {
