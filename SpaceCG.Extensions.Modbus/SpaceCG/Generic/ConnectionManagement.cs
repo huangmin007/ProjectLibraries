@@ -243,7 +243,7 @@ namespace SpaceCG.Generic
                                            where evt.Attribute(ReflectionController.XType)?.Value == eventType
                                            select evt;
 
-            ReflectionController.TryParseControlMessage(events.Elements());
+            ReflectionController.TryParseControlMessages(events.Elements());
         }
         /// <summary>
         /// 在所有连接配置中，跟据连接名称, 事件类型调用事件集合
@@ -260,7 +260,7 @@ namespace SpaceCG.Generic
                                            where evt.Attribute(ReflectionController.XType)?.Value == eventType
                                            select evt;
 
-            ReflectionController.TryParseControlMessage(events.Elements());
+            ReflectionController.TryParseControlMessages(events.Elements());
         }
         /// <summary>
         /// 在所有连接配置中，跟据连接名称、事件类型和其它多个参数调用事件集合
@@ -296,7 +296,7 @@ namespace SpaceCG.Generic
                         if (Logger.IsInfoEnabled)
                             Logger.Info($"{eventType} {connectionName} > 0x{deviceAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
-                        ReflectionController.TryParseControlMessage(evt.Elements());
+                        ReflectionController.TryParseControlMessages(evt.Elements());
                         continue;
                     }
                     else if (StringExtensions.ToNumber(evt.Attribute(XMinValue)?.Value, out long minValue) && StringExtensions.ToNumber(evt.Attribute(XMaxValue)?.Value, out long maxValue))
@@ -306,7 +306,7 @@ namespace SpaceCG.Generic
                             if (Logger.IsInfoEnabled)
                                 Logger.Info($"{eventType} {connectionName} > 0x{deviceAddress:X2} > #{register.Address:X4} > {register.Type} > {register.Value}");
 
-                            ReflectionController.TryParseControlMessage(evt.Elements());
+                            ReflectionController.TryParseControlMessages(evt.Elements());
                         }
                     }
                 }//End for                
@@ -328,7 +328,7 @@ namespace SpaceCG.Generic
                     if ((dataEvent.Bytes != null && bytes.SequenceEqual(dataEvent.Bytes)) ||
                         (dataEvent.Message != null && bytes.SequenceEqual(dataEvent.Message)))
                     {
-                        this.ReflectionController.TryParseControlMessage(dataEvent.Actions);
+                        this.ReflectionController.TryParseControlMessages(dataEvent.Actions);
                     }
                 }
             }
@@ -351,7 +351,7 @@ namespace SpaceCG.Generic
                                            where evt.Attribute(ReflectionController.XName)?.Value == eventName
                                            select evt;
 
-            ReflectionController.TryParseControlMessage(events.Elements());
+            ReflectionController.TryParseControlMessages(events.Elements());
         }
         /// <summary>
         /// 在所有连接配置中，跟据连接名称和事件名称调用事件集合
@@ -368,7 +368,7 @@ namespace SpaceCG.Generic
                                            where evt.Attribute(ReflectionController.XName)?.Value == eventName
                                            select evt;
 
-            ReflectionController.TryParseControlMessage(events.Elements());
+            ReflectionController.TryParseControlMessages(events.Elements());
         }
 
         /// <summary>

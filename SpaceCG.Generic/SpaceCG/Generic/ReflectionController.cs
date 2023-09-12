@@ -56,7 +56,7 @@ namespace SpaceCG.Generic
     }
 
     /// <summary>
-    /// 应用程序反射控制接口, 用于网络、键盘、代码、配置、或是其它方式的反射控制访问对象的方法或属性
+    /// (RPC协议的实现)应用程序反射控制接口, 用于网络、键盘、代码、配置、或是其它方式的反射控制访问对象的方法或属性
     /// <code>//消息协议 (XML) 示例：
     /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" /&gt;              //跟据调用的 Method 决定 Params 可选属性值
     /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" Sync="True" /&gt;  //可选属性 Sync 是指同步执行还是异步执行
@@ -352,7 +352,7 @@ namespace SpaceCG.Generic
 
             if (MessageGroups.TryGetValue(keyValue, out IEnumerable<XElement> messages))
             {
-                this.TryParseControlMessage(messages);
+                this.TryParseControlMessages(messages);
             }
         }
         /// <summary>
@@ -386,20 +386,44 @@ namespace SpaceCG.Generic
         }
 
         /// <summary>
-        /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
+        /// 调用远程方法
         /// </summary>
-        /// <param name="actionElement"></param>
-        public void TryParseControlMessage(XElement actionElement) => TryParseControlMessage(actionElement, null);
-        /// <summary>
-        /// 试图解析多个 xml 格式消息的集合, 在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
-        /// </summary>
-        /// <param name="actionElements"></param>
-        public void TryParseControlMessage(IEnumerable<XElement> actionElements)
+        /// <param name="targetObject"></param>
+        /// <param name="methodName"></param>
+        /// <param name="args"></param>
+        /// <exception cref="ArgumentNullException"></exception>
+        public void CallRemoteMethod(string targetObject, string methodName, params string[] args)
         {
-            if (actionElements == null || actionElements.Count() <= 0) return;
+            if (string.IsNullOrWhiteSpace(targetObject) || string.IsNullOrWhiteSpace(methodName))
+                throw new ArgumentNullException($"{nameof(targetObject)},{nameof(methodName)}", "调用参数不能为空");
 
-            foreach (var actionElement in actionElements) TryParseControlMessage(actionElement);
+            string arguments = "";
+            for(int i = 0; i < args.Length; i ++)
+                arguments += $"{args[i]}{(i != args.Length - 1 ? "," : "")}";
+
+            string message = $"<Action Target=\"{targetObject}\" Method=\"{methodName}\" Params=\"{arguments}\" />";
+            SendMessage(message);
         }
+        /// <summary>
+        /// 调本本地方法
+        /// </summary>
+        /// <param name="targetObject"></param>
+        /// <param name="methodName"></param>
+        /// <param name="args"></param>
+        /// <exception cref="ArgumentNullException"></exception>
+        public void CallLocalMethod(string targetObject, string methodName, params string[] args)
+        {
+            if (string.IsNullOrWhiteSpace(targetObject) || string.IsNullOrWhiteSpace(methodName))
+                throw new ArgumentNullException($"{nameof(targetObject)},{nameof(methodName)}", "调用参数不能为空");
+
+            string arguments = "";
+            for (int i = 0; i < args.Length; i++)
+                arguments += $"{args[i]}{(i != args.Length - 1 ? "," : "")}";
+
+            string message = $"<Action Target=\"{targetObject}\" Method=\"{methodName}\" Params=\"{arguments}\" />";
+            TryParseControlMessage(message);
+        }
+
         /// <summary>
         /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
         /// </summary>
@@ -420,7 +444,22 @@ namespace SpaceCG.Generic
 
             TryParseControlMessage(element, null);
         }
+        /// <summary>
+        /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
+        /// </summary>
+        /// <param name="actionElement"></param>
+        public void TryParseControlMessage(XElement actionElement) => TryParseControlMessage(actionElement, null);
+        /// <summary>
+        /// 试图解析多个 xml 格式消息的集合, 在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
+        /// </summary>
+        /// <param name="actionElements"></param>
+        public void TryParseControlMessages(IEnumerable<XElement> actionElements)
+        {
+            if (actionElements == null || actionElements.Count() <= 0) return;
 
+            foreach (var actionElement in actionElements) TryParseControlMessage(actionElement);
+        }
+        
         /// <summary>
         /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典找实例对象，并调用实例对象的方法
         /// <para>XML 格式：&lt;Action Target="object key name" Method="method name" Params="method params" /&gt; </para>
