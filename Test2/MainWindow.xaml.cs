@@ -51,7 +51,11 @@ namespace Test2
             //controller.SynchronizationContext = new ReflectionSynchronizationContext();
             //controller.AccessObjects.Add("Window", this);
 
-            if(TypeExtensions.ConvertFrom("#ffaa00FF", typeof(Color), out object color))
+            string str = "2023-09-10.IFLYTEK.story.log";
+            Console.WriteLine(str.Substring(0, str.IndexOf('.')));
+            Console.WriteLine(str.Substring(str.IndexOf('.')+1, str.LastIndexOf('.') - str.IndexOf('.') - 1) );
+
+            if (TypeExtensions.ConvertFrom("#ffaa00FF", typeof(Color), out object color))
             {
                 this.Background = new SolidColorBrush((Color)color);
             }
@@ -105,6 +109,7 @@ namespace Test2
             }
             else if(button == Button_Connect)
             {
+                logger1.Info("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
             }
             else if(button == Button_Send)
             {

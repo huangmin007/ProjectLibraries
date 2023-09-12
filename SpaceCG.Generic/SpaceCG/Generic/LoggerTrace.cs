@@ -54,7 +54,7 @@ namespace SpaceCG.Generic
         {
             ProcessModule processModule = Process.GetCurrentProcess().MainModule;
             string moduleFileName = processModule?.FileName;
-            if (!String.IsNullOrEmpty(moduleFileName))
+            if (!string.IsNullOrEmpty(moduleFileName))
             {
                 FileInfo info = new FileInfo(moduleFileName);
                 MainModuleName = info.Name.Replace(info.Extension, "");
@@ -62,7 +62,7 @@ namespace SpaceCG.Generic
 
             string path = "logs";
             if (!Directory.Exists(path)) Directory.CreateDirectory(path);
-            String defaultFileName = $"{path}/{MainModuleName}.{DateTime.Today.ToString("yyyy-MM-dd")}.log";
+            string defaultFileName = $"{path}/{DateTime.Today.ToString("yyyy-MM-dd")}.{MainModuleName}.log";
 
             Trace.AutoFlush = true;
             TextFileListener = new TextFileStreamTraceListener(defaultFileName, "FileTrace");
@@ -81,8 +81,8 @@ namespace SpaceCG.Generic
             ConsoleListener.WriteLine($"[Header] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
             TextFileListener.WriteLine($"[Header] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
 
-            String systemInfo = $"[{os} ({os.Platform})]({(Environment.Is64BitOperatingSystem ? "64" : "32")} 位操作系统 / 逻辑处理器: {Environment.ProcessorCount})";
-            String moduleInfo = $"[{moduleFileName}]({(Environment.Is64BitProcess ? "64" : "32")} 位进程 / 进程 ID: {Process.GetCurrentProcess().Id})";
+            string systemInfo = $"[{os} ({os.Platform})]({(Environment.Is64BitOperatingSystem ? "64" : "32")} 位操作系统 / 逻辑处理器: {Environment.ProcessorCount})";
+            string moduleInfo = $"[{moduleFileName}]({(Environment.Is64BitProcess ? "64" : "32")} 位进程 / 进程 ID: {Process.GetCurrentProcess().Id})";
 
             ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, systemInfo);
             ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, moduleInfo);
@@ -386,7 +386,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 单个文件的最大大小
         /// </summary>
-        protected const long FILE_MAX_SIZE = 1024 * 1024 * 2;
+        protected const long FILE_MAX_SIZE = 512;//1024 * 1024 * 2;
         /// <summary>
         /// 跟踪事件 <see cref="TRACE_TARGET_COUNT"/> 次数后检测一次文件，减少频繁的检查文件大小
         /// </summary>
@@ -669,15 +669,15 @@ namespace SpaceCG.Generic
             try
             {
                 FileInfo curLogFile = new FileInfo(fileStream.Name);
-                string headName = curLogFile.Name.Substring(0, curLogFile.Name.IndexOf('.'));
-                string fileName = curLogFile.Name.Substring(0, curLogFile.Name.Length - curLogFile.Extension.Length + 1); //fileName.(0).log
-                int count = (int)(curLogFile.Directory.GetFiles($"{fileName}*", SearchOption.TopDirectoryOnly)?.Length) - 1;
+                string fileName = curLogFile.Name;
 
-                //Console.WriteLine(curLogFile.Name);                             //Test2.2023-06-24.log
-                //Console.WriteLine($"HeadName:{headName}  FileName:{fileName}"); //HeadName:Test2  FileName:Test2.2023-06-24.
+                int findex = fileName.IndexOf('.');
+                string lastDate = fileName.Substring(0, findex);
+                string moduleName = fileName.Substring(findex + 1, curLogFile.Name.LastIndexOf('.') - findex - 1);
+                int count = (int)(curLogFile.Directory.GetFiles($"{lastDate}.{moduleName}*", SearchOption.TopDirectoryOnly)?.Length);
 
-                String sourceFileName = curLogFile.FullName;
-                string destFileName = $"{curLogFile.Directory.FullName}\\{fileName}({count}){curLogFile.Extension}";
+                string sourceFileName = curLogFile.FullName;
+                string destFileName = $"{curLogFile.Directory.FullName}\\{lastDate}.{moduleName}({count}){curLogFile.Extension}";
 
                 Writer.Flush();
                 Writer.Close();
@@ -685,15 +685,11 @@ namespace SpaceCG.Generic
                 Writer = null;
 
                 File.Move(sourceFileName, destFileName);
-                FileExtensions.ReserveFileDays(30, curLogFile.DirectoryName, $"{headName}*{curLogFile.Extension}");
-
+                FileExtensions.ReserveFileDays(30, curLogFile.DirectoryName, $"*{moduleName}*{curLogFile.Extension}");
 #if true
                 //解决过 24点 后文件名上的日期问题，但无法彻底解决，因为父类的属性 fileName 是私有的, 得继承 TraceListener 重写才可行
-                Encoding encoding = new UTF8Encoding(false);
-                encoding.EncoderFallback = EncoderFallback.ReplacementFallback;
-                encoding.DecoderFallback = DecoderFallback.ReplacementFallback;
-                string path = $"{curLogFile.Directory.FullName}\\{headName}.{DateTime.Today.ToString("yyyy-MM-dd")}{curLogFile.Extension}";
-                Writer = new StreamWriter(path, true, encoding, 4096);
+                string path = $"{curLogFile.Directory.FullName}\\{DateTime.Today.ToString("yyyy-MM-dd")}.{moduleName}{curLogFile.Extension}";
+                Writer = new StreamWriter(path, true, Encoding.Default, 4096);
 #endif
             }
             catch (Exception ex)
