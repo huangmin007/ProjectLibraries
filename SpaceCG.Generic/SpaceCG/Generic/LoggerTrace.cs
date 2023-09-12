@@ -148,7 +148,6 @@ namespace SpaceCG.Generic
             TextFileListener.Flush();
         }
         
-
         /// <summary>
         /// 当前 <see cref="LoggerTrace"/> 跟踪代码的执行并将跟踪消息的源对象
         /// </summary>
