@@ -385,7 +385,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 单个文件的最大大小
         /// </summary>
-        protected const long FILE_MAX_SIZE = 512;//1024 * 1024 * 2;
+        protected const long FILE_MAX_SIZE = 1024 * 1024 * 2;
         /// <summary>
         /// 跟踪事件 <see cref="TRACE_TARGET_COUNT"/> 次数后检测一次文件，减少频繁的检查文件大小
         /// </summary>
