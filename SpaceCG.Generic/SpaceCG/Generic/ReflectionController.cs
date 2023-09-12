@@ -287,7 +287,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
+        public bool SendMessage(string message) => SendBytes(Encoding.Default.GetBytes(message));
 
         /// <summary>
         /// On Client Disconnected Event Handler

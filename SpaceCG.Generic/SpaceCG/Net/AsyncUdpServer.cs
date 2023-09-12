@@ -190,9 +190,9 @@ namespace SpaceCG.Net
             return true;
         }
         /// <inheritdoc/>
-        public bool SendMessage(String message, EndPoint remote) => SendBytes(Encoding.UTF8.GetBytes(message), remote);
+        public bool SendMessage(String message, EndPoint remote) => SendBytes(Encoding.Default.GetBytes(message), remote);
         /// <inheritdoc/>
-        public bool SendMessage(String message, String ipAddress, int port) => SendBytes(Encoding.UTF8.GetBytes(message), ipAddress, port);
+        public bool SendMessage(String message, String ipAddress, int port) => SendBytes(Encoding.Default.GetBytes(message), ipAddress, port);
         private void SendCallback(IAsyncResult ar)
         {
             if (!ar.IsCompleted) return;
