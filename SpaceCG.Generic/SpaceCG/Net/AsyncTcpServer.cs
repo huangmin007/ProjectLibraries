@@ -281,9 +281,9 @@ namespace SpaceCG.Net
             }
         }
         /// <inheritdoc/>
-        public bool SendMessage(String message, EndPoint remote) => SendBytes(Encoding.Default.GetBytes(message), remote);
+        public bool SendMessage(String message, EndPoint remote) => SendBytes(Encoding.UTF8.GetBytes(message), remote);
         /// <inheritdoc/>
-        public bool SendMessage(String message, String ipAddress, int port) => SendBytes(Encoding.Default.GetBytes(message), ipAddress, port);
+        public bool SendMessage(String message, String ipAddress, int port) => SendBytes(Encoding.UTF8.GetBytes(message), ipAddress, port);
 
         /// <summary>
         /// 发送数据完成处理回调函数
@@ -333,7 +333,7 @@ namespace SpaceCG.Net
             return true;
         }
         /// <inheritdoc/>
-        public bool SendMessage(String message) => SendBytes(Encoding.Default.GetBytes(message));
+        public bool SendMessage(String message) => SendBytes(Encoding.UTF8.GetBytes(message));
 
         /// <inheritdoc/>
         public void Dispose()

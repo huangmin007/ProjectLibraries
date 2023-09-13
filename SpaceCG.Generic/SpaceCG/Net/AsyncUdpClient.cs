@@ -173,7 +173,7 @@ namespace SpaceCG.Net
             }
         }
         /// <inheritdoc/>
-        public bool SendMessage(string message) => SendBytes(Encoding.Default.GetBytes(message));
+        public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
         
         /// <inheritdoc/>
         public void Dispose()

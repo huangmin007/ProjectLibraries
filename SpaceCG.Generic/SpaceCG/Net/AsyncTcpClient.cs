@@ -211,7 +211,7 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="message"></param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
-        public bool SendMessage(string message) => SendBytes(Encoding.Default.GetBytes(message));
+        public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
 
         /// <inheritdoc/>
         public void Dispose()

@@ -62,7 +62,7 @@ namespace SpaceCG.Extensions
         /// <param name="client"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public static bool SendMessage(this TcpClient client, string message) => client.SendBytes(Encoding.Default.GetBytes(message));
+        public static bool SendMessage(this TcpClient client, string message) => client.SendBytes(Encoding.UTF8.GetBytes(message));
 
         /// <summary>
         /// 将字节异步写入当前 <see cref="UdpClient"/> 流
@@ -91,7 +91,7 @@ namespace SpaceCG.Extensions
         /// <param name="client"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public static bool SendMessage(this UdpClient client, string message) => client.SendBytes(Encoding.Default.GetBytes(message));
+        public static bool SendMessage(this UdpClient client, string message) => client.SendBytes(Encoding.UTF8.GetBytes(message));
 
         /// <summary>
         /// 创建 TCP/UDP 网络连接对象

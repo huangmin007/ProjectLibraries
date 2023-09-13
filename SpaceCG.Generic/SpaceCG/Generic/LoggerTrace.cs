@@ -688,7 +688,7 @@ namespace SpaceCG.Generic
 #if true
                 //解决过 24点 后文件名上的日期问题，但无法彻底解决，因为父类的属性 fileName 是私有的, 得继承 TraceListener 重写才可行
                 string path = $"{curLogFile.Directory.FullName}\\{DateTime.Today.ToString("yyyy-MM-dd")}.{moduleName}{curLogFile.Extension}";
-                Writer = new StreamWriter(path, true, Encoding.Default, 4096);
+                Writer = new StreamWriter(path, true, Encoding.UTF8, 4096);
 #endif
             }
             catch (Exception ex)

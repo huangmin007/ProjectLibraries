@@ -38,7 +38,7 @@ namespace SpaceCG.Extensions
         /// <param name="serialPort"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public static bool SendMessage(this SerialPort serialPort, string message) => SendBytes(serialPort, Encoding.Default.GetBytes(message));
+        public static bool SendMessage(this SerialPort serialPort, string message) => SendBytes(serialPort, Encoding.UTF8.GetBytes(message));
 
         /// <summary>
         /// 获取 <see cref="SerialPort"/> 自定义的唯一组合 $"{<see cref="SerialPort.PortName"/>}_{<see cref="SerialPort.BaudRate"/>}" 名称

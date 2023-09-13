@@ -338,7 +338,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="connectionName"></param>
         /// <param name="message"></param>
-        public void CallEventData(string connectionName, string message) => CallEventData(connectionName, Encoding.Default.GetBytes(message));
+        public void CallEventData(string connectionName, string message) => CallEventData(connectionName, Encoding.UTF8.GetBytes(message));
         /// <summary>
         /// 在所有连接配置中，跟据事件名称，调用事件集合
         /// </summary>
@@ -393,7 +393,7 @@ namespace SpaceCG.Generic
 
                 if (!string.IsNullOrWhiteSpace(message))
                 {
-                    dataArgs.Message = Encoding.Default.GetBytes(message);
+                    dataArgs.Message = Encoding.UTF8.GetBytes(message);
                 }
                 if (!string.IsNullOrWhiteSpace(bytes))
                 {

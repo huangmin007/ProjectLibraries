@@ -22,7 +22,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModbusDevicesManagerService
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceCG.Extensions.NETFramework", "SpaceCG.Extensions.NETFramework\SpaceCG.Extensions.NETFramework.csproj", "{72EAED11-5DEE-4EF6-A93F-6E70204A732B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test.ConsoleApp.NET", "Test.ConsoleApp.NET\Test.ConsoleApp.NET.csproj", "{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test.ConsoleApp.NET", "Test.ConsoleApp.NET\Test.ConsoleApp.NET.csproj", "{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

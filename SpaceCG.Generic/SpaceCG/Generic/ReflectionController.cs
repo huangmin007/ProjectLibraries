@@ -287,7 +287,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        public bool SendMessage(string message) => SendBytes(Encoding.Default.GetBytes(message));
+        public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
 
         /// <summary>
         /// On Client Disconnected Event Handler
@@ -323,7 +323,7 @@ namespace SpaceCG.Generic
             if (eventArgs.Action == null)
             {
                 XElement element = null;
-                string message = Encoding.Default.GetString(e.Bytes);
+                string message = Encoding.UTF8.GetString(e.Bytes);
 
                 try
                 {
