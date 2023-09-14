@@ -51,9 +51,13 @@ namespace Test2
             //controller.SynchronizationContext = new ReflectionSynchronizationContext();
             //controller.AccessObjects.Add("Window", this);
 
+            //FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\logs\2023-09-12.AIUI.control.log");
+            FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\nlp\result\20230913_124816_441_IFLYTEK.story.json");
+
             string str = "2023-09-10.IFLYTEK.story.log";
             Console.WriteLine(str.Substring(0, str.IndexOf('.')));
             Console.WriteLine(str.Substring(str.IndexOf('.')+1, str.LastIndexOf('.') - str.IndexOf('.') - 1) );
+            return;
 
             if (TypeExtensions.ConvertFrom("#ffaa00FF", typeof(Color), out object color))
             {

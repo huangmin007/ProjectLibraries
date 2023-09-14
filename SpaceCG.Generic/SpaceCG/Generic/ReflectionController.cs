@@ -312,8 +312,9 @@ namespace SpaceCG.Generic
         /// <param name="e"></param>
         private void Network_DataReceived(object sender, AsyncDataEventArgs e)
         {
+            Logger.Debug(Encoding.UTF8.GetString(e.Bytes));
             MessageEventArgs eventArgs = new MessageEventArgs(sender, e.EndPoint, e.Bytes);
-            
+
             if(NetworkMessage != null)
             {
                 NetworkMessage.Invoke(this, eventArgs);
@@ -478,9 +479,9 @@ namespace SpaceCG.Generic
                 Logger.Warn($"控制消息 XML 格式数数据错误，节点名称应为 {XAction}, 且属性 {XTarget}, {XMethod} 值不能为空");
                 return;
             }
-            if (!AccessObjects.TryGetValue(objectName, out object targetObject))
+            if (!AccessObjects.TryGetValue(objectName, out object targetObject) || targetObject == null)
             {
-                Logger.Warn($"未找到目标实例对象 {objectName} ");
+                Logger.Warn($"未找到目标实例对象 {objectName}, 或目标对象为 null 没创建实例");
                 return;
             }
 
@@ -542,9 +543,9 @@ namespace SpaceCG.Generic
                 Logger.Warn($"控制消息 XML 格式数数据错误，节点名称应为 {XAction}, 且属性 {XTarget}, {XProperty} 值不能为空");
                 return;
             }
-            if (!AccessObjects.TryGetValue(objectName, out object targetObject))
+            if (!AccessObjects.TryGetValue(objectName, out object targetObject) || targetObject == null)
             {
-                Logger.Warn($"未找到目标实例对象 {objectName} ");
+                Logger.Warn($"未找到目标实例对象 {objectName}, 或目标对象为 null 没创建实例");
                 return;
             }
 

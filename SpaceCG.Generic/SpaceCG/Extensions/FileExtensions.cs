@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace SpaceCG.Extensions
 {
@@ -67,5 +68,64 @@ namespace SpaceCG.Extensions
             }
         }
 
+        /// <summary>
+        /// 获取文件所采用的字符编码
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <returns></returns>
+        [Obsolete("test")]
+        private static Encoding GetFileEncoding(string fileName)
+        {
+            if(string.IsNullOrWhiteSpace(fileName))
+                throw new ArgumentNullException(nameof(fileName), "参数不能为空");
+
+            FileInfo fileInfo = new FileInfo(fileName);
+            if (!fileInfo.Exists) throw new ArgumentException($"指定的文件 {fileName} 不存在");
+
+            Encoding result = null;
+            FileStream fileStream = default;
+            //EncodingInfo[] encodingInfo = Encoding.GetEncodings();
+            //Console.WriteLine($"Encoding Info:{encodingInfo.Length}");
+            Encoding[] encodings = { Encoding.BigEndianUnicode, Encoding.Unicode, Encoding.UTF7, Encoding.UTF8, Encoding.UTF32, new UTF32Encoding(true, true) };
+
+            try
+            {
+                fileStream = fileInfo.OpenRead();
+                
+                for (int i = 0; result == null && i < encodings.Length; i++)
+                {
+                    bool isEqual = true;
+                    byte[] preamble = encodings[i].GetPreamble();
+                    Console.Write($"{i}:{encodings[i].EncodingName}/{encodings[i].HeaderName}: ");
+                    foreach (byte b in preamble)                    
+                        Console.Write("{0:X2} ", b);
+                    Console.WriteLine();
+
+                    fileStream.Position = 0;
+                    for (int j = 0; isEqual && j < preamble.Length; j++)
+                    {
+                        isEqual = preamble[j] == fileStream.ReadByte();
+                    }
+                    if (isEqual) result = encodings[i];
+                }
+            }
+            catch (IOException ex)
+            {
+                throw ex;
+            }
+            finally
+            {
+                if (fileStream != null)
+                {
+                    fileStream.Close();//包括了Dispose,并通过GC强行释放资源
+                }
+            }
+            if (object.ReferenceEquals(null, result))
+            {
+                result = Encoding.Default;
+            }
+            Console.WriteLine($"Result:{result.EncodingName}");
+            return result;
+        }
     }
 }
