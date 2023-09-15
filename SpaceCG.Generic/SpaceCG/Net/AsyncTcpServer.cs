@@ -160,13 +160,16 @@ namespace SpaceCG.Net
 
         private void RemoveClient(ref TcpClient tcpClient, EndPoint endPoint)
         {
-            if (endPoint == null) endPoint = tcpClient.Client?.RemoteEndPoint;
+            if (endPoint == null) 
+                endPoint = tcpClient.Client?.RemoteEndPoint;
 
-            tcpClient?.Close();
-            Logger.Info($"客户端 {endPoint} 断开连接");
-
+            clients.TryRemove(endPoint, out _);
             buffers.TryRemove(endPoint, out byte[] buffer);
-            clients.TryRemove(endPoint, out TcpClient client);
+
+            tcpClient?.Dispose();
+            tcpClient = null;
+
+            Logger.Info($"客户端 {endPoint} 断开连接");
             ClientDisconnected?.Invoke(this, new AsyncEventArgs(endPoint));
         }
 
@@ -212,9 +215,15 @@ namespace SpaceCG.Net
             TcpClient tcpClient = ar.AsyncState as TcpClient;
             if(tcpClient == null) return;
 
-            EndPoint endPoint = tcpClient.Client?.RemoteEndPoint;
+            EndPoint endPoint = null;
+            try
+            {
+                endPoint = tcpClient.Client?.RemoteEndPoint;
+            }
+            catch (ObjectDisposedException) { return; }
+            catch (Exception) { }
 
-            if(!AsyncTcpClient.IsOnline(ref tcpClient))
+            if (!AsyncTcpClient.IsOnline(ref tcpClient))
             {
                 RemoveClient(ref tcpClient, endPoint);
                 return;
