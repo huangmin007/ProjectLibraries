@@ -302,7 +302,9 @@ namespace SpaceCG.Net
         {
             if (ar.AsyncState == null) return;
 
-            TcpClient tcpClient = (TcpClient)ar.AsyncState;
+            TcpClient tcpClient = ar.AsyncState as TcpClient;
+            if(tcpClient == null) return;
+
             EndPoint endPoint = tcpClient.Client.RemoteEndPoint;
 
             try

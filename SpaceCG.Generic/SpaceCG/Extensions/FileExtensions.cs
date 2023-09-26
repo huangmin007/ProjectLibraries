@@ -9,7 +9,7 @@ namespace SpaceCG.Extensions
     /// <summary>
     /// FileExtensions
     /// </summary>
-    public static class FileExtensions
+    public static partial class FileExtensions
     {
 
         /// <summary>

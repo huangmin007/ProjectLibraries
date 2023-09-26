@@ -2,14 +2,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
+using SpaceCG.Generic;
 
 namespace SpaceCG.Extensions
 {
     /// <summary>
     /// XElement Extensions
     /// </summary>
-    public static class XElementExtensions
+    public static partial class XElementExtensions
     {
+        private static readonly LoggerTrace Logger = new LoggerTrace();
+
         /// <summary>
         /// 分析 XML 元素，处理模板与引用模板元素
         /// </summary>
@@ -94,19 +97,16 @@ namespace SpaceCG.Extensions
             const string XRefTemplateXName = "RefTemplateXName";
             const string XRemoveRefTemplates = "RemoveRefTemplates";
 
-            if (string.IsNullOrWhiteSpace(rootElement.Attribute(XTemplateXName)?.Value) ||
-                string.IsNullOrWhiteSpace(rootElement.Attribute(XRefTemplateXName)?.Value))
-            {
-                throw new ArgumentException($"参数错误, 参数不能为空, 或根节点应包含 {nameof(XTemplateXName)}, {nameof(XRefTemplateXName)}, 属性, 其属性值也不能为空");
-            }
-
+            string templateXName = string.IsNullOrWhiteSpace(rootElement.Attribute(XTemplateXName)?.Value) ? "Template" : rootElement.Attribute(XTemplateXName).Value;
+            string refTemplateXName = string.IsNullOrWhiteSpace(rootElement.Attribute(XRefTemplateXName)?.Value) ? "RefTemplate" : rootElement.Attribute(XRefTemplateXName).Value;
+            
             bool removeRefTemplates = true;
             if (rootElement.Attribute(XRemoveRefTemplates) != null && bool.TryParse(rootElement.Attribute(XRemoveRefTemplates).Value, out bool result))
             {
                 removeRefTemplates = result;
             }
 
-            ReplaceTemplateElements(rootElement, rootElement.Attribute(XTemplateXName).Value, rootElement.Attribute(XRefTemplateXName).Value, removeRefTemplates);
+            ReplaceTemplateElements(rootElement, templateXName, refTemplateXName, removeRefTemplates);
         }
 
     }

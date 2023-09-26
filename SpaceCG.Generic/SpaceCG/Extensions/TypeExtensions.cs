@@ -8,7 +8,7 @@ namespace SpaceCG.Extensions
     /// <summary>
     /// Type Extensions
     /// </summary>
-    public static class TypeExtensions
+    public static partial class TypeExtensions
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(TypeExtensions));
 

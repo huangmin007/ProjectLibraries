@@ -10,7 +10,7 @@ namespace SpaceCG.Extensions
     /// <summary>
     /// IP Connection Extensions
     /// </summary>
-    public static class ConnectionExtensions
+    public static partial class ConnectionExtensions
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ConnectionExtensions));
 

@@ -8,7 +8,7 @@ namespace SpaceCG.Extensions
     /// <summary>
     /// Extensions
     /// </summary>
-    public static class Extensions
+    public static partial class Extensions
     {
         /// <summary>
         /// 从 <see cref="ConcurrentQueue&lt;T&gt;"/> 中移除所有对象。
