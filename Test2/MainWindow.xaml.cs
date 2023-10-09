@@ -20,6 +20,14 @@ using SpaceCG.Net;
 
 namespace Test2
 {
+    public enum TestEnum:ushort
+    {
+        A = 0x00,
+        B = 0x10,
+        C = 0x20,
+        D = 0x40,
+    }
+
     /// <summary>
     /// MainWindow.xaml 的交互逻辑
     /// </summary>
@@ -52,7 +60,12 @@ namespace Test2
             //controller.AccessObjects.Add("Window", this);
 
             //FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\logs\2023-09-12.AIUI.control.log");
-            FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\nlp\result\20230913_124816_441_IFLYTEK.story.json");
+            //FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\nlp\result\20230913_124816_441_IFLYTEK.story.json");
+
+            bool r = TypeExtensions.ConvertFrom("TestEnum.C", typeof(TestEnum), out object convert);
+            Console.WriteLine($"{r}");
+            Console.WriteLine($"{convert.GetType()}::{convert}");
+            //Console.WriteLine(typeof(TestEnum).Name);
 
             string str = "2023-09-10.IFLYTEK.story.log";
             Console.WriteLine(str.Substring(0, str.IndexOf('.')));

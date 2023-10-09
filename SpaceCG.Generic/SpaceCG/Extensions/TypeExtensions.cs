@@ -90,7 +90,21 @@ namespace SpaceCG.Extensions
                 string valueString = value.ToString();
                 if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
 
-                if (destinationType == typeof(bool))
+                if (destinationType.IsEnum)
+                {
+                    valueString = valueString.ToLower().Trim();
+                    string desTypeName = $"{destinationType.Name}.".ToLower();
+                    if (valueString.IndexOf(desTypeName) == 0) valueString = valueString.Replace(desTypeName, "");
+                    if (valueString.IndexOf("0x") == 0 && StringExtensions.ToNumber<int>(valueString, out int number)) valueString = number.ToString();
+
+                    try
+                    {
+                        conversionValue = Enum.Parse(destinationType, valueString, true);
+                        return true;
+                    }
+                    catch (Exception ex) { Logger.Warn($"{ex}"); }
+                }
+                else if (destinationType == typeof(bool))
                 {
                     if (bool.TryParse(valueString, out bool result))
                     {

@@ -85,10 +85,10 @@ namespace SpaceCG.Extensions
 
         /// <summary>
         /// 分析 XML 元素，处理模板与引用模板元素
-        /// <para>根节点元素属性应包括 TemplateXName, RefTemplateXName, RemoveRefTemplates(可选属性, Boolean 类型值, 默认为 true)</para>
+        /// <para>从根节点元素属性 TemplateXName,RefTemplateXName,RemoveRefTemplates(可选属性, Boolean 类型值, 默认为 true) 查找对应的模版节点名称及参数<br/>
+        /// 如果为空则会使用默认节点名称及参数：Template,RefTemplate,true</para>
         /// </summary>
         /// <param name="rootElement"> XML 元素或根元素</param>
-        /// <exception cref="ArgumentException"></exception>
         public static void ReplaceTemplateElements(this XElement rootElement)
         {
             if(rootElement == null) return;
