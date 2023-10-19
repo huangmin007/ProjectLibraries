@@ -61,7 +61,24 @@ namespace Test2
 
             //FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\logs\2023-09-12.AIUI.control.log");
             //FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\nlp\result\20230913_124816_441_IFLYTEK.story.json");
+            Type v = typeof(void);
+            Console.WriteLine($"{v}");
+            Console.WriteLine(v);
 
+            string xmlString = "<data> <string><![CDATA[这是一段未解析字符数据<a>test</a>,[0x12,0x13,0xAA] ]]></string> </data>";
+            XElement XML = XElement.Parse(xmlString);
+            Console.WriteLine(XML);
+            Console.WriteLine(XML.Element("string").Value);
+
+            Type[] src = new Type[] { typeof(int), typeof(string) };
+            List<Type> dst = new List<Type>() { typeof(int), typeof(string)};
+            bool booo = TypeExtensions.Equals(src, dst);
+            Console.WriteLine($"Equals::{booo}");
+
+            Type type = Type.GetType("System.Threading.Thread", false, true);            
+            Console.WriteLine($"Type::{type}");
+            int t = 3;
+            
             bool r = TypeExtensions.ConvertFrom("TestEnum.C", typeof(TestEnum), out object convert);
             Console.WriteLine($"{r}");
             Console.WriteLine($"{convert.GetType()}::{convert}");
@@ -118,11 +135,11 @@ namespace Test2
             Button button = (Button)sender;
             if (button == Button_Test)
             {
-                controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"300\" Sync=\"True\" />");
+                //controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"300\" Sync=\"True\" />");
             }
             else if(button == Button_Close)
             {
-                controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
+                //controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
             }
             else if(button == Button_Connect)
             {

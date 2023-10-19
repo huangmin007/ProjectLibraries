@@ -60,9 +60,6 @@ namespace SpaceCG.Generic
     /// <code>//消息协议 (XML) 示例：
     /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" /&gt;              //跟据调用的 Method 决定 Params 可选属性值
     /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" Sync="True" /&gt;  //可选属性 Sync 是指同步执行还是异步执行
-    /// &lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="False" Sync="True"/&gt; //可选属性 Return 只针对网络消息有效
-    /// &lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="True" Sync="False"/&gt; //如果属性 Value 不存在，则表示获取属性的值
-    /// &lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt;       //特殊格式，同时修改对象的多个属性值
     /// //网络消息返回格式
     /// &lt;Return Result="True/False" Value="value" /&gt;
     /// </code>
@@ -124,13 +121,14 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 可控制、访问的对象的方法过滤集合，指定对象的方法不在访问范围内；字符格式为：objectName.methodName, objectName 支持通配符 '*'
         /// <para>例如："*.Dispose" 禁止反射访问所有对象的 Dispose 方法，默认已添加</para>
-        /// </summary>
+        /// </summary>        
         public List<string> MethodFilters { get; } = new List<string>(16) { "*.Dispose" };
 
         /// <summary>
         /// 可控制、访问的对象的属性过滤集合，指定对象的属性不在访问范围内；字符格式为：objectName.propertyName, objectName 支持通配符 '*'
         /// <para>例如："*.Name" 禁止反射访问所有对象的 Name 属性，默认已添加</para>
         /// </summary>
+        [Obsolete("弃用", true)]
         public List<string> PropertyFilters { get; } = new List<string>(16) { "*.Name" };
         
         /// <summary>
@@ -170,9 +168,6 @@ namespace SpaceCG.Generic
         /// <code>//消息协议 (XML) 示例：
         /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" /&gt;              //跟据调用的 Method 决定 Params 可选属性值
         /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" Sync="True" /&gt;  //可选属性 Sync 是指同步执行还是异步执行
-        /// &lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="False" Sync="True"/&gt; //可选属性 Return 只针对网络消息有效
-        /// &lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="True" Sync="False"/&gt; //如果属性 Value 不存在，则表示获取属性的值
-        /// &lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt;       //特殊格式，同时修改对象的多个属性值
         /// //网络消息返回格式
         /// &lt;Return Result="True/False" Value="value" /&gt;
         /// </code>
@@ -192,9 +187,6 @@ namespace SpaceCG.Generic
         /// <code>//消息协议 (XML) 示例：
         /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" /&gt;              //跟据调用的 Method 决定 Params 可选属性值
         /// &lt;Action Target="ObjectName" Method="MethodName" Params="MethodParams" Sync="True" /&gt;  //可选属性 Sync 是指同步执行还是异步执行
-        /// &lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="False" Sync="True"/&gt; //可选属性 Return 只针对网络消息有效
-        /// &lt;Action Target="ObjectName" Property="PropertyName" Value="NewValue" Return="True" Sync="False"/&gt; //如果属性 Value 不存在，则表示获取属性的值
-        /// &lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt;       //特殊格式，同时修改对象的多个属性值
         /// //网络消息返回格式
         /// &lt;Return Result="True/False" Value="value" /&gt;
         /// </code>
@@ -371,64 +363,83 @@ namespace SpaceCG.Generic
                 {
                     TryParseCallMethod(actionElement, internalEventArgs);
                 }
+#if false
                 else if (actionElement.Attribute(XTarget) != null && actionElement.Attribute(XProperty) != null)
                 {
                     TryParseChangeValue(actionElement, internalEventArgs);
                 }
+#endif
                 else
                 {
                     Logger.Error($"XML 格式数据错误 {actionElement} 不支持的格式");
                 }
             }
+#if false
             else
             {
                 TryParseChangeValues(actionElement);
             }
+#endif
         }
 
         /// <summary>
         /// 调用远程方法
         /// </summary>
-        /// <param name="targetObject"></param>
+        /// <param name="objectName"></param>
         /// <param name="methodName"></param>
         /// <param name="args"></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public void CallRemoteMethod(string targetObject, string methodName, params string[] args)
+        public void CallRemoteMethod(string objectName, string methodName, params string[] args)
         {
-            if (string.IsNullOrWhiteSpace(targetObject) || string.IsNullOrWhiteSpace(methodName))
-                throw new ArgumentNullException($"{nameof(targetObject)},{nameof(methodName)}", "调用参数不能为空");
+            if (string.IsNullOrWhiteSpace(objectName) || string.IsNullOrWhiteSpace(methodName))
+                throw new ArgumentNullException($"{nameof(objectName)},{nameof(methodName)}", "调用参数不能为空");
 
             string arguments = "";
             for(int i = 0; i < args.Length; i ++)
                 arguments += $"{args[i]}{(i != args.Length - 1 ? "," : "")}";
 
-            string message = $"<Action Target=\"{targetObject}\" Method=\"{methodName}\" Params=\"{arguments}\" />";
+            string message = $"<Action Target=\"{objectName}\" Method=\"{methodName}\" Params=\"{arguments}\" />";
             SendMessage(message);
         }
         /// <summary>
         /// 调本本地方法
         /// </summary>
-        /// <param name="targetObject"></param>
+        /// <param name="objectName"></param>
         /// <param name="methodName"></param>
         /// <param name="args"></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public void CallLocalMethod(string targetObject, string methodName, params string[] args)
+        public void CallLocalMethod(string objectName, string methodName, params string[] args)
         {
-            if (string.IsNullOrWhiteSpace(targetObject) || string.IsNullOrWhiteSpace(methodName))
-                throw new ArgumentNullException($"{nameof(targetObject)},{nameof(methodName)}", "调用参数不能为空");
+            if (string.IsNullOrWhiteSpace(objectName) || string.IsNullOrWhiteSpace(methodName))
+                throw new ArgumentNullException($"{nameof(objectName)},{nameof(methodName)}", "调用参数不能为空");
 
             string arguments = "";
             for (int i = 0; i < args.Length; i++)
                 arguments += $"{args[i]}{(i != args.Length - 1 ? "," : "")}";
 
-            string message = $"<Action Target=\"{targetObject}\" Method=\"{methodName}\" Params=\"{arguments}\" />";
-            TryParseControlMessage(message);
+            string message = $"<Action Target=\"{objectName}\" Method=\"{methodName}\" Params=\"{arguments}\" />";
+
+            XElement element = null;
+            try
+            {
+                element = XElement.Parse(message);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"控制消息 XML 格式数据 {message} 解析错误：{ex}");
+                return;
+            }
+
+            TryParseControlMessage(element, null);
+
+            //TryParseControlMessage(message);
         }
 
         /// <summary>
         /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典中查找实例对象，并调用实例对象的方法或属性
         /// </summary>
         /// <param name="xmlMessage"></param>
+        [Obsolete("弃用", true)]
         public void TryParseControlMessage(string xmlMessage)
         {
             XElement element = null;
@@ -531,6 +542,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="actionElement"></param>
         /// <param name="internalEventArgs"></param>
+        [Obsolete("弃用", true)]
         protected void TryParseChangeValue(XElement actionElement, MessageEventArgs internalEventArgs = null)
         {
             if (actionElement == null || actionElement.Name.LocalName != XAction) return;
@@ -596,6 +608,7 @@ namespace SpaceCG.Generic
         /// <para>XML 格式：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; </para>
         /// </summary>
         /// <param name="objectElement"></param>
+        [Obsolete("弃用", true)]
         protected void TryParseChangeValues(XElement objectElement)
         {
             if (objectElement == null) return;

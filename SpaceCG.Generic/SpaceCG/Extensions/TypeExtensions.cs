@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using SpaceCG.Generic;
 
@@ -177,5 +179,26 @@ namespace SpaceCG.Extensions
 
             return result;
         }
+
+        /// <summary>
+        /// 比较两个类型的集合是否相同
+        /// </summary>
+        /// <param name="sourceTypes"></param>
+        /// <param name="targetTypes"></param>
+        /// <returns>如果两个类型的集合相同，则返回 true，否则返回 false </returns>
+        public static bool Equals(IReadOnlyCollection<Type> sourceTypes, IReadOnlyCollection<Type> targetTypes)
+        {
+            if (sourceTypes == null || sourceTypes.Count == 0 || sourceTypes.Count != targetTypes?.Count) return false;
+            if (sourceTypes == targetTypes) return true;
+
+            int count = sourceTypes.Count;
+            for (int i = 0; i < count; i++)
+            {
+                if (sourceTypes.ElementAt(i) != targetTypes.ElementAt(i)) return false;
+            }
+
+            return true;
+        }
+
     }
 }

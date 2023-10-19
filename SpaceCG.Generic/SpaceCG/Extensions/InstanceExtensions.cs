@@ -154,9 +154,10 @@ namespace SpaceCG.Extensions
 
             Type type = instanceObj.GetType();
             PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
-            if (property == null || !property.CanWrite || !property.CanRead)
+            if (property == null) return false;
+            if (!property.CanWrite || !property.CanRead)
             {
-                Logger.Warn($"实例对象 {type.Name} 的属性 {property} 是要实现了 get/set 可读写的");
+                Logger.Warn($"实例对象 {type.Name} 的属性 {property.Name} 是要实现了 get/set 可读写的");
                 return false;
             }
 
@@ -290,7 +291,7 @@ namespace SpaceCG.Extensions
                     Type methodParamType = paramsInfo[k].ParameterType;
 
                     if ((methodParamType.IsArray && inputParamType.IsArray) ||
-                        (methodParamType.IsValueType && (inputParamType.IsValueType || inputParamType == typeof(String))))
+                        (methodParamType.IsValueType && (inputParamType.IsValueType || inputParamType == typeof(string))))
                     {
                         continue;
                     }
@@ -371,7 +372,7 @@ namespace SpaceCG.Extensions
             {
                 if (methodInfo.ReturnType == typeof(void))
                 {
-                    returnValue = "void";
+                    returnValue = null; //typeof(void);
                     methodInfo.Invoke(instanceObj, arguments);
                 }
                 else
@@ -414,12 +415,11 @@ namespace SpaceCG.Extensions
             if (methodCount != 1)
             {
                 Logger.Info($"在实例对象 {type.Name} 中，找到匹配的函数 {methodName}/{paramsLength} 有 {methodCount} 个，准备查找实例对象的扩展函数");
-                return CallInstanceExtensionMethod(instanceObj, methodName, parameters, out returnValue);
+                return CallExtensionMethod(instanceObj, methodName, parameters, out returnValue);
             }
 
             return CallInstanceMethod(instanceObj, methods.First(), parameters, out returnValue);
         }
-
 
         /// <summary>
         /// 动态调用 对象扩展 的方法 (非嵌套的、非泛型静态类内部定义的)
@@ -431,7 +431,7 @@ namespace SpaceCG.Extensions
         /// <param name="parameters"></param>
         /// <param name="returnValue">函数的返回值</param>
         /// <returns>方法调用成功返回 true, 否则返回 false</returns>
-        public static bool CallInstanceExtensionMethod(object instanceObj, string methodName, object[] parameters, out object returnValue)
+        public static bool CallExtensionMethod(object instanceObj, string methodName, object[] parameters, out object returnValue)
         {
             returnValue = null;
             if (instanceObj == null || string.IsNullOrWhiteSpace(methodName)) return false;
@@ -461,24 +461,25 @@ namespace SpaceCG.Extensions
 
             return CallInstanceMethod(instanceObj, methods.First(), parameters, out returnValue);
         }
+        
         /// <summary>
         /// 动态调用 类的 静态方法
         /// <para>按顺序查找方法：(类)静态方法</para>
-        /// <para>示例：InstanceExtension.CallClassStaticMethod("System.Threading.Thread", "Sleep", new object[] { "1000" });</para>
+        /// <para>示例：InstanceExtension.CallStaticMethod("System.Threading.Thread", "Sleep", new object[] { "1000" });</para>
         /// </summary>
-        /// <param name="classFullName"></param>
+        /// <param name="typeName">Type/Class Full Name</param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
         /// <param name="returnValue">函数的返回值</param>
         /// <returns>方法调用成功返回 true, 否则返回 false</returns>
-        public static bool CallClassStaticMethod(string classFullName, string methodName, object[] parameters, out object returnValue)
+        public static bool CallStaticMethod(string typeName, string methodName, object[] parameters, out object returnValue)
         {
             returnValue = null;
-            if (string.IsNullOrWhiteSpace(classFullName) || string.IsNullOrWhiteSpace(methodName)) return false;
+            if (string.IsNullOrWhiteSpace(typeName) || string.IsNullOrWhiteSpace(methodName)) return false;
 
             int paramsLength = parameters == null ? 0 : parameters.Length;
             List<MethodInfo> methods = (from assembly in AppDomain.CurrentDomain.GetAssemblies()
-                                        let type = assembly.GetType(classFullName)
+                                        let type = assembly.GetType(typeName)
                                         where type != null
                                         from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public)
                                         where method.Name == methodName && method.GetParameters().Length == paramsLength
@@ -489,7 +490,7 @@ namespace SpaceCG.Extensions
 
             if (methodCount != 1)
             {
-                Logger.Warn($"在类 {classFullName} 中，找到匹配的静态函数 {methodName} 有 {methodCount} 个, 存在执行歧异, 取消函数执行");
+                Logger.Warn($"在类 {typeName} 中，找到匹配的静态函数 {methodName} 有 {methodCount} 个, 存在执行歧异, 取消函数执行");
                 return false;
             }
 
