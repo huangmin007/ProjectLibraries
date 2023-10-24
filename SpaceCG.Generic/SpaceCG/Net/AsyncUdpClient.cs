@@ -172,6 +172,25 @@ namespace SpaceCG.Net
                 return false;
             }
         }
+
+        /// <inheritdoc/>
+        public bool SendBytes(byte[] data, int offset, int count)
+        {
+            if (!IsConnected || data?.Length <= 0 || offset <= 0 || count <= 0 || 
+                offset >= data.Length || count - offset > data.Length) return false;
+
+            try
+            {
+                udpClient.Client.Send(data, offset, count, SocketFlags.None);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
+                return false;
+            }
+        }
+
         /// <inheritdoc/>
         public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
         

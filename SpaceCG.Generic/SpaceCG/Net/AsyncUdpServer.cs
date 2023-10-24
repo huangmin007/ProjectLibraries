@@ -157,24 +157,24 @@ namespace SpaceCG.Net
         }
 
         /// <inheritdoc/>
-        public bool SendBytes(byte[] datagram, EndPoint remote)
+        public bool SendBytes(byte[] datagram, EndPoint remoteEndPoint)
         {
-            if (!IsListening || remote?.GetType() != typeof(IPEndPoint)) return false;
+            if (!IsListening || remoteEndPoint?.GetType() != typeof(IPEndPoint)) return false;
 
             try
             {
-                udpClient.BeginSend(datagram, datagram.Length, (IPEndPoint)remote, SendCallback, remote);
+                udpClient.BeginSend(datagram, datagram.Length, (IPEndPoint)remoteEndPoint, SendCallback, remoteEndPoint);
             }
             catch (Exception ex)
             {
-                Logger.Error($"数据报异步发送到目标 {remote} 异常：{ex}");
-                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remote, ex));
+                Logger.Error($"数据报异步发送到目标 {remoteEndPoint} 异常：{ex}");
+                ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
                 return false;
             }
             return true;
         }
         /// <inheritdoc/>
-        public bool SendBytes(byte[] datagram, String ipAddress, int port)
+        public bool SendBytes(byte[] datagram, string ipAddress, int port)
         {
             IPEndPoint remote = new IPEndPoint(IPAddress.Parse(ipAddress), port);
             try
@@ -218,7 +218,28 @@ namespace SpaceCG.Net
             return true;
         }
         /// <inheritdoc/>
-        public bool SendMessage(String message) => SendBytes(Encoding.UTF8.GetBytes(message));
+        public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
+
+        /// <inheritdoc/>
+        public bool SendBytes(byte[] datagram, int offset, int count)
+        {
+            if (!IsListening || datagram?.Length <= 0 || offset <= 0 || count <= 0 
+                || offset >= datagram.Length || count - offset > datagram.Length) return false;
+            
+            foreach (var client in clients)
+            {
+                try
+                {
+                    udpClient.Client.BeginSendTo(datagram, offset, count, SocketFlags.None, client, SendCallback, client);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"数据报异步发送到目标 {client} 异常：{ex}");
+                    ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(client, ex));
+                }
+            }
+            return true;
+        }
 
         /// <inheritdoc/>
         public void Dispose()

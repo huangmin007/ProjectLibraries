@@ -42,6 +42,12 @@ namespace SpaceCG.Net
 
         /// <summary> <see cref="ModbusUdpRtu"/> 类型, Modbus UDP RTU 协议 </summary>
         ModbusUdpRtu,
+
+        /// <summary> <see cref="WebSocket"/> 类型, WebSocket 协议 </summary>
+        WebSocket,
+
+        /// <summary> <see cref="HTTPRequest"/> 类型, Http Request 协议 </summary>
+        HTTPRequest,
     }
 
     /// <summary>
@@ -70,6 +76,15 @@ namespace SpaceCG.Net
         /// <param name="data"></param>
         /// <returns>发送成功则返回 True, 否则返回 False</returns>
         bool SendBytes(byte[] data);
+
+        /// <summary>
+        /// 向连接的另一端发送数据，或是广播数据
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        bool SendBytes(byte[] data, int offset, int count);
 
         /// <summary>
         /// 向连接的另一端发送文本消息，或是广播文本消息

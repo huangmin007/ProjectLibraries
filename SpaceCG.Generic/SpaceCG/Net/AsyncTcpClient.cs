@@ -191,21 +191,32 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="data">要发送的数据</param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
-        public bool SendBytes(byte[] data)
+        public bool SendBytes(byte[] data) => SendBytes(data, 0, data.Length);
+        
+        /// <summary>
+        /// 异步发送数据到远程服务端
+        /// </summary>
+        /// <param name="data">要发送的数据</param>
+        /// <param name="offset">从零开始的字节偏移量，从此处开始将字节复制到该流</param>
+        /// <param name="count">最多写入的字节数</param>
+        /// <returns></returns>
+        public bool SendBytes(byte[] data, int offset, int count)
         {
-            if (!this.IsConnected || data?.Length <= 0) return false;
+            if (!this.IsConnected || data?.Length <= 0 || offset <= 0 || count <= 0 ||
+                offset >= data.Length || count - offset > data.Length) return false;
 
             try
             {
-                tcpClient.GetStream().WriteAsync(data, 0, data.Length);
+                tcpClient.GetStream().WriteAsync(data, offset, count);
                 return true;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 ExceptionEvent?.Invoke(this, new AsyncExceptionEventArgs(remoteEndPoint, ex));
                 return false;
             }
         }
+
         /// <summary>
         /// 异步发送数据到远程服务端
         /// </summary>

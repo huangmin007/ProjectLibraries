@@ -257,7 +257,7 @@ namespace SpaceCG.Net
         }
 
         /// <inheritdoc/>
-        public bool SendBytes(byte[] data, String ipAddress, int port) => SendBytes(data, new IPEndPoint(IPAddress.Parse(ipAddress), port));
+        public bool SendBytes(byte[] data, string ipAddress, int port) => SendBytes(data, new IPEndPoint(IPAddress.Parse(ipAddress), port));
         /// <inheritdoc/>
         public bool SendBytes(byte[] data, EndPoint remote)
         {
@@ -319,8 +319,14 @@ namespace SpaceCG.Net
         }
 
         /// <inheritdoc/>
-        public bool SendBytes(byte[] data)
+        public bool SendBytes(byte[] data) => SendBytes(data, 0, data.Length);
+
+        /// <inheritdoc/>
+        public bool SendBytes(byte[] data, int offset, int count)
         {
+            if (data?.Length <= 0 || offset >= data.Length || offset <= 0 || count <= 0 ||
+                offset >= data.Length || count - offset > data.Length) return false;
+
             foreach (var kv in clients)
             {
                 TcpClient tcpClient = kv.Value;
@@ -333,7 +339,7 @@ namespace SpaceCG.Net
 
                 try
                 {
-                    tcpClient.GetStream().BeginWrite(data, 0, data.Length, WriteCallback, tcpClient);
+                    tcpClient.GetStream().BeginWrite(data, offset, count, WriteCallback, tcpClient);
                 }
                 catch (Exception ex)
                 {
@@ -343,6 +349,7 @@ namespace SpaceCG.Net
             }
             return true;
         }
+
         /// <inheritdoc/>
         public bool SendMessage(String message) => SendBytes(Encoding.UTF8.GetBytes(message));
 
