@@ -138,8 +138,10 @@ namespace SpaceCG.Generic
                 Environment.Exit(System.Runtime.InteropServices.Marshal.GetHRForException((Exception)e.ExceptionObject));
             }
         }
-        private static void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        private static async void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
         {
+            await System.Threading.Tasks.Task.Delay(2);
+            
             TraceEventCache eventCache = new TraceEventCache();
             ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");
             TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");

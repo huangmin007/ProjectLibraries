@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -40,11 +41,15 @@ namespace Test2
         protected override void OnClosing(CancelEventArgs e)
         {
             base.OnClosing(e);
+
+            rpcClient?.Dispose();
+            rpcServer?.Dispose();
         }
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
             controller?.Dispose();
+
         }
 
         private static LoggerTrace logger1 = new LoggerTrace();
@@ -52,6 +57,13 @@ namespace Test2
         ReflectionController controller;
 
         InputHook inputHook;
+
+        RPCServer rpcServer;
+        RPCClient rpcClient;
+
+        public int Add33(int a, int b) => a + b;
+
+        public float Add(float a, float b) => a + b;
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
@@ -64,6 +76,17 @@ namespace Test2
             Type v = typeof(void);
             Console.WriteLine($"{v}");
             Console.WriteLine(v);
+
+            rpcServer = new RPCServer(2025);
+            rpcServer.AccessObjects.Add("Window", this);
+            rpcServer.Start();
+
+            //rpcServer.AccessObjects.Add("Thread", typeof(Thread).GetMethod("Sleep", new Type[] { typeof(int) }));
+           
+            rpcClient = new RPCClient("127.0.0.1", 2025);
+            rpcClient.ConnectAsync();
+            rpcClient.Timeout = 10000;
+            //rpcClient.IsThrowException = true;
 
             string xmlString = "<data> <string><![CDATA[这是一段未解析字符数据<a>test</a>,[0x12,0x13,0xAA] ]]></string> </data>";
             XElement XML = XElement.Parse(xmlString);
@@ -87,7 +110,7 @@ namespace Test2
             string str = "2023-09-10.IFLYTEK.story.log";
             Console.WriteLine(str.Substring(0, str.IndexOf('.')));
             Console.WriteLine(str.Substring(str.IndexOf('.')+1, str.LastIndexOf('.') - str.IndexOf('.') - 1) );
-            return;
+            
 
             if (TypeExtensions.ConvertFrom("#ffaa00FF", typeof(Color), out object color))
             {
@@ -102,11 +125,6 @@ namespace Test2
                 {
                     Console.WriteLine($"{i}:{array.GetValue(i)} {array.GetValue(i).GetType()}");
                 }
-            }
-
-            if(TypeExtensions.ConvertFrom("D:\\Desktop\\big\\IMG_ (8).jpg", typeof(ImageSource), out object source))
-            {
-                Image_Test.Source = (ImageSource)source;
             }
 
             if (TypeExtensions.ConvertFrom("80", out Thickness margin))
@@ -130,15 +148,31 @@ namespace Test2
             Console.WriteLine($"KeyboardEvent::{e.dwFlags}:{e.wVk}");
         }
 
-        private void Button_btn_Click(object sender, RoutedEventArgs e)
+        private async void Button_btn_Click(object sender, RoutedEventArgs e)
         {
             Button button = (Button)sender;
+            logger1.Info($"Click {button.Name}");
             if (button == Button_Test)
             {
+                var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { "120", "160" });
+                logger1.Info($"Result::{result}");
+
+                //var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { 12, 16 });
+                //logger1.Info($"Result::{result}");
+#if false
+                await Task.Run(() =>
+                {
+                    var result = rpcClient?.CallMethod("Window", "Add", new object[] { 12, 16 });
+                    logger1.Info($"Result::{result}");
+                });
+#endif
                 //controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"300\" Sync=\"True\" />");
             }
             else if(button == Button_Close)
             {
+                var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { 120.0f, 160.0f });
+                logger1.Info($"Result Float::{result}");
+
                 //controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
             }
             else if(button == Button_Connect)
@@ -147,12 +181,7 @@ namespace Test2
             }
             else if(button == Button_Send)
             {
-                this.Dispatcher.InvokeAsync(() =>
-                {
-                    Console.WriteLine($"InvokeAsync 1  {Thread.CurrentThread.ManagedThreadId}");
-                    Thread.Sleep(3000);
-                    Console.WriteLine($"InvokeAsync 2");
-                });
+                
             }
         }
 

@@ -78,8 +78,8 @@ namespace SpaceCG.Extensions
         public static bool ConvertFrom(object value, Type destinationType, out object conversionValue)
         {
             conversionValue = null;
-            if (value == null) return true;
             if (destinationType == null) return false;
+            if (value == null || destinationType == typeof(void)) return true;
 
             Type valueType = value.GetType();
             if (!destinationType.IsArray && valueType == destinationType)
@@ -124,7 +124,12 @@ namespace SpaceCG.Extensions
                         conversionValue = cValue;
                         return true;
                     }
-                }                
+                }
+            }
+            else if (destinationType.IsArray && valueType.IsArray && destinationType.GetElementType() == valueType.GetElementType())
+            {
+                conversionValue = value;
+                return true;
             }
             else if (destinationType.IsArray && valueType.IsArray && destinationType.GetElementType() != valueType.GetElementType())
             {
