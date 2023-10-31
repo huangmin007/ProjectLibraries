@@ -354,7 +354,7 @@ namespace SpaceCG.Net
             else
             {
                 var paramElements = action.Elements(NParam);
-                if (paramElements.Count() > 0)
+                if (paramElements?.Count() > 0)
                 {
                     parameters = new object[paramElements.Count()];
                     for (int i = 0; i < parameters.Length; i++)
@@ -362,10 +362,19 @@ namespace SpaceCG.Net
                         XElement paramElement = paramElements.ElementAt(i);
                         if (paramElement == null) continue;
 
-                        object value = paramElement.Value;
-                        Type type = Type.GetType(paramElement.Attribute(NType).Value, false, true);
-                        if (type != null && type.IsArray) value = paramElement.Value.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                        parameters[i] = type != null && TypeExtensions.ConvertFrom(value, type, out object convertValue) ? convertValue : paramElement.Value;
+                        string typeName = paramElement.Attribute(NType)?.Value;
+                        if (!string.IsNullOrWhiteSpace(typeName))
+                        {
+                            object value = paramElement.Value;
+                            Type type = Type.GetType(typeName, false, true);
+
+                            if (type != null && type.IsArray) value = paramElement.Value.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                            parameters[i] = type != null && TypeExtensions.ConvertFrom(value, type, out object convertValue) ? convertValue : paramElement.Value;
+                        }
+                        else
+                        {
+                            parameters[i] = paramElement.Value;
+                        }
                     }
                 }
             }
@@ -515,6 +524,18 @@ namespace SpaceCG.Net
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// 调用实例对象的方法
+        /// </summary>
+        /// <param name="actions"></param>
+        public void CallMethods(IEnumerable<XElement> actions)
+        {
+            foreach(var action in actions)
+            {
+                ParseClientMessage(null, action);
+            }
         }
 
         /// <summary>
