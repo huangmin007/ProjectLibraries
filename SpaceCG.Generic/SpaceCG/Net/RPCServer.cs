@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
@@ -30,7 +31,7 @@ namespace SpaceCG.Net
         const string NParam = "Param";
         const string NParams = "Params";
 
-        const int ClientBufferSize = 1024 * 4;
+        const int ClientBufferSize = 1024 * 2;
 
         /// <summary>
         /// 连接的客户端集合
@@ -76,18 +77,13 @@ namespace SpaceCG.Net
 
         private ushort localPort;
         private TcpListener listener;
-        /// <summary>
-        /// 调用过的方法记录
-        /// </summary>
         private Dictionary<string, MethodInfo> historyMethodInfos;
 
         /// <summary>
         /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
         /// </summary>
-        /// <param name="localPort"></param>
-        public RPCServer(ushort localPort)
+        public RPCServer()
         {
-            this.localPort = localPort;
             this.syncContext = SynchronizationContext.Current;
             this.historyMethodInfos = new Dictionary<string, MethodInfo>(32);
             if (syncContext == null)
@@ -96,12 +92,22 @@ namespace SpaceCG.Net
                 syncContext = new SynchronizationContext();
             }
         }
+        /// <summary>
+        /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
+        /// </summary>
+        /// <param name="localPort"></param>
+        public RPCServer(ushort localPort) : this()
+        {
+            this.localPort = localPort;
+        }
 
         /// <summary>
         /// 启动 RPC(Remote Procedure Call)  服务
         /// </summary>
         public void Start()
         {
+            Stop();
+
             if (localPort > 1024 && localPort < 65535)
             {
                 listener = new TcpListener(IPAddress.Any, localPort);
@@ -125,7 +131,6 @@ namespace SpaceCG.Net
                 AcceptTcpClient();
             }
         }
-
         /// <summary>
         /// 启动 RPC(Remote Procedure Call)  服务
         /// </summary>
@@ -141,11 +146,6 @@ namespace SpaceCG.Net
         /// </summary>
         public void Stop()
         {
-            if (listener != null)
-            {
-                listener?.Stop();
-                listener = null;
-            }
             foreach (var clientObject in ClientObjects)
             {
                 TcpClient client = clientObject.Key;
@@ -157,15 +157,24 @@ namespace SpaceCG.Net
             }
 
             ClientObjects.Clear();
-            Logger.Info($"RPC Server Stop Success");
+
+            try
+            {
+                listener?.Stop();
+            }
+            catch { }
+            finally
+            {
+                listener = null;
+            }
         }
 
         /// <inheritdoc />
         public void Dispose()
         {
-            localPort = 0;
-
             Stop();
+
+            localPort = 0;
             AccessObjects.Clear();
             historyMethodInfos.Clear();
         }
@@ -184,11 +193,11 @@ namespace SpaceCG.Net
                 ClientObjects.Add(client, new byte[ClientBufferSize]);
                 Logger.Debug($"Server Accept Remote Client {client?.Client?.RemoteEndPoint} Count:{ClientObjects.Count}");
             }
-            catch(ObjectDisposedException)
+            catch (ObjectDisposedException)
             {
                 return;
             }
-            catch(Exception ex) 
+            catch (Exception ex)
             {
                 Logger.Error($"Server Exception: {ex.Message}");
                 return;
@@ -219,11 +228,11 @@ namespace SpaceCG.Net
                 networkStream = client.GetStream();
                 remoteEndPoint = client.Client.RemoteEndPoint as IPEndPoint;
             }
-            catch(Exception ex) 
+            catch (Exception ex)
             {
                 if (ClientObjects.ContainsKey(client)) ClientObjects.Remove(client);
                 client?.Dispose();
-                Logger.Warn($"Client {remoteEndPoint} GetStream Exception: {ex}");                
+                Logger.Warn($"Client {remoteEndPoint} GetStream Exception: {ex}");
                 return;
             }
 
@@ -231,7 +240,7 @@ namespace SpaceCG.Net
             {
                 byte[] buffer = ClientObjects[client];
                 int count = await networkStream.ReadAsync(buffer, 0, buffer.Length);
-                
+
                 if (count <= 0)
                 {
                     if (ClientObjects.ContainsKey(client)) ClientObjects.Remove(client);
@@ -248,10 +257,10 @@ namespace SpaceCG.Net
             catch (ObjectDisposedException)
             {
                 networkStream?.Dispose();
-                if(ClientObjects.ContainsKey(client)) ClientObjects.Remove(client);
+                if (ClientObjects.ContainsKey(client)) ClientObjects.Remove(client);
                 return;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (ClientObjects.ContainsKey(client)) ClientObjects.Remove(client);
                 client?.Dispose();
@@ -277,7 +286,7 @@ namespace SpaceCG.Net
                 if (client.Connected)
                 {
                     byte[] bytes = Encoding.UTF8.GetBytes($"{result}");
-                    client.GetStream()?.WriteAsync(bytes, 0, bytes.Length);
+                    client.GetStream().WriteAsync(bytes, 0, bytes.Length);
                 }
             }
             catch (Exception ex)
@@ -294,14 +303,14 @@ namespace SpaceCG.Net
         /// <returns></returns>
         private object ParseClientMessage(TcpClient client, string message)
         {
-            if(string.IsNullOrEmpty(message)) return null;
+            if (string.IsNullOrEmpty(message)) return null;
 
             XElement action = null;
             try
             {
                 action = XElement.Parse(message);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 ReturnObject result = new ReturnObject(-1);
                 result.Exception = $"数据解析异常: {ex.Message}";
@@ -313,7 +322,6 @@ namespace SpaceCG.Net
 
             return ParseClientMessage(client, action);
         }
-
         /// <summary>
         /// 解析客户端消息
         /// </summary>
@@ -356,7 +364,7 @@ namespace SpaceCG.Net
 
                         object value = paramElement.Value;
                         Type type = Type.GetType(paramElement.Attribute(NType).Value, false, true);
-                        if(type != null && type.IsArray) value = paramElement.Value.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (type != null && type.IsArray) value = paramElement.Value.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                         parameters[i] = type != null && TypeExtensions.ConvertFrom(value, type, out object convertValue) ? convertValue : paramElement.Value;
                     }
                 }
@@ -364,7 +372,7 @@ namespace SpaceCG.Net
 
             CallInstanceMethod(objectName, methodName, parameters, synchronous, out ReturnObject result);
             SendReturnObject(ref client, result);
-            
+
             return result.Value;
         }
 
@@ -380,7 +388,7 @@ namespace SpaceCG.Net
         private bool CallInstanceMethod(string objectName, string methodName, object[] parameters, bool synchronous, out ReturnObject returnResult)
         {
             returnResult = new ReturnObject(-1);
-            if(string.IsNullOrWhiteSpace(objectName) || string.IsNullOrWhiteSpace(methodName))
+            if (string.IsNullOrWhiteSpace(objectName) || string.IsNullOrWhiteSpace(methodName))
             {
                 returnResult.Exception = $"参数异常, 参数不能为空";
                 Logger.Warn($"{returnResult.Exception} {nameof(objectName)}={objectName}, {nameof(methodName)}={methodName}");
@@ -483,18 +491,18 @@ namespace SpaceCG.Net
 
             try
             {
-                returnResult.Code = 0; 
+                returnResult.Code = 0;
                 returnResult.Type = methodInfo.ReturnType;
-                
+
                 dispatcher.Invoke((result) =>
                 {
-                    object value = methodInfo.Invoke(instanceObj, arguments);                    
+                    object value = methodInfo.Invoke(instanceObj, arguments);
                     if (result != null)
                     {
                         ReturnObject rresult = result as ReturnObject;
                         rresult.Value = value;
                     }
-                }, 
+                },
                 returnResult.Type == typeof(void) ? null : returnResult);
             }
             catch (Exception ex)
@@ -523,7 +531,7 @@ namespace SpaceCG.Net
         /// <returns></returns>
         public object CallMethod(string objectName, string methodName)
         {
-            if(CallInstanceMethod(objectName, methodName, null, true, out ReturnObject result))
+            if (CallInstanceMethod(objectName, methodName, null, true, out ReturnObject result))
             {
                 return result.Value;
             }

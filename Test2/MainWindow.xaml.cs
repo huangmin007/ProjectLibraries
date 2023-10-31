@@ -170,7 +170,8 @@ namespace Test2
             }
             else if(button == Button_Close)
             {
-                var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { 120.0f, 160.0f });
+                var result = rpcServer.CallMethod("Window", "Add", new object[] { 12.0f, 13.0f});
+                //var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { 120.0f, 160.0f });
                 logger1.Info($"Result Float::{result}");
 
                 //controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");

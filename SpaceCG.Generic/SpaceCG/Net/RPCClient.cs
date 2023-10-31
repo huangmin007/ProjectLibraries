@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Net;
+using System.Diagnostics;
 using System.Net.Sockets;
-using System.Runtime.InteropServices.ComTypes;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using SpaceCG.Extensions;
 using SpaceCG.Generic;
 
 namespace SpaceCG.Net
@@ -26,7 +22,7 @@ namespace SpaceCG.Net
         private TcpClient tcpClient;
 
         /// <summary>
-        /// 远程方法调用异常时是否在本在抛出
+        /// 远程方法调用异常时是否在本地抛出
         /// </summary>
         public bool IsThrowException { get; set; } = false;
 
@@ -57,27 +53,19 @@ namespace SpaceCG.Net
         /// <summary>
         /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
         /// </summary>
-        /// <param name="remoteAddress"></param>
-        /// <param name="remotePort"></param>
-        public RPCClient(string remoteAddress, ushort remotePort)
+        public RPCClient()
         {
-            buffer = new byte[4096];
-            this.remotePort = remotePort;
-            this.remoteHost = remoteAddress;
+            this.buffer = new byte[2048];
         }
-
-        /// <inheritdoc />
-        public void Dispose()
+        /// <summary>
+        /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
+        /// </summary>
+        /// <param name="remoteHost"></param>
+        /// <param name="remotePort"></param>
+        public RPCClient(string remoteHost, ushort remotePort) : this()
         {
-            if (tcpClient != null)
-            {
-                tcpClient?.Dispose();
-                tcpClient = null;
-            }
-
-            remotePort = 0;
-            remoteHost = null;
-            buffer = null;
+            this.remotePort = remotePort;
+            this.remoteHost = remoteHost;
         }
 
         /// <summary>
@@ -85,12 +73,7 @@ namespace SpaceCG.Net
         /// </summary>
         public async void ConnectAsync()
         {
-            if (!IsConnected)
-            {
-                tcpClient?.Dispose();
-                tcpClient = null;
-            }
-
+            Close();
             if (remotePort <= 0) return;
 
             try
@@ -103,14 +86,54 @@ namespace SpaceCG.Net
                 Logger.Error($"RPC Client Connect(Async) Exception: {ex}");
             }
 
-            if(!IsConnected)
+            if(IsConnected)
             {
-                Logger.Debug($"RPC Client Reconnecting {remoteHost}:{remotePort}");
+                Logger.Info($"RPC Client {tcpClient.Client.LocalEndPoint} Connect(Async) Server {tcpClient.Client.RemoteEndPoint} Success");
+            }
+            else
+            {
+                Logger.Debug($"RPC Client Ready Reconnecting {remoteHost}:{remotePort}");
                 await Task.Delay(1000);
                 ConnectAsync();
-                return;
             }
-            Logger.Info($"RPC Client Connect(Async) Server {tcpClient.Client.RemoteEndPoint} Success");
+        }
+        /// <summary>
+        /// 连接远程服务端
+        /// </summary>
+        /// <param name="remoteHost"></param>
+        /// <param name="remotePort"></param>
+        public void ConnectAsync(string remoteHost, ushort remotePort)
+        {
+            this.remotePort = remotePort;
+            this.remoteHost = remoteHost;
+
+            ConnectAsync();
+        }
+
+        /// <summary>
+        /// 关闭连接
+        /// </summary>
+        public void Close()
+        {
+            try
+            {
+                tcpClient?.Dispose();
+            }
+            catch { }
+            finally
+            {
+                tcpClient = null;
+            }
+        }
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            Close();
+
+            buffer = null;
+            remotePort = 0;
+            remoteHost = null;
         }
 
         /// <summary>
@@ -118,12 +141,7 @@ namespace SpaceCG.Net
         /// </summary>
         protected void Connect()
         {
-            if (!IsConnected)
-            {
-                tcpClient?.Dispose();
-                tcpClient = null;
-            }
-
+            Close();
             if (remotePort <= 0) return;
 
             try
@@ -138,7 +156,7 @@ namespace SpaceCG.Net
             }
 
             if(IsConnected)
-                Logger.Info($"RPC Client Connect(Sync) Server {tcpClient.Client.RemoteEndPoint} Success");
+                Logger.Info($"RPC Client {tcpClient.Client.LocalEndPoint} Connect(Sync) Server {tcpClient.Client.RemoteEndPoint} Success");
         }
 
         /// <summary>
@@ -148,11 +166,14 @@ namespace SpaceCG.Net
         /// <returns></returns>
         public object CallMethod(XElement action)
         {
+            if (tcpClient == null)
+                throw new ObjectDisposedException(nameof(TcpClient), $"{nameof(TcpClient)} 已释放的对象执行操作异常");
+
             if (action == null || action.Name.LocalName != "Action")
                 throw new ArgumentException(nameof(action), "参数不能为空或参数格式错误");
 
-            if(!IsConnected) Connect();
-            if(!IsConnected)
+            if (!IsConnected) Connect();
+            if (!IsConnected)
             {
                 Logger.Warn($"RPC Client Connect(Sync) Failed");
                 return null;
@@ -167,22 +188,22 @@ namespace SpaceCG.Net
                 networkStream.WriteTimeout = Timeout;
 
                 //clear read buffer
-                if (networkStream.DataAvailable)
+                while (networkStream.DataAvailable)
                 {
                     int count = networkStream.Read(buffer, 0, buffer.Length);
-                    Logger.Warn($"RPC Client Read/Clear Buffer {count}");
+                    Logger.Warn($"RPC Client Clear Buffer Size: {count}");
                 }
 
                 byte[] bytes = Encoding.UTF8.GetBytes(action.ToString());
                 networkStream.Write(bytes, 0, bytes.Length);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error($"RPC Client Write Exception: {ex}");
                 return null;
             }
 
-            string response = null;
+            string responseMessage = null;
             try
             {
                 while (networkStream != null)
@@ -192,27 +213,35 @@ namespace SpaceCG.Net
                     if (count <= 0)
                     {
                         ConnectAsync();
+                        Logger.Warn($"RPC Server is Closed");
                         return null;
                     }
 
-                    response = Encoding.UTF8.GetString(buffer, 0, count);
-                    Logger.Debug($"Read Count::{count} {response}");
+                    responseMessage = Encoding.UTF8.GetString(buffer, 0, count);
+                    Logger.Debug($"RPC Client Read Buffer Size: {count}  Message: {responseMessage}");
                     break;
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error($"RPC Client Read Exception: {ex}");
             }
 
-            if (string.IsNullOrWhiteSpace(response)) return null;
+            if (string.IsNullOrWhiteSpace(responseMessage)) return null;
             XElement element = null;
-            try { element = XElement.Parse(response); }
-            catch (Exception) { return null; }
+            try 
+            {
+                element = XElement.Parse(responseMessage); 
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"RPC Client Respose Message: {responseMessage}");
+                Logger.Error($"RPC Client Respose Message Exception: {ex}");
+                return null; 
+            }
 
             ReturnObject result = new ReturnObject(element);
-            if (result.Code != 0 && this.IsThrowException)
-                throw new Exception(result.Exception);
+            if (result.Code != 0 && IsThrowException) throw new Exception(result.Exception);
 
             return result.Value;
         }
