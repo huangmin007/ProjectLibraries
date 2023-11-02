@@ -67,30 +67,11 @@ namespace Test2
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            //controller = new ReflectionController(2023);
-            //controller.SynchronizationContext = new ReflectionSynchronizationContext();
-            //controller.AccessObjects.Add("Window", this);
-
-            //FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\logs\2023-09-12.AIUI.control.log");
-            //FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\nlp\result\20230913_124816_441_IFLYTEK.story.json");
-
-            List<int> values = new List<int>() { 1, 2, 3, 4, 5, 6,7,8,9,10};
-            for(int i = 0; i < values.Count; i ++)
-            {
-                int val = values[i];
-                if(val % 2 == 0)
-                {
-                    values.RemoveAt(i--);
-                }
-            }
-
-            foreach(var val in values)
-                Console.Write($"{val},");
-            Console.WriteLine("edn...");
-
-            Type v = typeof(void);
-            Console.WriteLine($"{v}");
-            Console.WriteLine(v);
+            Type convertType = typeof(Thickness);
+            Thickness thick = new Thickness(12);
+            TypeConverter converter = TypeDescriptor.GetConverter(convertType);
+            Console.WriteLine($"CanConvertTo::{converter.CanConvertTo(convertType)}");
+            Console.WriteLine($"ToString::{converter.ConvertToString(thick)}"); 
 
             string message = "1234";
 
@@ -104,7 +85,6 @@ namespace Test2
             rpcClient = new RPCClient("127.0.0.1", 2025);
             rpcClient.ConnectAsync();
             rpcClient.Timeout = 10000;
-            //rpcClient.IsThrowException = true;
 
             string xmlString = "<data> <string><![CDATA[这是一段未解析字符数据<a>test</a>,[0x12,0x13,0xAA] ]]></string> </data>";
             XElement XML = XElement.Parse(xmlString);

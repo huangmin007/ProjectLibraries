@@ -108,9 +108,9 @@ namespace SpaceCG.Extensions
                 }
                 else if (destinationType == typeof(bool))
                 {
-                    if (bool.TryParse(valueString, out bool result))
+                    if (bool.TryParse(valueString, out bool boolValue))
                     {
-                        conversionValue = result;
+                        conversionValue = boolValue;
                         return true;
                     }
                     string pv = valueString.Replace(" ", "");

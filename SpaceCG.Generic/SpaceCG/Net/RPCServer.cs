@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -20,7 +21,7 @@ namespace SpaceCG.Net
     /// </summary>
     public class RPCServer : IDisposable
     {
-        static readonly LoggerTrace Logger = new LoggerTrace(nameof(RPCServer));
+        internal static readonly LoggerTrace Logger = new LoggerTrace(nameof(RPCServer));
 
         /// <summary>
         /// Buffer Size
@@ -770,16 +771,22 @@ namespace SpaceCG.Net
 
         internal string ToMessage()
         {
-            //这里要在后面完善，value to string
-            return $"<{XInvokeResult} {nameof(Status)}=\"{Status}\" {nameof(ReturnType)}=\"{ReturnType}\" {nameof(ReturnValue)}=\"{ReturnValue}\" {nameof(ExceptionMessage)}=\"{ExceptionMessage}\" />";
-        }
+            string valueString = ReturnValue != null ? ReturnValue.ToString() : "";
+            if (ReturnValue != null && ReturnType != null && ReturnType != typeof(void) && ReturnType != typeof(string))
+            {
+                try
+                {
+                    TypeConverter converter = TypeDescriptor.GetConverter(ReturnType);
+                    if (converter.CanConvertTo(ReturnType)) valueString = converter.ConvertToString(valueString);
+                }
+                catch (Exception ex)
+                {
+                    valueString = ReturnValue.ToString();
+                    RPCServer.Logger.Warn($"MethodInvokeResult TypeConverter。ConvertToString Exception: {ex}");
+                }
+            }
 
-#if false
-        /// <inheritdoc/>
-        public override string ToString()
-        {
-            return $"<{XInvokeResult} {nameof(Status)}=\"{Status}\" {nameof(ReturnType)}=\"{ReturnType}\" {nameof(ReturnValue)}=\"{ReturnValue}\" {nameof(ExceptionMessage)}=\"{ExceptionMessage}\" />";
+            return $"<{XInvokeResult} {nameof(Status)}=\"{Status}\" {nameof(ReturnType)}=\"{ReturnType}\" {nameof(ReturnValue)}=\"{valueString}\" {nameof(ExceptionMessage)}=\"{ExceptionMessage}\" />";
         }
-#endif
     }
 }
