@@ -119,9 +119,9 @@ namespace SpaceCG.Extensions
                 }
                 else if (IsNumeric(destinationType))
                 {
-                    if (valueString.ToNumber(destinationType, out ValueType cValue))
+                    if (valueString.ToNumber(destinationType, out ValueType numberValue))
                     {
-                        conversionValue = cValue;
+                        conversionValue = numberValue;
                         return true;
                     }
                 }

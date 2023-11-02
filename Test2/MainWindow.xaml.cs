@@ -73,12 +73,30 @@ namespace Test2
 
             //FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\logs\2023-09-12.AIUI.control.log");
             //FileExtensions.GetFileEncoding(@"E:\2020\2023_AIUI\AIUI.Application.v2\AIUI.Application.v2\bin\Debug\nlp\result\20230913_124816_441_IFLYTEK.story.json");
+
+            List<int> values = new List<int>() { 1, 2, 3, 4, 5, 6,7,8,9,10};
+            for(int i = 0; i < values.Count; i ++)
+            {
+                int val = values[i];
+                if(val % 2 == 0)
+                {
+                    values.RemoveAt(i--);
+                }
+            }
+
+            foreach(var val in values)
+                Console.Write($"{val},");
+            Console.WriteLine("edn...");
+
             Type v = typeof(void);
             Console.WriteLine($"{v}");
             Console.WriteLine(v);
 
+            string message = "1234";
+
             rpcServer = new RPCServer(2025);
             rpcServer.AccessObjects.Add("Window", this);
+            rpcServer.AccessObjects.Add("string", message);
             rpcServer.Start();
 
             //rpcServer.AccessObjects.Add("Thread", typeof(Thread).GetMethod("Sleep", new Type[] { typeof(int) }));
@@ -154,7 +172,7 @@ namespace Test2
             logger1.Info($"Click {button.Name}");
             if (button == Button_Test)
             {
-                var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { "120", "160" });
+                var result = await rpcClient.TryCallMethodAsync("Window", "Add", new object[] { "120", "160" });
                 logger1.Info($"Result::{result}");
 
                 //var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { 12, 16 });
@@ -166,15 +184,11 @@ namespace Test2
                     logger1.Info($"Result::{result}");
                 });
 #endif
-                //controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"300\" Sync=\"True\" />");
             }
             else if(button == Button_Close)
             {
-                var result = rpcServer.CallMethod("Window", "Add", new object[] { 12.0f, 13.0f});
-                //var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { 120.0f, 160.0f });
-                logger1.Info($"Result Float::{result}");
-
-                //controller.TryParseControlMessage("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
+                rpcServer.TryCallMethod("string", "ToNumber2", new object[] { 12 }, out object returnValue);
+                Console.WriteLine($"RPC Server CallMethod::{returnValue}");
             }
             else if(button == Button_Connect)
             {

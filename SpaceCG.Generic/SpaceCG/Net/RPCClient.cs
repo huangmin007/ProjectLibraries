@@ -11,7 +11,7 @@ namespace SpaceCG.Net
     /// <summary>
     /// RPC (Remote Procedure Call) or (Reflection Program Control) Client
     /// </summary>
-    public class RPCClient:IDisposable
+    public class RPCClient : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(RPCClient));
 
@@ -55,7 +55,7 @@ namespace SpaceCG.Net
         /// </summary>
         public RPCClient()
         {
-            this.buffer = new byte[2048];
+            this.buffer = new byte[RPCServer.BufferSize];
         }
         /// <summary>
         /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
@@ -73,20 +73,20 @@ namespace SpaceCG.Net
         /// </summary>
         public async void ConnectAsync()
         {
-            Close();
             if (remotePort <= 0) return;
+            Close();
 
             try
             {
                 tcpClient = new TcpClient();
                 await tcpClient.ConnectAsync(remoteHost, remotePort);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error($"RPC Client Connect(Async) Exception: {ex}");
             }
 
-            if(IsConnected)
+            if (IsConnected)
             {
                 Logger.Info($"RPC Client {tcpClient.Client.LocalEndPoint} Connect(Async) Server {tcpClient.Client.RemoteEndPoint} Success");
             }
@@ -141,46 +141,53 @@ namespace SpaceCG.Net
         /// </summary>
         protected void Connect()
         {
-            Close();
             if (remotePort <= 0) return;
+            Close();
 
             try
             {
                 tcpClient = new TcpClient();
                 tcpClient.Connect(remoteHost, remotePort);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error($"RPC Client Connect(Sync) Exception: {ex}");
                 return;
             }
 
-            if(IsConnected)
+            if (IsConnected)
                 Logger.Info($"RPC Client {tcpClient.Client.LocalEndPoint} Connect(Sync) Server {tcpClient.Client.RemoteEndPoint} Success");
         }
 
         /// <summary>
         /// 调用远程实例对象的方法
+        /// <para>服务端有响应时, 返回 true, 此时输出参数 out returnResult 不为 null</para>
         /// </summary>
         /// <param name="action"></param>
-        /// <returns></returns>
-        public object CallMethod(XElement action)
+        /// <param name="returnResult"></param>
+        /// <returns>服务端有响应时, 返回 true, 否则返回 false</returns>
+        public bool TryCallMethod(XElement action, out MethodInvokeResult returnResult)
         {
+            returnResult = null;
             if (tcpClient == null)
-                throw new ObjectDisposedException(nameof(TcpClient), $"{nameof(TcpClient)} 已释放的对象执行操作异常");
-
-            if (action == null || action.Name.LocalName != "Action")
-                throw new ArgumentException(nameof(action), "参数不能为空或参数格式错误");
+            {
+                Logger.Warn($"{nameof(TcpClient)} 已释放的对象执行操作异常");
+                return false;
+            }
+            if (!MethodInvokeMessage.CheckFormat(action))
+            {
+                Logger.Warn($"{nameof(action)} 参数不能为空或参数格式错误");
+                return false;
+            }
 
             if (!IsConnected) Connect();
             if (!IsConnected)
             {
-                Logger.Warn($"RPC Client Connect(Sync) Failed");
-                return null;
+                Logger.Error("RPC Client Connect(Sync) Failed");
+                return false;
             }
 
             NetworkStream networkStream = null;
-
             try
             {
                 networkStream = tcpClient.GetStream();
@@ -200,7 +207,7 @@ namespace SpaceCG.Net
             catch (Exception ex)
             {
                 Logger.Error($"RPC Client Write Exception: {ex}");
-                return null;
+                return false;
             }
 
             string responseMessage = null;
@@ -213,77 +220,106 @@ namespace SpaceCG.Net
                     if (count <= 0)
                     {
                         ConnectAsync();
-                        Logger.Warn($"RPC Server is Closed");
-                        return null;
+                        Logger.Warn("RPC Server is Closed");
+                        return false;
                     }
 
                     responseMessage = Encoding.UTF8.GetString(buffer, 0, count);
-                    Logger.Debug($"RPC Client Read Buffer Size: {count}  Message: {responseMessage}");
+                    Logger.Debug($"RPC Client Read Size: {count}, Response Message: {responseMessage}");
                     break;
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error($"RPC Client Read Exception: {ex}");
+                return false;
             }
 
-            if (string.IsNullOrWhiteSpace(responseMessage)) return null;
             XElement element = null;
-            try 
+            try
             {
-                element = XElement.Parse(responseMessage); 
+                element = XElement.Parse(responseMessage);
             }
             catch (Exception ex)
             {
-                Logger.Warn($"RPC Client Respose Message: {responseMessage}");
-                Logger.Error($"RPC Client Respose Message Exception: {ex}");
-                return null; 
+                Logger.Info($"RPC Client Receive Message: {responseMessage}");
+                Logger.Error($"RPC Server Return Result Format Exception: {ex}");
+                return false;
             }
 
-            ReturnObject result = new ReturnObject(element);
-            if (result.Code != 0 && IsThrowException) throw new Exception(result.Exception);
+            returnResult = new MethodInvokeResult(element);
+            if (IsThrowException && returnResult.Status != InvokeStatus.Success)
+                throw new Exception(returnResult.ExceptionMessage);
 
-            return result.Value;
+            return true;
         }
         /// <summary>
         /// 调用远程实例对象的方法
+        /// <para></para>
         /// </summary>
         /// <param name="action"></param>
-        /// <returns></returns>
-        public Task<object> CallMethodAsync(XElement action) => Task.Run(() => CallMethod(action));
+        /// <returns>服务端有响应时, 异步操作返回对象 <see cref="MethodInvokeResult"/> 不为 null </returns>
+        public Task<MethodInvokeResult> TryCallMethodAsync(XElement action) => Task.Run(() =>
+        {
+            return TryCallMethod(action, out MethodInvokeResult invokeResult) ? invokeResult : null;
+        });
 
+        /// <summary>
+        /// 调用远程实例对象的方法
+        /// <para>服务端有响应时, 返回 true, 此时输出参数 out returnResult 不为 null</para>
+        /// </summary>
+        /// <param name="objectName"></param>
+        /// <param name="methodName"></param>
+        /// <param name="returnResult"></param>
+        /// <returns>服务端有响应时, 返回 true, 否则返回 false</returns>
+        public bool TryCallMethod(string objectName, string methodName, out MethodInvokeResult returnResult) 
+            => TryCallMethod(objectName, methodName, null, true, out returnResult);
         /// <summary>
         /// 调用远程实例对象的方法
         /// </summary>
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
-        /// <returns></returns>
-        public object CallMethod(string objectName, string methodName) => CallMethod(objectName, methodName, null, true);
+        /// <returns>服务端有响应时, 异步操作返回对象 <see cref="MethodInvokeResult"/> 不为 null </returns>
+        public Task<MethodInvokeResult> TryCallMethodAsync(string objectName, string methodName) => Task.Run(() =>
+        {
+            return TryCallMethod(objectName, methodName, null, true, out MethodInvokeResult invokeResult) ? invokeResult : null;
+        });
+
         /// <summary>
         /// 调用远程实例对象的方法
+        /// <para>服务端有响应时, 返回 true, 此时输出参数 out returnResult 不为 null</para>
         /// </summary>
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
-        /// <returns></returns>
-        public Task<object> CallMethodAsync(string objectName, string methodName) => Task.Run(() => CallMethod(objectName, methodName, null, true));
-
+        /// <param name="parameters"></param>
+        /// <param name="returnResult"></param>
+        /// <returns>服务端有响应时, 返回 true, 否则返回 false</returns>
+        public bool TryCallMethod(string objectName, string methodName, object[] parameters, out MethodInvokeResult returnResult) 
+            => TryCallMethod(objectName, methodName, parameters, true, out returnResult);
         /// <summary>
         /// 调用远程实例对象的方法
         /// </summary>
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <returns></returns>
-        public object CallMethod(string objectName, string methodName, object[] parameters) => CallMethod(objectName, methodName, parameters, true);
+        /// <returns>服务端有响应时, 异步操作返回对象 <see cref="MethodInvokeResult"/> 不为 null </returns>
+        public Task<MethodInvokeResult> TryCallMethodAsync(string objectName, string methodName, object[] parameters) => Task.Run(() =>
+        {
+            return TryCallMethod(objectName, methodName, parameters, true, out MethodInvokeResult invokeResult) ? invokeResult : null;
+        });
+
         /// <summary>
         /// 调用远程实例对象的方法
+        /// <para>服务端有响应时, 返回 true, 此时输出参数 out returnResult 不为 null</para>
         /// </summary>
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <returns></returns>
-        public Task<object> CallMethodAsync(string objectName, string methodName, object[] parameters) => Task.Run(()=>CallMethod(objectName, methodName, parameters, true));
-
+        /// <param name="synchronous"></param>
+        /// <param name="returnResult"></param>
+        /// <returns>服务端有响应时, 返回 true, 否则返回 false</returns>
+        public bool TryCallMethod(string objectName, string methodName, object[] parameters, bool synchronous, out MethodInvokeResult returnResult)
+            => TryCallMethod(MethodInvokeMessage.Create(objectName, methodName, parameters, synchronous), out returnResult);
         /// <summary>
         /// 调用远程实例对象的方法
         /// </summary>
@@ -291,33 +327,11 @@ namespace SpaceCG.Net
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
         /// <param name="synchronous"></param>
-        /// <returns></returns>
-        public object CallMethod(string objectName, string methodName, object[] parameters, bool synchronous)
+        /// <returns>服务端有响应时, 异步操作返回对象 <see cref="MethodInvokeResult"/> 不为 null </returns>
+        public Task<MethodInvokeResult> TryCallMethodAsync(string objectName, string methodName, object[] parameters, bool synchronous) => Task.Run(() =>
         {
-            StringBuilder builder = new StringBuilder(1024);            
-            builder.AppendLine($"<Action Object=\"{objectName}\" Method=\"{methodName}\" Sync=\"{synchronous}\">");
-            if (parameters?.Length > 0)
-            {
-                foreach (var param in parameters)
-                {
-                    builder.AppendLine($"<Param Type=\"{param.GetType()}\">{param}</Param>");
-                }
-            }
-            builder.Append("</Action>");
-
-            return CallMethod(XElement.Parse(builder.ToString()));
-        }
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <param name="synchronous"></param>
-        /// <returns></returns>
-        public Task<object> CallMethodAsync(string objectName, string methodName, object[] parameters, bool synchronous)
-        {
-            return Task.Run(() => CallMethod(objectName, methodName, parameters, synchronous));
-        }
+             return TryCallMethod(objectName, methodName, parameters, synchronous, out MethodInvokeResult invokeResult) ? invokeResult : null;
+        });
+        
     }
 }
