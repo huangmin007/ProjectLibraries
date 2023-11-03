@@ -239,12 +239,12 @@ namespace SpaceCG.Net
                 {
                     if (ClientObjects.ContainsKey(client)) ClientObjects.Remove(client);
                     client?.Dispose();
-                    Logger.Info($"RPC Server Remote Client {remoteEndPoint} Disconnection, Clients Count:{ClientObjects.Count}");
+                    Logger.Info($"Remote Client {remoteEndPoint} Disconnection, Clients Count:{ClientObjects.Count}");
                     return;
                 }
 
                 string message = Encoding.UTF8.GetString(buffer, 0, count);
-                Logger.Debug($"RPC Server Remote Client {remoteEndPoint} Read Message({count}bytes): {message}");
+                Logger.Debug($"Read Remote Client {remoteEndPoint} Message({count}bytes): {message}");
 
                 _ = Task.Run(() => TryParseControlMessage(client, message, out _));
             }
@@ -271,7 +271,7 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="client"></param>
         /// <param name="returnResult"></param>
-        private void SendReturnObject(ref TcpClient client, MethodInvokeResult returnResult)
+        private void SendInvokeResult(ref TcpClient client, MethodInvokeResult returnResult)
         {
             if (client == null || returnResult == null) return;
 
@@ -311,7 +311,7 @@ namespace SpaceCG.Net
                 MethodInvokeResult result = new MethodInvokeResult(InvokeStatus.RPCServerException, $"数据解析异常: {ex.Message}, 或不支持数据格式");
                 Logger.Warn($"Client {client?.Client?.RemoteEndPoint} {result.ExceptionMessage}");
 
-                SendReturnObject(ref client, result);
+                SendInvokeResult(ref client, result);
                 return false;
             }
 
@@ -328,13 +328,13 @@ namespace SpaceCG.Net
             returnValue = null;
             if (!MethodInvokeMessage.CheckFormat(action))
             {
-                SendReturnObject(ref client, new MethodInvokeResult(InvokeStatus.RPCServerException, $"{nameof(RPCClient)} 数据格式错误"));
+                SendInvokeResult(ref client, new MethodInvokeResult(InvokeStatus.RPCServerException, $"{nameof(RPCClient)} 数据格式错误"));
                 return false;
             }
 
             bool result = CallInstanceMethod(new MethodInvokeMessage(action), out MethodInvokeResult invokeResult);
             if(result) returnValue = invokeResult.ReturnValue;
-            SendReturnObject(ref client, invokeResult);
+            SendInvokeResult(ref client, invokeResult);
 
             return result && invokeResult.Status == InvokeStatus.Success;
         }
@@ -672,15 +672,39 @@ namespace SpaceCG.Net
             }
         }
 
-        internal static XElement Create(string objectName, string methodName, object[] parameters, bool synchronous)
+        internal static XElement ToMessage(string objectName, string methodName, object[] parameters, bool synchronous)
         {
             StringBuilder builder = new StringBuilder(1024);
             builder.AppendLine($"<{XAction} {XObject}=\"{objectName}\" {XMethod}=\"{methodName}\" {XSync}=\"{synchronous}\">");
             if (parameters?.Length > 0)
             {
+                Type stringType = typeof(string);
                 foreach (var param in parameters)
                 {
-                    builder.AppendLine($"<{XParam} {XType}=\"{param.GetType()}\">{param}</{XParam}>");
+                    Type paramType = param.GetType();
+
+                    if (param == null)
+                    {
+                        builder.AppendLine($"<{XParam} {XType}=\"{paramType}\">null</{XParam}>");
+                        continue;
+                    }
+                    if(paramType == stringType)
+                    {
+                        builder.AppendLine($"<{XParam} {XType}=\"{paramType}\">{param}</{XParam}>");
+                        continue;
+                    }
+
+                    string paramString = param.ToString();
+                    try
+                    {
+                        TypeConverter converter = TypeDescriptor.GetConverter(paramType);
+                        if (converter.CanConvertTo(paramType)) paramString = converter.ConvertToString(param);
+                    }
+                    catch (Exception)
+                    {
+                        paramString = param.ToString();
+                    }
+                    builder.AppendLine($"<{XParam} {XType}=\"{paramType}\">{paramString}</{XParam}>");
                 }
             }
             builder.Append($"</{XAction}>");

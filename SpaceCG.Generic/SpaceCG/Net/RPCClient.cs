@@ -51,6 +51,11 @@ namespace SpaceCG.Net
         }
 
         /// <summary>
+        /// <see cref="TcpClient"/> 客户端对象
+        /// </summary>
+        public TcpClient TcpClient => tcpClient;
+
+        /// <summary>
         /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
         /// </summary>
         public RPCClient()
@@ -319,7 +324,7 @@ namespace SpaceCG.Net
         /// <param name="returnResult"></param>
         /// <returns>服务端有响应时, 返回 true, 否则返回 false</returns>
         public bool TryCallMethod(string objectName, string methodName, object[] parameters, bool synchronous, out MethodInvokeResult returnResult)
-            => TryCallMethod(MethodInvokeMessage.Create(objectName, methodName, parameters, synchronous), out returnResult);
+            => TryCallMethod(MethodInvokeMessage.ToMessage(objectName, methodName, parameters, synchronous), out returnResult);
         /// <summary>
         /// 调用远程实例对象的方法
         /// </summary>

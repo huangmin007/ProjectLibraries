@@ -402,11 +402,6 @@ namespace SpaceCG.Extensions
 
             return array;
         }
-
-        public static int ToNumber2(this string str, int a)
-        {
-            return int.TryParse(str, out int result) ? result + a : -1;
-        }
 #endif
     }
 }
