@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -67,11 +68,7 @@ namespace Test2
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            Type convertType = typeof(Thickness);
-            Thickness thick = new Thickness(12);
-            TypeConverter converter = TypeDescriptor.GetConverter(convertType);
-            Console.WriteLine($"CanConvertTo::{converter.CanConvertTo(convertType)}");
-            Console.WriteLine($"ToString::{converter.ConvertToString(thick)}"); 
+            byte[] buffer = new byte[16];
 
             string message = "1234";
 
@@ -80,8 +77,9 @@ namespace Test2
             rpcServer.AccessObjects.Add("string", message);
             rpcServer.Start();
 
+            rpcServer.AccessObjects.Add("System.Threading.Thread", typeof(Thread));
             //rpcServer.AccessObjects.Add("Thread", typeof(Thread).GetMethod("Sleep", new Type[] { typeof(int) }));
-           
+
             rpcClient = new RPCClient("127.0.0.1", 2025);
             rpcClient.ConnectAsync();
             rpcClient.Timeout = 10000;
@@ -98,7 +96,6 @@ namespace Test2
 
             Type type = Type.GetType("System.Threading.Thread", false, true);            
             Console.WriteLine($"Type::{type}");
-            int t = 3;
             
             bool r = TypeExtensions.ConvertFrom("TestEnum.C", typeof(TestEnum), out object convert);
             Console.WriteLine($"{r}");
@@ -152,7 +149,7 @@ namespace Test2
             logger1.Info($"Click {button.Name}");
             if (button == Button_Test)
             {
-                var result = await rpcClient.TryCallMethodAsync("Window", "Add", new object[] { "120", "160" });
+                var result = await rpcClient.TryCallMethodAsync("Window", "Add33", new object[] { "120", "160" });
                 logger1.Info($"Result::{result}");
 
                 //var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { 12, 16 });
@@ -167,8 +164,8 @@ namespace Test2
             }
             else if(button == Button_Close)
             {
-                rpcServer.TryCallMethod("string", "ToNumber2", new object[] { 12 }, out object returnValue);
-                Console.WriteLine($"RPC Server CallMethod::{returnValue}");
+                rpcServer.TryCallMethod("Window", "Add33", new object[] { 12,13 }, out InvokeResult invokeResult);
+                Console.WriteLine($"RPC Server CallMethod::{invokeResult}");
             }
             else if(button == Button_Connect)
             {

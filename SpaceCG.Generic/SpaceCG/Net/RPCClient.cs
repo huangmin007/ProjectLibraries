@@ -1,5 +1,6 @@
 ﻿using System;
-using System.Diagnostics;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,11 +21,6 @@ namespace SpaceCG.Net
 
         private byte[] buffer;
         private TcpClient tcpClient;
-
-        /// <summary>
-        /// 远程方法调用异常时是否在本地抛出
-        /// </summary>
-        public bool IsThrowException { get; set; } = false;
 
         /// <summary>
         /// Read/Write Timeout
@@ -60,7 +56,7 @@ namespace SpaceCG.Net
         /// </summary>
         public RPCClient()
         {
-            this.buffer = new byte[RPCServer.BufferSize];
+            this.buffer = new byte[RPCServer.BUFFER_SIZE];
         }
         /// <summary>
         /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
@@ -165,26 +161,18 @@ namespace SpaceCG.Net
         }
 
         /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para>服务端有响应时, 返回 true, 此时输出参数 out returnResult 不为 null</para>
+        /// Write And Read Messages
         /// </summary>
-        /// <param name="action"></param>
-        /// <param name="returnResult"></param>
-        /// <returns>服务端有响应时, 返回 true, 否则返回 false</returns>
-        public bool TryCallMethod(XElement action, out MethodInvokeResult returnResult)
+        /// <param name="invokeMessage"></param>
+        /// <param name="invokeResult"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        protected bool WriteAndReadMessages(string invokeMessage, out string invokeResult)
         {
-            returnResult = null;
-            if (tcpClient == null)
-            {
-                Logger.Warn($"{nameof(TcpClient)} 已释放的对象执行操作异常");
-                return false;
-            }
-            if (!MethodInvokeMessage.CheckFormat(action))
-            {
-                Logger.Warn($"{nameof(action)} 参数不能为空或参数格式错误");
-                return false;
-            }
+            if (string.IsNullOrWhiteSpace(invokeMessage))
+                throw new ArgumentNullException(nameof(invokeMessage), "参数不能为空");
 
+            invokeResult = null;
             if (!IsConnected) Connect();
             if (!IsConnected)
             {
@@ -206,7 +194,7 @@ namespace SpaceCG.Net
                     Logger.Warn($"RPC Client Clear Buffer Size: {count}");
                 }
 
-                byte[] bytes = Encoding.UTF8.GetBytes(action.ToString());
+                byte[] bytes = Encoding.UTF8.GetBytes(invokeMessage);
                 networkStream.Write(bytes, 0, bytes.Length);
             }
             catch (Exception ex)
@@ -215,7 +203,6 @@ namespace SpaceCG.Net
                 return false;
             }
 
-            string responseMessage = null;
             try
             {
                 while (networkStream != null)
@@ -229,14 +216,107 @@ namespace SpaceCG.Net
                         return false;
                     }
 
-                    responseMessage = Encoding.UTF8.GetString(buffer, 0, count);
-                    Logger.Debug($"RPC Client Read Size: {count}, Response Message: {responseMessage}");
+                    invokeResult = Encoding.UTF8.GetString(buffer, 0, count);
+                    Logger.Debug($"RPC Client Read Size: {count}, Response Message: {invokeResult}");
                     break;
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error($"RPC Client Read Exception: {ex}");
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 调用远程多个实例对象的方法
+        /// </summary>
+        /// <param name="invokeMessages"></param>
+        /// <param name="invokeResults"></param>
+        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public bool TryCallMethods(IEnumerable<InvokeMessage> invokeMessages, out IEnumerable<InvokeResult> invokeResults)
+        {
+            if (invokeMessages?.Count() == 0) 
+                throw new ArgumentNullException(nameof(invokeMessages), "参数不能为空");
+
+            string InvokeMessages = $"{nameof(InvokeMessage)}s";
+            StringBuilder builer = new StringBuilder(RPCServer.BUFFER_SIZE);
+            builer.AppendLine($"<{InvokeMessages}>");
+            for (int i = 0; i < invokeMessages.Count(); i++)
+            {
+                builer.AppendLine(invokeMessages.ElementAt(i).ToXElementString());
+            }
+            builer.AppendLine($"</{InvokeMessages}>");
+
+            return TryCallMethods(XElement.Parse(builer.ToString()), out invokeResults); ;
+        }
+        /// <summary>
+        /// 调用远程实例对象的方法
+        /// </summary>
+        /// <param name="invokeMessages"></param>
+        /// <param name="invokeResults"></param>
+        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        public bool TryCallMethods(XElement invokeMessages, out IEnumerable<InvokeResult> invokeResults)
+        {
+            if (invokeMessages?.Elements(nameof(InvokeMessage)).Count() == 0)
+                throw new ArgumentNullException(nameof(invokeMessages), "参数不能为空");
+
+            if (invokeMessages.Name.LocalName != $"{nameof(InvokeMessage)}s")
+                throw new ArgumentException(nameof(invokeMessages), "格式协议错误");
+
+            invokeResults = Enumerable.Empty<InvokeResult>();
+            if (!WriteAndReadMessages(invokeMessages.ToString(), out string responseMessage))
+            {
+                return false;
+            }
+
+            XElement elements = null;
+            try
+            {
+                elements = XElement.Parse(responseMessage);
+            }
+            catch (Exception ex)
+            {
+                Logger.Info($"RPC Client Receive Message: {responseMessage}");
+                Logger.Error($"RPC Server Return Result Format Exception: {ex}");
+                return true;
+            }
+
+            var xResults = elements.Elements(nameof(InvokeResult));
+            InvokeResult[] iResults = new InvokeResult[xResults.Count()];
+            for (int i = 0; i < xResults.Count(); i++)
+            {
+                iResults[i] = new InvokeResult(xResults.ElementAt(i));
+            }
+
+            invokeResults = iResults;
+            return true;
+        }
+
+
+        /// <summary>
+        /// 调用远程实例对象的方法
+        /// <para>返回结果为 true 时, 此时输出参数 <see cref="InvokeResult"/> 不为 null</para>
+        /// </summary>
+        /// <param name="invokeMessage"></param>
+        /// <param name="invokeResult"></param>
+        /// <param name="throwException">远程方法或函数执行异常时，是否在本地抛出异常信息</param>
+        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="Exception"></exception>
+        public bool TryCallMethod(InvokeMessage invokeMessage, out InvokeResult invokeResult, bool throwException = false)
+        {
+            invokeResult = null;
+            if (invokeMessage == null) throw new ArgumentNullException(nameof(invokeMessage), "参数不能为空");
+
+            if (!WriteAndReadMessages(invokeMessage.ToXElementString(), out string responseMessage))
+            {
                 return false;
             }
 
@@ -247,96 +327,134 @@ namespace SpaceCG.Net
             }
             catch (Exception ex)
             {
+                invokeResult = new InvokeResult(StatusCodes.Unknow, invokeMessage.ObjectMethod, $"RPC Server Invoke Result Format Exception: {ex.Message}");
+
                 Logger.Info($"RPC Client Receive Message: {responseMessage}");
                 Logger.Error($"RPC Server Return Result Format Exception: {ex}");
-                return false;
+                if (throwException) throw ex;
+                return true;
             }
 
-            returnResult = new MethodInvokeResult(element);
-            if (IsThrowException && returnResult.Status != InvokeStatus.Success)
-                throw new Exception(returnResult.ExceptionMessage);
+            invokeResult = new InvokeResult(element);
+            if (string.IsNullOrEmpty(invokeResult.ObjectMethod)) 
+                invokeResult.ObjectMethod = invokeMessage.ObjectMethod;
+
+            if (throwException && invokeResult.StatusCode < StatusCodes.Success)
+                throw new Exception(invokeResult.ExceptionMessage);
 
             return true;
         }
         /// <summary>
         /// 调用远程实例对象的方法
+        /// <para>返回结果为 true 时, 此时输出参数 <see cref="InvokeResult"/> 不为 null</para>
+        /// </summary>
+        /// <param name="invokeMessage"></param>
+        /// <param name="invokeResult"></param>
+        /// <param name="throwException">远程方法或函数执行异常时，是否在本地抛出异常信息</param>
+        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
+        public bool TryCallMethod(XElement invokeMessage, out InvokeResult invokeResult, bool throwException = false)
+        {
+            if (invokeMessage == null)
+                throw new ArgumentNullException(nameof(invokeMessage), "参数不能为空");
+            if (!InvokeMessage.IsValid(invokeMessage))
+                throw new ArgumentException(nameof(invokeMessage), "参数不符合协议要求");
+
+            invokeResult = null;
+            if (!WriteAndReadMessages(invokeMessage.ToString(), out string responseMessage))
+            {
+                return false;
+            }
+
+            XElement element = null;
+            try
+            {
+                element = XElement.Parse(responseMessage);
+            }
+            catch (Exception ex)
+            {
+                invokeResult = new InvokeResult(StatusCodes.Unknow, new InvokeMessage(invokeMessage).ObjectMethod, $"RPC Server Invoke Result Format Exception: {ex.Message}");
+
+                Logger.Info($"RPC Client Receive Message: {responseMessage}");
+                Logger.Error($"RPC Server Return Result Format Exception: {ex}");
+
+                if (throwException) throw ex;
+                return true;
+            }
+
+            invokeResult = new InvokeResult(element);
+            if (string.IsNullOrEmpty(invokeResult.ObjectMethod))
+            {
+                invokeResult.ObjectMethod = new InvokeMessage(invokeMessage).ObjectMethod;
+            }
+
+            if (throwException && invokeResult.StatusCode < StatusCodes.Success)
+                throw new Exception(invokeResult.ExceptionMessage);
+
+            return true;
+        }
+        /// <summary>
+        /// 调用远程实例对象的方法
+        /// <para>返回结果为 true 时, 此时输出参数 <see cref="InvokeResult"/> 不为 null</para>
+        /// </summary>
+        /// <param name="objectName"></param>
+        /// <param name="methodName"></param>
+        /// <param name="invokeResult"></param>
+        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
+        public bool TryCallMethod(string objectName, string methodName, out InvokeResult invokeResult)
+            => TryCallMethod(new InvokeMessage(objectName, methodName), out invokeResult, false);
+        /// <summary>
+        /// 调用远程实例对象的方法
+        /// <para>返回结果为 true 时, 此时输出参数 <see cref="InvokeResult"/> 不为 null</para>
+        /// </summary>
+        /// <param name="objectName"></param>
+        /// <param name="methodName"></param>
+        /// <param name="parameters"></param>
+        /// <param name="invokeResult"></param>
+        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
+        public bool TryCallMethod(string objectName, string methodName, object[] parameters, out InvokeResult invokeResult)
+            => TryCallMethod(new InvokeMessage(objectName, methodName, parameters, true, null), out invokeResult, false);
+
+
+        /// <summary>
+        /// 调用远程实例对象的方法
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns>远程服务端有任何响应信息时, 异步操作返回对象 <see cref="InvokeResult"/> 不为 null </returns>
+        public Task<InvokeResult> TryCallMethodAsync(InvokeMessage message) => Task.Run(() =>
+        {
+            return TryCallMethod(message, out InvokeResult invokeResult) ? invokeResult : null;
+        });
+        /// <summary>
+        /// 调用远程实例对象的方法
         /// <para></para>
         /// </summary>
-        /// <param name="action"></param>
-        /// <returns>服务端有响应时, 异步操作返回对象 <see cref="MethodInvokeResult"/> 不为 null </returns>
-        public Task<MethodInvokeResult> TryCallMethodAsync(XElement action) => Task.Run(() =>
+        /// <param name="message"></param>
+        /// <returns>远程服务端有任何响应信息时, 异步操作返回对象 <see cref="InvokeResult"/> 不为 null </returns>
+        public Task<InvokeResult> TryCallMethodAsync(XElement message) => Task.Run(() =>
         {
-            return TryCallMethod(action, out MethodInvokeResult invokeResult) ? invokeResult : null;
+            return TryCallMethod(message, out InvokeResult invokeResult) ? invokeResult : null;
         });
-
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para>服务端有响应时, 返回 true, 此时输出参数 out returnResult 不为 null</para>
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="returnResult"></param>
-        /// <returns>服务端有响应时, 返回 true, 否则返回 false</returns>
-        public bool TryCallMethod(string objectName, string methodName, out MethodInvokeResult returnResult) 
-            => TryCallMethod(objectName, methodName, null, true, out returnResult);
         /// <summary>
         /// 调用远程实例对象的方法
         /// </summary>
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
-        /// <returns>服务端有响应时, 异步操作返回对象 <see cref="MethodInvokeResult"/> 不为 null </returns>
-        public Task<MethodInvokeResult> TryCallMethodAsync(string objectName, string methodName) => Task.Run(() =>
+        /// <returns>远程服务端有任何响应信息时, 异步操作返回对象 <see cref="InvokeResult"/> 不为 null </returns>
+        public Task<InvokeResult> TryCallMethodAsync(string objectName, string methodName) => Task.Run(() =>
         {
-            return TryCallMethod(objectName, methodName, null, true, out MethodInvokeResult invokeResult) ? invokeResult : null;
+            return TryCallMethod(objectName, methodName, out InvokeResult invokeResult) ? invokeResult : null;
         });
-
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para>服务端有响应时, 返回 true, 此时输出参数 out returnResult 不为 null</para>
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <param name="returnResult"></param>
-        /// <returns>服务端有响应时, 返回 true, 否则返回 false</returns>
-        public bool TryCallMethod(string objectName, string methodName, object[] parameters, out MethodInvokeResult returnResult) 
-            => TryCallMethod(objectName, methodName, parameters, true, out returnResult);
         /// <summary>
         /// 调用远程实例对象的方法
         /// </summary>
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <returns>服务端有响应时, 异步操作返回对象 <see cref="MethodInvokeResult"/> 不为 null </returns>
-        public Task<MethodInvokeResult> TryCallMethodAsync(string objectName, string methodName, object[] parameters) => Task.Run(() =>
+        /// <returns>远程服务端有任何响应信息时, 异步操作返回对象 <see cref="InvokeResult"/> 不为 null </returns>
+        public Task<InvokeResult> TryCallMethodAsync(string objectName, string methodName, object[] parameters) => Task.Run(() =>
         {
-            return TryCallMethod(objectName, methodName, parameters, true, out MethodInvokeResult invokeResult) ? invokeResult : null;
+            return TryCallMethod(objectName, methodName, parameters, out InvokeResult invokeResult) ? invokeResult : null;
         });
-
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para>服务端有响应时, 返回 true, 此时输出参数 out returnResult 不为 null</para>
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <param name="synchronous"></param>
-        /// <param name="returnResult"></param>
-        /// <returns>服务端有响应时, 返回 true, 否则返回 false</returns>
-        public bool TryCallMethod(string objectName, string methodName, object[] parameters, bool synchronous, out MethodInvokeResult returnResult)
-            => TryCallMethod(MethodInvokeMessage.ToMessage(objectName, methodName, parameters, synchronous), out returnResult);
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <param name="synchronous"></param>
-        /// <returns>服务端有响应时, 异步操作返回对象 <see cref="MethodInvokeResult"/> 不为 null </returns>
-        public Task<MethodInvokeResult> TryCallMethodAsync(string objectName, string methodName, object[] parameters, bool synchronous) => Task.Run(() =>
-        {
-             return TryCallMethod(objectName, methodName, parameters, synchronous, out MethodInvokeResult invokeResult) ? invokeResult : null;
-        });
-        
+                
     }
 }

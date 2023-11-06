@@ -293,20 +293,20 @@ namespace SpaceCG.Extensions
         public static bool ToUInt64Array(this string value, ref UInt64[] array, char separator = ',') => ToNumberArray<UInt64>(value, ref array, separator);
 
         /// <summary> 正则匹配 '~' | "~" </summary>
-        private static readonly String pattern_string = @"\'([^\']+)\'|" + "\"([^\"]+)\"";
+        internal static readonly string pattern_string = @"\'([^\']+)\'|" + "\"([^\"]+)\"";
         /// <summary> 正则匹配 '['~']' </summary>
-        private static readonly String pattern_array = @"\[([^\[\]]+)\]";
+        internal static readonly string pattern_array = @"\[([^\[\]]+)\]";
 #pragma warning disable CS0414
         /// <summary> 正则匹配 '('~')' </summary>
-        private static readonly String pattern_parent = @"\(([^\(\)]+)\)";
+        internal static readonly string pattern_parent = @"\(([^\(\)]+)\)";
 #pragma warning restore CS0414
         /// <summary> 正则匹配 ',' 分割, 或结尾部份 </summary>
-        private static readonly String pattern_split = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";
-        private static readonly String pattern_arguments = $@"{pattern_string}|{pattern_array}|{pattern_split}";
+        internal static readonly string pattern_split = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";
+        internal static readonly string pattern_arguments = $@"{pattern_string}|{pattern_array}|{pattern_split}";
         /// <summary>
         /// 字符串参数正则表达式
         /// </summary>
-        public static readonly Regex RegexStringArguments = new Regex(pattern_arguments, RegexOptions.Compiled | RegexOptions.Singleline);
+        public static readonly Regex RegexStringParameters = new Regex(pattern_arguments, RegexOptions.Compiled | RegexOptions.Singleline);
 
         /// <summary>
         /// 将字符串参数集，分割转换为字符串数组
@@ -332,7 +332,7 @@ namespace SpaceCG.Extensions
             String pattern = $@"{pattern_string}|{pattern_array}|{pattern_split}";
             MatchCollection matchs = Regex.Matches(parameters, pattern, RegexOptions.Compiled | RegexOptions.Singleline);
 #else
-            MatchCollection matchs = RegexStringArguments.Matches(parameters);
+            MatchCollection matchs = RegexStringParameters.Matches(parameters);
 #endif
 
             List<object> args = new List<object>();
