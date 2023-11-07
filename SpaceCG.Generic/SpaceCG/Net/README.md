@@ -20,9 +20,9 @@
 >
 > 4.  C# 应用在项目上都使用过 XML 和 JSON 格式，但统计使用 XML 格式较多
 >
-> 5.  考虑 DEMO 端的综合效率问题，建议优先支持 XML 其次兼容 JSON 格式
+> 5.  考虑 DEMO 端的综合效率问题，建议优先支持 XML 格式，后继在考虑是否实现对 JSON 格式的支持
 >
-> 6.  未来可扩展，增加指令列表的描述定义文件(包含UI描述，层级描述，指令描述)，自动传输至各控制端，控制端跟据描述信息自动解析，生成UI、连接、控制
+> 6.  未来可扩展，增加指令列表的描述定义文件(文件中包含UI描述，层级描述，指令描述)，自动传输至各控制端，控制端跟据描述信息自动解析，生成UI、连接、控制
 
 ## XML 消息控制格式
 
@@ -35,18 +35,18 @@
 </InvokeMessage>
 ```
 
-| <div style="width:90pt;">**节点/@属性名称**</div> | **说明**                                                                                                                                          | <div style="width:40pt;">**值类型**</div> | <div style="width:50pt;">**必要(属性及其值)**</div> |
-| :------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------- | :------------------------------------------- |
-| **InvokeMessages**                          | 调用多个远程方法或函数的消息集合(按顺序调用)                                                                                                                         |                                        | 否，保留                                         |
-| @IntervalDelay                              | 调用多个远程方法或函数执行时，每次调用等待的间隔时间；时间单位 ms, 默认为 0 ms；*++要考虑到实现问题，不能堵塞通信进程，那Flash是实现异步的问题？？++*                                                           | Int32                                  | 否，保留                                         |
-| **InvokeMessage**                           | 调用远程方法或函数的消息对象，单个调用消息                                                                                                                           |                                        | 是                                            |
-| @ObjectName                                 | 需要控制的实例或对象的名称                                                                                                                                   | String                                 | 是                                            |
-| @MethodName                                 | 实例或对象的方法或函数名称                                                                                                                                   | String                                 | 是                                            |
-| @Parameters                                 | 节点 **Parameter** 的简单形式，**优先级低于 Parameter 节点**，所有参数将按匹配的函数参数强制类型转换；<br />示例：Parameters="12,play,'hello,world.',\[0x08,0x09,0x10,0x0A,0x0B,0x0C]" | String                                 | 否                                            |
-| @Comment                                    | 该条控制消息说明、注释或描述信息；也可以预留未来给控制端做 Label 使用                                                                                                          | String                                 | 否，保留                                         |
-| **Parameter**                               | 方法或函数的参数信息，跟据方法或函数是否存在参数而定义；<br />**优先级高于 @Parameters 属性**                                                                                      |                                        | 否                                            |
-| @Type                                       | 参数的数据类型，如果不明确指定数据类型，则会跟据方法对应的参数强制类型转换；<br />参考：[TypeCode 枚举](https://learn.microsoft.com/zh-cn/dotnet/api/system.typecode?view=net-7.0)         | String                                 | 否                                            |
-| ~~@扩展属性或节点~~                                | ~~可在 InvokeMessage 根节点上扩展属性，或根节点之下扩展子节点(非Parameter节点)~~                                                                                         |                                        |                                              |
+| <div style="width:90pt;">**节点/@属性名称**</div> | **说明**                                                                                                                                          | <div style="width:40pt;">**值类型**</div> | <div style="width:50pt;">**必要** |
+| :------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------- | :------------------------------ |
+| **InvokeMessages**                          | 调用多个远程方法或函数的消息集合(按顺序调用)                                                                                                                         |                                        | 否，保留                            |
+| @IntervalDelay                              | 调用多个远程方法或函数执行时，每次调用等待的间隔时间；时间单位 ms, 默认为 0 ms；*++要考虑到实现问题，不能堵塞通信进程，那Flash是实现异步的问题？？++*                                                           | Int32                                  | 否，保留                            |
+| **InvokeMessage**                           | 调用远程方法或函数的消息对象，单个调用消息                                                                                                                           |                                        | 是                               |
+| @ObjectName                                 | 需要控制的实例或对象的名称                                                                                                                                   | String                                 | 是                               |
+| @MethodName                                 | 实例或对象的方法或函数名称                                                                                                                                   | String                                 | 是                               |
+| @Parameters                                 | 节点 **Parameter** 的简单形式，**优先级低于 Parameter 节点**，所有参数将按匹配的函数参数强制类型转换；<br />示例：Parameters="12,play,'hello,world.',\[0x08,0x09,0x10,0x0A,0x0B,0x0C]" | String                                 | 否                               |
+| @Comment                                    | 该条控制消息说明、注释或描述信息；也可以预留未来给控制端做 Label 使用                                                                                                          | String                                 | 否，保留                            |
+| **Parameter**                               | 方法或函数的参数信息，跟据方法或函数是否存在参数而定义；<br />**优先级高于 @Parameters 属性**                                                                                      |                                        | 否                               |
+| @Type                                       | 参数的数据类型，如果不明确指定数据类型，则会跟据方法对应的参数强制类型转换；<br />参考：[TypeCode 枚举](https://learn.microsoft.com/zh-cn/dotnet/api/system.typecode?view=net-7.0)         | String                                 | 否                               |
+| @扩展属性或节点                                    | 可在 InvokeMessage 根节点上扩展属性，或根节点之下扩展子节点(非Parameter节点)                                                                                             |                                        |                                 |
 
 *   [x] **建议：手动输入消息编码使用 @Parameters 属性，代码封装或序列化使用 Parameter 节点；**
 
@@ -85,22 +85,22 @@
 </InvokeResult>
 ```
 
-| <div style="width:110pt;">**节点/@属性名称**</div> | <div style="width:400pt;">**说明**  </div>                                                                                            | <div style="width:40pt;">**值类型**</div> | <div style="width:50pt;">**必要(属性及其值)**</div> |
-| :------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------- | :------------------------------------------- |
-| **InvokeResults**                            | 调用远程方法或函数的返回消息集合，多个按顺序的响应消息集合                                                                                                       |                                        | 否，保留                                         |
-| **InvokeResult**                             | 调用远程方法或函数的返回消息对象，单个响应消息                                                                                                             |                                        | 是                                            |
-| @StatusCode                                  | 方法或函数执行的状态码，执行失败小于0，执行成功大于等于0；保留状态码：-2, -1, 0, 1                                                                                    | Int32                                  | 是                                            |
-| @ExceptionMessage                            | 方法或函数执行的异常信息，状态码为小于 0 的解释说明                                                                                                         | String                                 | 否                                            |
-| @ObjectMethod                                | 远程对象或实例的方法或函数的完整名称，格式：{ObjectName}.{MethodName}；示例：ObjectMethod="Window\.Close"                                                     | String                                 | 否，存在多个返回消息时为必需选项                             |
-| @ReturnType                                  | 节点 Return 的简单形式，**优先级低于 Return 节点**                                                                                                 | String                                 | 否                                            |
-| @ReturnValue                                 | 节点 Return 的简单形式，**优先级低于 Return 节点**                                                                                                 | String                                 | 否                                            |
-| **Return**                                   | 方法或函数的返回值，**优先级高于@ReturnType,@ReturnValue**                                                                                         |                                        | 否                                            |
-| @Type                                        | 返回的值类型，如果为System.Void类型，则值为 null；<br /> 参考：[TypeCode 枚举](https://learn.microsoft.com/zh-cn/dotnet/api/system.typecode?view=net-7.0) | String                                 | 否                                            |
-| ~~@扩展属性或节点~~                                 | ~~可在 InvokeResult 根节点上扩展属性，或根节点之下扩展子节点(非Return节点)~~                                                                                 |                                        |                                              |
+| <div style="width:110pt;">**节点/@属性名称**</div> | <div style="width:400pt;">**说明**  </div>                                                                                            | <div style="width:40pt;">**值类型**</div> | <div style="width:50pt;">**必要** |
+| :------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------- | :------------------------------ |
+| **InvokeResults**                            | 调用远程方法或函数的返回消息集合，多个按顺序的响应消息集合                                                                                                       |                                        | 否，保留                            |
+| **InvokeResult**                             | 调用远程方法或函数的返回消息对象，单个响应消息                                                                                                             |                                        | 是                               |
+| @StatusCode                                  | 方法或函数执行的状态码，执行失败小于0，执行成功大于等于0；保留状态码：-2, -1, 0, 1                                                                                    | Int32                                  | 是                               |
+| @ExceptionMessage                            | 方法或函数执行的异常信息，状态码为小于 0 的解释说明                                                                                                         | String                                 | 否                               |
+| @ObjectMethod                                | 远程对象或实例的方法或函数的完整名称，格式：{ObjectName}.{MethodName}；示例：ObjectMethod="Window\.Close"                                                     | String                                 | 否，存在多个返回消息时为必需选项                |
+| @ReturnType                                  | 节点 Return 的简单形式，**优先级低于 Return 节点**                                                                                                 | String                                 | 否                               |
+| @ReturnValue                                 | 节点 Return 的简单形式，**优先级低于 Return 节点**                                                                                                 | String                                 | 否                               |
+| **Return**                                   | 方法或函数的返回值，**优先级高于@ReturnType,@ReturnValue**                                                                                         |                                        | 否                               |
+| @Type                                        | 返回的值类型，如果为System.Void类型，则值为 null；<br /> 参考：[TypeCode 枚举](https://learn.microsoft.com/zh-cn/dotnet/api/system.typecode?view=net-7.0) | String                                 | 否                               |
+| @扩展属性或节点                                     | 可在 InvokeResult 根节点上扩展属性，或根节点之下扩展子节点(非Return节点)                                                                                     |                                        |                                 |
 
 | **执行状 @StatusCode** | **状态码**  | **函数执行状态**                                          | **是否有返回值** |
 | :------------------ | :------- | :-------------------------------------------------- | :--------- |
-| Unknow              | -2       | 未知状态，函数可能执行成功，也有可能执行失败，可能是在传输过程中出现不可预测的异常，或是消息返回超时等 |            |
+| Unknow              | -2       | 未知状态，函数可能执行成功，也有可能执行失败，可能是在传输过程中出现不可预测的异常，或是消息读写超时等 |            |
 | Failed              | -1       | 确认执行失败                                              | 无          |
 | Success             | 0        | 确认执行成功，函数无返回值为 System.Void 类型                       | 无          |
 | SuccessAndReturn    | 1        | 确认执行成功，函数有返回值(为非 System.Void 类型)                    | 有          |
@@ -133,7 +133,7 @@
 		"ObjectName":"",
 		"MethodName":"",
 		"Comment":"",
-		//"Parameters":"", //支持两种值类型？
+		//"Parameters":"", //考虑支持两种值类型？
 		"Parameters":[
 			{
 				"Type":"",
@@ -240,7 +240,7 @@
             /// 输入字符串："0x01,3,[True,True,False]"，输出数组：["0x01","3",["True","True","False"]]
             /// 输入字符串："0x01,[0,3,4,7],[True,True,False,True]"，输出数组：["0x01",["0","3","4","7"],["True","True","False","True"]]
             /// 输入字符串："'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15"
-            ///   输出数组：["hello,world","0x01","3","ni?,hao,[aa,bb]",["True","True","False","True"],["aaa,bb,c","ni,hao"],"15","aa,aaa","15"]
+            /// 输出数组：["hello,world","0x01","3","ni?,hao,[aa,bb]",["True","True","False","True"],["aaa,bb,c","ni,hao"],"15","aa,aaa","15"]
             /// </code>
             /// </summary>
             /// <param name="parameters"></param>
@@ -266,16 +266,18 @@
                     if (!match.Success) continue;
     #if true
                     string trimValue = match.Value.Trim();
-                    if ((trimValue.IndexOf('\'') == 0 && trimValue.LastIndexOf('\'') == trimValue.Length - 1) ||
-                       (trimValue.IndexOf('\"') == 0 && trimValue.LastIndexOf('\"') == trimValue.Length - 1))
+                    char first = trimValue[0];
+                    char last = trimValue[trimValue.Length - 1];
+
+                    if (first == '\'' && last == '\'' || first == '\"' && last == '\"')
                     {
                         args.Add(trimValue.Substring(1, trimValue.Length - 2));
                     }
-                    else if (trimValue.IndexOf('[') == 0 && trimValue.LastIndexOf(']') == trimValue.Length - 1)
+                    else if (first == '[' && last == ']')
                     {
                         args.Add(SplitToObjectArray(trimValue.Substring(1, trimValue.Length - 2)));
                     }
-                    else if (trimValue.LastIndexOf(',') == trimValue.Length - 1)
+                    else if (last == ',')
                     {
                         args.Add(trimValue.Substring(0, trimValue.Length - 1));
                     }

@@ -62,8 +62,10 @@ namespace Test2
         RPCServer rpcServer;
         RPCClient rpcClient;
 
-        public int Add33(int a, int b) => a + b;
-
+        public int Add33(int a, int b)
+        {
+            return a + b;
+        }
         public float Add(float a, float b) => a + b;
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -77,12 +79,12 @@ namespace Test2
             rpcServer.AccessObjects.Add("string", message);
             rpcServer.Start();
 
-            rpcServer.AccessObjects.Add("System.Threading.Thread", typeof(Thread));
+            rpcServer.AccessObjects.Add(nameof(Task), typeof(Task));
+            rpcServer.AccessObjects.Add(nameof(Thread), typeof(Thread));
             //rpcServer.AccessObjects.Add("Thread", typeof(Thread).GetMethod("Sleep", new Type[] { typeof(int) }));
 
             rpcClient = new RPCClient("127.0.0.1", 2025);
             rpcClient.ConnectAsync();
-            rpcClient.Timeout = 10000;
 
             string xmlString = "<data> <string><![CDATA[这是一段未解析字符数据<a>test</a>,[0x12,0x13,0xAA] ]]></string> </data>";
             XElement XML = XElement.Parse(xmlString);
@@ -149,8 +151,9 @@ namespace Test2
             logger1.Info($"Click {button.Name}");
             if (button == Button_Test)
             {
-                var result = await rpcClient.TryCallMethodAsync("Window", "Add33", new object[] { "120", "160" });
-                logger1.Info($"Result::{result}");
+                //var result = rpcClient.TryCallMethod("Window", "Add33", new object[] { "120", 160 }, out InvokeResult invokeResult);
+                var invokeResult = await rpcClient.TryCallMethodAsync("Window", "Add33", new object[] { "120", 160 });
+                logger1.Info($"Result::{invokeResult}");
 
                 //var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { 12, 16 });
                 //logger1.Info($"Result::{result}");
@@ -164,7 +167,9 @@ namespace Test2
             }
             else if(button == Button_Close)
             {
-                rpcServer.TryCallMethod("Window", "Add33", new object[] { 12,13 }, out InvokeResult invokeResult);
+                //object invokeResult = rpcServer.TryCallMethod("Task", "Delay", new object[] { 3000 });
+                object invokeResult = rpcServer.TryCallMethod("Thread", "Sleep", new object[] { 3000 });
+                //rpcServer.TryCallMethod("Window", "Add33", new object[] { 12,13 }, out InvokeResult invokeResult);
                 Console.WriteLine($"RPC Server CallMethod::{invokeResult}");
             }
             else if(button == Button_Connect)

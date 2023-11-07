@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Resources;
 using System.Text.RegularExpressions;
 using SpaceCG.Generic;
 
@@ -325,11 +324,11 @@ namespace SpaceCG.Extensions
             if (string.IsNullOrWhiteSpace(parameters)) return new object[] { }; // null
             
 #if false
-            String pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //匹配'~',"~"
-            String pattern_array    = @"\[([^\[\]]+)\]";                    //匹配[~]
-            String pattern_parent   = @"\(([^\(\)]+)\)";                    //匹配(~)
-            String pattern_split    = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";   //匹配 ',' 分割, 或结尾部份
-            String pattern = $@"{pattern_string}|{pattern_array}|{pattern_split}";
+            string pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //匹配'~',"~"
+            string pattern_array    = @"\[([^\[\]]+)\]";                    //匹配[~]
+            string pattern_parent   = @"\(([^\(\)]+)\)";                    //匹配(~)
+            string pattern_split    = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";   //匹配 ',' 分割, 或结尾部份
+            string pattern = $@"{pattern_string}|{pattern_array}|{pattern_split}";
             MatchCollection matchs = Regex.Matches(parameters, pattern, RegexOptions.Compiled | RegexOptions.Singleline);
 #else
             MatchCollection matchs = RegexStringParameters.Matches(parameters);
@@ -341,16 +340,18 @@ namespace SpaceCG.Extensions
                 if (!match.Success) continue;
 #if true
                 string trimValue = match.Value.Trim();
-                if ((trimValue.IndexOf('\'') == 0 && trimValue.LastIndexOf('\'') == trimValue.Length - 1) ||
-                   (trimValue.IndexOf('\"') == 0 && trimValue.LastIndexOf('\"') == trimValue.Length - 1))
+                char first = trimValue[0];
+                char last = trimValue[trimValue.Length - 1];
+
+                if (first == '\'' && last == '\'' || first == '\"' && last == '\"')
                 {
                     args.Add(trimValue.Substring(1, trimValue.Length - 2));
                 }
-                else if (trimValue.IndexOf('[') == 0 && trimValue.LastIndexOf(']') == trimValue.Length - 1)
+                else if (first == '[' && last == ']')
                 {
                     args.Add(SplitToObjectArray(trimValue.Substring(1, trimValue.Length - 2)));
                 }
-                else if (trimValue.LastIndexOf(',') == trimValue.Length - 1)
+                else if (last == ',')
                 {
                     args.Add(trimValue.Substring(0, trimValue.Length - 1));
                 }

@@ -17,7 +17,19 @@ namespace SpaceCG.Net
 {
     /// <summary>
     /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
-    /// <para>支持实例对象的公共方法，和实例类型的扩展方法</para>
+    /// <para>支持实例对象的公共方法，实例类型的扩展方法和类型的静态方法的查询调用</para>
+    /// <para>注意：支持参数为值类型(<see cref="ValueType"/>)和数组类型(元素为值类型) 和 返回为值类型(<see cref="ValueType"/>)和<see cref="Void"/>类型的方法，或者是方法的参数和返回类型，支持类型转换器<see cref="TypeConverter"/>的</para>
+    /// <code>
+    /// //示例：
+    /// int value = 12;
+    /// RPCServer rpcServer = new RPCServer();
+    /// rpcServer.AccessObject.Add(nameof(Thread), typeof(Thread));
+    /// rpcServer.AccessObject.Add("Window",  this);
+    /// rpcServer.AccessObject.Add(nameof(value), value);
+    /// rpcServer.TryCallMethod("Thread", "Sleep", new object[]{ 3000 }); //调用 Thread 的静态方法
+    /// rpcServer.TryCallMethod("Window", "Close"); //调用 Window 实例的 Close 方法
+    /// rpcServer.TryCallMethod("value", "ToString"); //调用 value 实例的 ToString 方法
+    /// </code>
     /// </summary>
     public class RPCServer : IDisposable
     {
@@ -38,25 +50,21 @@ namespace SpaceCG.Net
         protected Dictionary<TcpClient, byte[]> ClientObjects { get; } = new Dictionary<TcpClient, byte[]>(16);
 
         /// <summary>
-        /// 可控制、访问的对象集合，就是可以通过反射技术访问的对象集合
+        /// 可控制、访问的对象的方法过滤集合，指定对象的方法不在访问范围内；
+        /// <para>字符格式为：{ObjectName}.{MethodName}, ObjectName 支持通配符 '*'</para>
+        /// <para>例如："*.Dispose" 禁止反射访问所有对象的 Dispose 方法，默认已添加</para>
+        /// </summary>
+        public List<string> MethodFilters { get; } = new List<string>(16) { "*.Dispose" };
+        /// <summary>
+        /// 可控制、访问的对象集合，可以通过反射技术访问的对象集合
         /// <para>值键对 &lt;name, object&gt; name 表示唯一的对象名称</para>
         /// </summary>
         public Dictionary<string, object> AccessObjects { get; } = new Dictionary<string, object>(16);
-        /// <summary>
-        /// 可控制、访问的对象的方法过滤集合，指定对象的方法不在访问范围内；字符格式为：objectName.methodName, objectName 支持通配符 '*'
-        /// <para>例如："*.Dispose" 禁止反射访问所有对象的 Dispose 方法，默认已添加</para>
-        /// </summary>
-        public List<string> MethodFilters { get; } = new List<string>(16) { "*.Dispose", "*.Close" };
 
         private SynchronizationContext syncContext = SynchronizationContext.Current;
         /// <summary>
-        /// 当前 RPC 的同步上下文, 默认为 <see cref="SynchronizationContext.Current"/>
-        /// <code>
-        /// //示例：
-        /// <see cref="RPCServer.SynchronizationContext"/> = new SynchronizationContext();
-        /// <see cref="RPCServer.SynchronizationContext"/> = new RPCSynchronizationContext();
-        /// <see cref="RPCServer.SynchronizationContext"/> = new DispatcherSynchronizationContext();
-        /// </code>
+        /// 当前 <see cref="RPCServer"/> 的同步上下文, 默认为 <see cref="SynchronizationContext.Current"/>
+        /// <para>see <see cref="System.Threading.SynchronizationContext"/>, DispatcherSynchronizationContext, <see cref="RPCSynchronizationContext"/> ... </para>
         /// </summary>
         /// <exception cref="ArgumentNullException"></exception>
         public SynchronizationContext SynchronizationContext
@@ -72,11 +80,15 @@ namespace SpaceCG.Net
 
         private ushort localPort;
         private TcpListener listener;
+        /// <summary>
+        /// 历史调用过的唯一方法，无歧义的方法
+        /// </summary>
         private Dictionary<string, MethodInfo> historyMethodInfos;
 
         /// <summary>
         /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
-        /// <para>支持实例对象的公共方法，和实例类型的扩展方法</para>
+        /// <para>支持实例对象的公共方法，实例类型的扩展方法和类型的静态方的查询调用</para>
+        /// <para>注意：支持参数为值类型(<see cref="ValueType"/>)和数组类型(元素为值类型) 和 返回为值类型(<see cref="ValueType"/>)和<see cref="Void"/>类型的方法，或者是方法的参数和返回类型，支持类型转换器<see cref="TypeConverter"/>的</para>
         /// </summary>
         public RPCServer()
         {
@@ -135,7 +147,6 @@ namespace SpaceCG.Net
             this.localPort = localPort;
             Start();
         }
-
         /// <summary>
         /// 停止 RPC(Remote Procedure Call)  服务
         /// </summary>
@@ -162,7 +173,6 @@ namespace SpaceCG.Net
                 listener = null;
             }
         }
-
         /// <inheritdoc />
         public void Dispose()
         {
@@ -185,7 +195,7 @@ namespace SpaceCG.Net
             {
                 client = await listener.AcceptTcpClientAsync();
                 ClientObjects.Add(client, new byte[BUFFER_SIZE]);
-                Logger.Info($"RPC Server Accept Remote Client {client.Client?.RemoteEndPoint}, Clients Count:{ClientObjects.Count}");
+                Logger.Info($"RPC Server Accept Remote Client {client.Client.RemoteEndPoint}, Online:{ClientObjects.Count}");
             }
             catch (ObjectDisposedException)
             {
@@ -193,18 +203,18 @@ namespace SpaceCG.Net
             }
             catch (Exception ex)
             {
-                Logger.Error($"RPC Server Accept Client Exception: {ex.Message}");
+                Logger.Error($"RPC Server Accept Remote Client Exception: {ex.Message}");
                 return;
             }
 
-            ReadNetworkStream(client);
+            ReadClientMessage(client);
             AcceptTcpClient();
         }
         /// <summary>
         /// 读取 <see cref="TcpClient"/> 的网络流数据
         /// </summary>
         /// <param name="client"></param>
-        private async void ReadNetworkStream(TcpClient client)
+        private async void ReadClientMessage(TcpClient client)
         {
             if (localPort <= 1024 || listener == null) return;
             if (client == null || !client.Connected || !ClientObjects.ContainsKey(client))
@@ -239,14 +249,14 @@ namespace SpaceCG.Net
                 {
                     if (ClientObjects.ContainsKey(client)) ClientObjects.Remove(client);
                     client?.Dispose();
-                    Logger.Info($"Remote Client {remoteEndPoint} Disconnection, Clients Count:{ClientObjects.Count}");
+                    Logger.Info($"RPC Client {remoteEndPoint} Disconnection, Online:{ClientObjects.Count}");
                     return;
                 }
 
                 string message = Encoding.UTF8.GetString(buffer, 0, count);
-                Logger.Debug($"Read Remote Client {remoteEndPoint} Message({count}bytes): {message}");
+                Logger.Debug($"Receive RPC Client {remoteEndPoint} Invoke Message {count} Bytes \r\n{message}");
 
-                _ = Task.Run(() => TryParseClientMessage(client, message));
+                _ = Task.Run(() => ParseClientMessage(client, message));
             }
             catch (ObjectDisposedException)
             {
@@ -259,71 +269,81 @@ namespace SpaceCG.Net
                 if (ClientObjects.ContainsKey(client)) ClientObjects.Remove(client);
                 client?.Dispose();
 
-                Logger.Warn($"RPC Client {remoteEndPoint} NetworkStream Exception: {ex}");
+                Logger.Warn($"RPC Client {remoteEndPoint} Invoke Message Exception: {ex}");
                 return;
             }
 
-            ReadNetworkStream(client);
+            ReadClientMessage(client);
         }
-
         /// <summary>
-        /// 解析客户端控制消息
+        /// 解析客户端消息
         /// </summary>
         /// <param name="client"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        protected bool TryParseClientMessage(TcpClient client, string message)
+        protected void ParseClientMessage(TcpClient client, string message)
         {
             message = message.Trim();
-            char fist = message[0];
+            char first = message[0];
             char last = message[message.Length - 1];
 
-            InvokeResult invokeResult = new InvokeResult(StatusCodes.Failed, $"", $"不支持协议数据，解析失败。");
+            MessageFormatType formatType = MessageFormatType.Code;
+            InvokeResult invokeResult = new InvokeResult(InvokeStatusCode.Failed, $"", $"不支持协议数据，解析失败。");
 
-            if (fist == '<' && last == '>')
+            //正则表达式测试中，待下次更新 o_o!!
+            if (first == '<' && last == '>')
             {
                 XElement element = null;
+                formatType = MessageFormatType.XML;
+
                 try
                 {
                     element = XElement.Parse(message);
                 }
                 catch (Exception ex)
                 {
-                    invokeResult.ExceptionMessage = $"数据解析异常: {ex.Message}, 或不支持数据格式";
-                    Logger.Warn($"Client {client.Client?.RemoteEndPoint} {invokeResult.ExceptionMessage}");
-                    SendInvokeResult(ref client, invokeResult);
-                    return false;
+                    invokeResult.ExceptionMessage = $"数据解析异常: {ex.Message}, 或不支持数据格式。";
+                    Logger.Warn($"RPC Client {client.Client?.RemoteEndPoint} Invoke Message Format Exception: {invokeResult.ExceptionMessage}");
+                    SendInvokeResult(ref client, invokeResult, formatType);
+                    return;
                 }
 
                 if (element.Name.LocalName == nameof(InvokeMessage))
                 {
                     bool result = TryCallMethod(element, out invokeResult);
-                    SendInvokeResult(ref client, invokeResult);
-                    return result;
+                    SendInvokeResult(ref client, invokeResult, formatType);
+                    return;
                 }
                 else if (element.Name.LocalName == $"{nameof(InvokeMessage)}s")
                 {
                     var invokeResults = TryCallMethods(element);
-                    SendInvokeResult(ref client, invokeResults);
-                    return true;
+                    SendInvokeResult(ref client, invokeResults, formatType);
+                    return;
                 }
             }
-            else if (fist == '{' && last == '}')
+            else if (first == '{' && last == '}')
             {
-
+                formatType = MessageFormatType.JSON;
+#if false
+                // ...
+#endif
+            }
+            else
+            {
+                formatType = first == '<' || last == '>' ? MessageFormatType.XML : first == '{' || last == '}' ? MessageFormatType.JSON : MessageFormatType.Code;
             }
 
-            Logger.Warn($"RPC Client {client.Client?.RemoteEndPoint} Message Exception: {invokeResult.ExceptionMessage}");
-            SendInvokeResult(ref client, invokeResult);
-            return false;
+            Logger.Warn($"RPC Client {client.Client?.RemoteEndPoint} Invoke Message Format Not Support: {invokeResult.ExceptionMessage}");
+            SendInvokeResult(ref client, invokeResult, formatType);
         }
 
         /// <summary>
-        /// 向客户端发送返回结果对象
+        /// 向客户端发送返回调用结果信息
         /// </summary>
         /// <param name="client"></param>
         /// <param name="invokeResult"></param>
-        protected void SendInvokeResult(ref TcpClient client, InvokeResult invokeResult)
+        /// <param name="formatType"></param>
+        protected void SendInvokeResult(ref TcpClient client, InvokeResult invokeResult, MessageFormatType formatType)
         {
             if (client == null || invokeResult == null) return;
 
@@ -331,7 +351,7 @@ namespace SpaceCG.Net
             {
                 if (client.Connected)
                 {
-                    byte[] bytes = Encoding.UTF8.GetBytes($"{invokeResult.ToXElementString()}");
+                    byte[] bytes = Encoding.UTF8.GetBytes($"{invokeResult.ToString(formatType)}");
                     client.GetStream().WriteAsync(bytes, 0, bytes.Length);
                 }
             }
@@ -341,11 +361,12 @@ namespace SpaceCG.Net
             }
         }
         /// <summary>
-        /// 向客户端发送返回结果对象
+        /// 向客户端发送返回调用结果信息
         /// </summary>
         /// <param name="client"></param>
         /// <param name="invokeResults"></param>
-        protected void SendInvokeResult(ref TcpClient client, IEnumerable<InvokeResult> invokeResults)
+        /// <param name="formatType"></param>
+        protected void SendInvokeResult(ref TcpClient client, IEnumerable<InvokeResult> invokeResults, MessageFormatType formatType)
         {
             if (client == null || invokeResults == null) return;
 
@@ -353,17 +374,7 @@ namespace SpaceCG.Net
             {
                 if (client.Connected)
                 {
-                    string InvokeMessage = $"{nameof(InvokeResult)}s";
-                    StringBuilder builer = new StringBuilder(BUFFER_SIZE);
-
-                    builer.AppendLine($"<{InvokeMessage}>");
-                    for (int i = 0; i < invokeResults.Count(); i++)
-                    {
-                        builer.AppendLine(invokeResults.ElementAt(i).ToXElementString());
-                    }
-                    builer.AppendLine($"</{InvokeMessage}>");
-
-                    byte[] bytes = Encoding.UTF8.GetBytes($"{builer.ToString()}");
+                    byte[] bytes = Encoding.UTF8.GetBytes($"{InvokeResult.ToString(invokeResults, formatType)}");
                     client.GetStream().WriteAsync(bytes, 0, bytes.Length);
                 }
             }
@@ -374,21 +385,23 @@ namespace SpaceCG.Net
         }
 
         /// <summary>
-        /// 获取对象的方法
+        /// 获取对象或实例的方法
         /// </summary>
         /// <param name="instanceType"></param>
         /// <param name="invokeMessage"></param>
         /// <returns></returns>
         protected IEnumerable<MethodInfo> GetMethods(Type instanceType, InvokeMessage invokeMessage)
         {
+            if (instanceType == null || invokeMessage == null) return Enumerable.Empty<MethodInfo>();
+
             Type extensionType = typeof(ExtensionAttribute);
             int paramsLength = invokeMessage.Parameters?.Length ?? 0;
-            string objectMethod = $"{invokeMessage.ObjectName}.{paramsLength}";
+            string objectMethod = $"{invokeMessage.ObjectName}.{invokeMessage.MethodName}.{paramsLength}";
 
             if (historyMethodInfos.ContainsKey(objectMethod))
                 return new MethodInfo[] { historyMethodInfos[objectMethod] };
 
-            //Get Instance MethodInfo
+            //Get Instance Methods
             IEnumerable<MethodInfo> methodInfos = from method in instanceType.GetMethods()
                                                   where method.Name == invokeMessage.MethodName && method.GetParameters().Length == paramsLength
                                                   select method;
@@ -396,7 +409,7 @@ namespace SpaceCG.Net
             int methodCount = methodInfos?.Count() ?? 0;
             if (methodCount == 0)
             {
-                //Get Extension Method
+                //Get Extension Methods
                 methodInfos = from assembly in AppDomain.CurrentDomain.GetAssemblies()
                               where !assembly.GlobalAssemblyCache
                               from type in assembly.GetExportedTypes()
@@ -411,12 +424,13 @@ namespace SpaceCG.Net
 
             methodCount = methodInfos?.Count() ?? 0;
             if (methodCount <= 0) return Enumerable.Empty<MethodInfo>();
-            if (methodCount == 1)  //如果只有唯一一个的方法与参数长度，则记录，因为不存在歧义
+            if (methodCount == 1)  //只有一个方法，不存在歧义，记录，下次不用重复查询
             {
                 historyMethodInfos.Add(objectMethod, methodInfos.First());
                 return methodInfos;
             }
 
+            //有多个方法，存在歧义，对比参数类型
             Type stringType = typeof(string);
             List<MethodInfo> methods = methodInfos.ToList();
             for (int i = 0; i < methods.Count; i++)
@@ -449,8 +463,10 @@ namespace SpaceCG.Net
         /// <param name="invokeMessages"></param>
         public IEnumerable<InvokeResult> TryCallMethods(XElement invokeMessages)
         {
-            if (invokeMessages == null || invokeMessages.Name.LocalName != $"{nameof(InvokeMessage)}s")
-                return Enumerable.Empty<InvokeResult>();
+            if (invokeMessages?.Elements(nameof(InvokeMessage)).Count() == 0)
+                throw new ArgumentNullException(nameof(invokeMessages), "参数不能为空，或调用消息不能为空");
+            if (invokeMessages.Name.LocalName != $"{nameof(InvokeMessage)}s")
+                throw new ArgumentException(nameof(invokeMessages), $"{nameof(InvokeMessage)}s 调用消息不符合协议要求，节点名称错误");
 
             int IntervalDelay = 0;
             if (invokeMessages.Attribute(nameof(IntervalDelay)) != null)
@@ -463,7 +479,7 @@ namespace SpaceCG.Net
 
             for (int i = 0; i < messages.Count(); i++)
             {
-                invokeResults[i] = new InvokeResult(StatusCodes.Unknow);
+                invokeResults[i] = new InvokeResult(InvokeStatusCode.Unknow);
                 bool success = TryCallMethod(messages.ElementAt(i), out invokeResults[i]);
 
                 if (success && IntervalDelay > 0) Task.Delay(IntervalDelay);
@@ -478,12 +494,13 @@ namespace SpaceCG.Net
         /// <returns></returns>
         public IEnumerable<InvokeResult> TryCallMethods(IEnumerable<InvokeMessage> invokeMessages)
         {
-            if(invokeMessages?.Count() <= 0) return Enumerable.Empty<InvokeResult>();
+            if (invokeMessages?.Count() == 0)
+                throw new ArgumentNullException(nameof(invokeMessages), "集合参数不能为空");
 
             InvokeResult[] invokeResults = new InvokeResult[invokeMessages.Count()];
             for (int i = 0; i < invokeMessages.Count(); i++)
             {
-                invokeResults[i] = new InvokeResult(StatusCodes.Unknow);
+                invokeResults[i] = new InvokeResult(InvokeStatusCode.Unknow);
                 TryCallMethod(invokeMessages.ElementAt(i), out invokeResults[i]);
             }
 
@@ -504,7 +521,7 @@ namespace SpaceCG.Net
 
         /// <summary>
         /// 调用实例对象的方法
-        /// <para>支持实例对象的公共方法，和实例类型的扩展方法</para>
+        /// <para>支持实例对象的公共方法，实例类型的扩展方法和类型的静态方法的查询调用</para>
         /// <para>方法调用成功返回 true 时, 输出参数 <see cref="InvokeResult" /> 有效（如果调用的方法有返回值）</para>
         /// </summary>
         /// <param name="invokeMessage"></param>
@@ -512,7 +529,7 @@ namespace SpaceCG.Net
         /// <returns>方法调用成功时，返回 true, 否则返回 false </returns>
         public bool TryCallMethod(InvokeMessage invokeMessage, out InvokeResult invokeResult)
         {
-            invokeResult = new InvokeResult(StatusCodes.Failed, invokeMessage?.ObjectMethod, $"参数异常，对象或参数是无效值");
+            invokeResult = new InvokeResult(InvokeStatusCode.Failed, invokeMessage?.ObjectMethod, $"{nameof(InvokeMessage)} 调用消息不符合协议要求，缺少必要属性或值");
             if (invokeMessage?.IsValid() == false)
             {
                 Logger.Error(invokeResult.ExceptionMessage);
@@ -526,18 +543,18 @@ namespace SpaceCG.Net
             }
             if (MethodFilters.IndexOf($"*.{invokeMessage.MethodName}") != -1 || MethodFilters.IndexOf($"{invokeMessage.ObjectName}.{invokeMessage.MethodName}") != -1)
             {
-                invokeResult.ExceptionMessage = $"实例对象名名称 {invokeMessage.ObjectName}({objectInstance.GetType().Name}) 的方法 {invokeMessage.MethodName} 被禁止访问";
+                invokeResult.ExceptionMessage = $"实例对象名名称 {invokeMessage.ObjectName}({objectInstance.GetType().FullName}) 的方法 {invokeMessage.MethodName} 被禁止访问";
                 Logger.Warn($"{invokeResult.ExceptionMessage}");
                 return false;
             }
 
-            //获取方法对象
-            Type instanceType = objectInstance.GetType();
+            //获取对象方法
             int paramsLength = invokeMessage.Parameters?.Length ?? 0;
+            Type instanceType = objectInstance is Type ? objectInstance as Type : objectInstance.GetType();
             IEnumerable<MethodInfo> methodInfos = GetMethods(instanceType, invokeMessage);
             if (methodInfos.Count() != 1)
             {
-                invokeResult.ExceptionMessage = $"在实例对象 {invokeMessage.ObjectName}({instanceType}) 中, 匹配的方法 {invokeMessage.MethodName}, 参数长度 {paramsLength}, 有 {methodInfos.Count()} 个";
+                invokeResult.ExceptionMessage = $"在实例对象 {invokeMessage.ObjectName}({instanceType.FullName}) 中, 匹配的方法 {invokeMessage.MethodName}(输入参数长度 {paramsLength}), 有 {methodInfos.Count()} 个";
                 Logger.Warn($"{invokeResult.ExceptionMessage}");
                 return false;
             }
@@ -564,13 +581,14 @@ namespace SpaceCG.Net
                 Type destinationType = parameterInfos[i + offsetIndex].ParameterType;
                 if (!TypeExtensions.ConvertFrom(invokeMessage.Parameters[i], destinationType, out object convertValue))
                 {
-                    invokeResult.ExceptionMessage = $"实例对象 {invokeMessage.ObjectName}({instanceType.Name}), 方法 {invokeMessage.MethodName} 的参数值 {invokeMessage.Parameters[i]}({invokeMessage.Parameters[i]?.GetType().Name}) 转换类型 {destinationType} 失败";
+                    invokeResult.ExceptionMessage = $"实例对象 {invokeMessage.ObjectName}({instanceType.FullName}), 方法 {invokeMessage.MethodName} 的参数值 {invokeMessage.Parameters[i]}({invokeMessage.Parameters[i].GetType().FullName}) 转换类型 {destinationType} 失败";
                     Logger.Warn($"{invokeResult.ExceptionMessage}");
                     return false;
                 }
                 convertParameters[i + offsetIndex] = convertValue;
             }
 
+            //消息分派到指定的上下文
             Action<SendOrPostCallback, object> dispatcher;
             if (invokeMessage.Synchronous) dispatcher = syncContext.Send;
             else dispatcher = syncContext.Post;
@@ -578,24 +596,26 @@ namespace SpaceCG.Net
             try
             {
                 Type voidType = typeof(void);
+                invokeResult.ExceptionMessage = "";
                 invokeResult.ReturnType = methodInfo.ReturnType;
-                invokeResult.StatusCode = invokeResult.ReturnType == voidType ? StatusCodes.Success : StatusCodes.SuccessAndReturn;
+                invokeResult.StatusCode = invokeResult.ReturnType == voidType ? InvokeStatusCode.Success : InvokeStatusCode.SuccessAndReturn;
 
-                dispatcher.Invoke((result) =>
+                dispatcher.Invoke((state) =>
                 {
                     object value = methodInfo.Invoke(objectInstance, convertParameters);
-                    if (result != null)
+                    if (state != null)
                     {
-                        InvokeResult rresult = result as InvokeResult;
-                        rresult.ReturnValue = value;
+                        InvokeResult result = (InvokeResult)state;
+                        result.ReturnValue = value;
                     }
                 },
-                invokeResult.ReturnType == voidType ? null : invokeResult);
+                methodInfo.ReturnType == voidType ? null : invokeResult);
+                Logger.Info($"实例对象 {invokeMessage.ObjectName}({instanceType.FullName}) 的方法 {invokeMessage.MethodName} 调用成功");
             }
             catch (Exception ex)
             {
-                invokeResult.StatusCode = StatusCodes.Failed;
-                invokeResult.ExceptionMessage = $"实例对象 {invokeMessage.ObjectName}({instanceType.Name}), 方法 {methodInfo.Name} 调用异常: {ex.Message}";
+                invokeResult.StatusCode = InvokeStatusCode.Failed;
+                invokeResult.ExceptionMessage = $"实例对象 {invokeMessage.ObjectName}({instanceType.FullName}) 的方法 {methodInfo.Name} 调用异常: {ex.Message}";
 
                 Logger.Warn($"{invokeResult.ExceptionMessage}");
                 Logger.Error($"RPC Server MethodBase.Invoke Exception: {ex}");
@@ -607,10 +627,10 @@ namespace SpaceCG.Net
         /// <summary>
         /// 调用实例对象的方法
         /// </summary>
-        /// <param name="message"></param>
+        /// <param name="invokeMessage"></param>
         /// <param name="invokeResult"></param>
         /// <returns>方法调用成功时，返回 true, 否则返回 false </returns>
-        public bool TryCallMethod(XElement message, out InvokeResult invokeResult) => TryCallMethod(new InvokeMessage(message), out invokeResult);
+        public bool TryCallMethod(XElement invokeMessage, out InvokeResult invokeResult) => TryCallMethod(new InvokeMessage(invokeMessage), out invokeResult);
         /// <summary>
         /// 调用实例对象的方法
         /// </summary>
@@ -637,421 +657,76 @@ namespace SpaceCG.Net
         /// <param name="synchronous"></param>
         /// <param name="invokeResult"></param>
         /// <returns>方法调用成功时，返回 true, 否则返回 false </returns>
-        private bool TryCallMethod(string objectName, string methodName, object[] parameters, bool synchronous, out InvokeResult invokeResult) => TryCallMethod(new InvokeMessage(objectName, methodName, parameters, synchronous, null), out invokeResult);
+        public bool TryCallMethod(string objectName, string methodName, object[] parameters, bool synchronous, out InvokeResult invokeResult) => TryCallMethod(new InvokeMessage(objectName, methodName, parameters, synchronous, null), out invokeResult);
 
         /// <summary>
         /// 调用实例对象的方法
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <returns></returns>
-        public T TryCallMethod<T>(string objectName, string methodName) where T : class
-        {
-            if (TryCallMethod(new InvokeMessage(objectName, methodName), out InvokeResult invokeResult) && invokeResult.StatusCode == StatusCodes.SuccessAndReturn)
-                return invokeResult.ReturnValue as T;
-
-            return default;
-        }
-    }
-
-    internal enum FormatType
-    {
-        Code = 0,
-        XML = 1,
-        JSON = 2,
-    }
-
-    /// <summary>
-    /// 调用远程方法或函数的的消息对象
-    /// </summary>
-    public class InvokeMessage
-    {
-        internal const string XType = "Type";
-        internal const string XParameter = "Parameter";
-        internal const string XInvokeMessage = nameof(InvokeMessage);
-        internal const string XObjectName = nameof(ObjectName);
-        internal const string XMethodName = nameof(MethodName);
-        internal const string XParameters = nameof(Parameters);
-        internal const string XSynchronous = nameof(Synchronous);
-        internal const string XComment = nameof(Comment);
-
+        /// <param name="invokeMessage"></param>
+        /// <returns>调用成功且方法有返回值，则返回对象不为 null </returns>
+        public object TryCallMethod(XElement invokeMessage) => TryCallMethod(invokeMessage, out InvokeResult invokeResult) ? invokeResult.ReturnValue : null;
         /// <summary>
-        /// 消息的格式类型
+        /// 调用实例对象的方法
         /// </summary>
-        internal FormatType FormatType { get; private set; } = FormatType.Code;
-
+        /// <param name="invokeMessage"></param>
+        /// <returns>调用成功且方法有返回值，则返回对象不为 null </returns>
+        public object TryCallMethod(InvokeMessage invokeMessage) => TryCallMethod(invokeMessage, out InvokeResult invokeResult) ? invokeResult.ReturnValue : null;
         /// <summary>
-        /// 调用的对象或实例名称
-        /// </summary>
-        public string ObjectName { get; set; }
-        /// <summary>
-        /// 调用的方法或函数名称
-        /// </summary>
-        public string MethodName { get; set; }
-        /// <summary>
-        /// 对象方法或函数名称
-        /// </summary>
-        internal string ObjectMethod => $"{ObjectName}.{MethodName}";
-        /// <summary>
-        /// 调用的方法或函数的参数
-        /// </summary>
-        public object[] Parameters { get; set; }
-        /// <summary>
-        /// Comment
-        /// </summary>
-        public string Comment { get; set; }
-        /// <summary>
-        /// 同步或异步调用方法或函数
-        /// </summary>
-        public bool Synchronous { get; set; } = true;
-        /// <summary>
-        /// 消息对象是否有效
-        /// </summary>
-        /// <returns>对象有效时返回 true </returns>
-        public bool IsValid() => !string.IsNullOrWhiteSpace(ObjectName) && !string.IsNullOrWhiteSpace(MethodName);
-
-        /// <summary>
-        /// 调用远程方法或函数的的消息对象
+        /// 调用实例对象的方法
         /// </summary>
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
-        /// <exception cref="ArgumentNullException"></exception>
-        public InvokeMessage(string objectName, string methodName)
-        {
-            if (string.IsNullOrWhiteSpace(objectName)) throw new ArgumentNullException(nameof(objectName), "参数不能为空");
-            if (string.IsNullOrWhiteSpace(methodName)) throw new ArgumentNullException(nameof(objectName), "参数不能为空");
-
-            this.ObjectName = objectName;
-            this.MethodName = methodName;
-        }
+        /// <returns>调用成功且方法有返回值，则返回对象不为 null </returns>
+        public object TryCallMethod(string objectName, string methodName) => TryCallMethod(new InvokeMessage(objectName, methodName), out InvokeResult invokeResult) ? invokeResult.ReturnValue : null;
         /// <summary>
-        /// 调用远程方法或函数的的消息对象
+        /// 调用实例对象的方法
+        /// </summary>
+        /// <param name="objectName"></param>
+        /// <param name="methodName"></param>
+        /// <param name="parameters"></param>
+        /// <returns>调用成功且方法有返回值，则返回对象不为 null </returns>
+        public object TryCallMethod(string objectName, string methodName, object[] parameters)        
+            => TryCallMethod(new InvokeMessage(objectName, methodName, parameters, true, null), out InvokeResult invokeResult) ? invokeResult.ReturnValue : null;
+        /// <summary>
+        /// 调用实例对象的方法
         /// </summary>
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
         /// <param name="synchronous"></param>
-        /// <param name="comment"></param>
-        /// <exception cref="ArgumentNullException"></exception>
-        public InvokeMessage(string objectName, string methodName, object[] parameters, bool synchronous = true, string comment = null)
-        {
-            if (string.IsNullOrWhiteSpace(objectName)) throw new ArgumentNullException(nameof(objectName), "参数不能为空");
-            if (string.IsNullOrWhiteSpace(methodName)) throw new ArgumentNullException(nameof(objectName), "参数不能为空");
-
-            this.ObjectName = objectName;
-            this.MethodName = methodName;
-            this.Parameters = parameters;
-            this.Synchronous = synchronous;
-            this.Comment = comment;
-        }
-
-        internal InvokeMessage(XElement message)
-        {
-            if (!IsValid(message))
-                throw new ArgumentNullException(nameof(message), $"{nameof(XElement)} 数据格式错误，缺少必要属性或值");
-
-            Comment = message.Attribute(XComment)?.Value;
-            ObjectName = message.Attribute(XObjectName)?.Value;
-            MethodName = message.Attribute(XMethodName)?.Value;
-
-            if (message.Attribute(XSynchronous) != null)
-            {
-                string syncValue = message.Attribute(XSynchronous).Value;
-                if (!string.IsNullOrWhiteSpace(syncValue) && bool.TryParse(syncValue, out bool sync))
-                    Synchronous = sync;
-            }
-
-            var paramElements = message.Elements(XParameter);
-            if (paramElements.Count() > 0)
-            {
-                Parameters = new object[paramElements.Count()];
-                for (int i = 0; i < Parameters.Length; i++)
-                {
-                    XElement paramElement = paramElements.ElementAt(i);
-                    if (paramElement == null) continue;
-                    if (string.IsNullOrWhiteSpace(paramElement?.Value))
-                    {
-                        Parameters[i] = null;
-                        continue;
-                    }
-
-                    try
-                    {
-                        string typeString = paramElement.Attribute(XType)?.Value;
-                        Type paramType = string.IsNullOrWhiteSpace(typeString) ? null : Type.GetType(typeString, false, true);
-                        if (paramType == null)
-                        {
-                            Parameters[i] = paramElement.Value;
-                            continue;
-                        }
-
-                        object value;
-                        if (paramType.IsArray) value = paramElement.Value.Split(new char[] { ',' }); //, StringSplitOptions.RemoveEmptyEntries);
-                        else value = paramElement.Value;
-
-                        Parameters[i] = TypeExtensions.ConvertFrom(value, paramType, out object convertValue) ? convertValue : paramElement?.Value;
-                    }
-                    catch (Exception)
-                    {
-                        Parameters[i] = paramElement.Value;
-                    }
-                }
-            }
-            else
-            {
-                string parameters = message.Attribute(XParameters)?.Value;
-                if (!string.IsNullOrWhiteSpace(parameters)) Parameters = StringExtensions.SplitToObjectArray(parameters);
-            }
-        }
-        /// <summary>
-        /// 返回表示当前对象 <see cref="XElement"/> 格式的字符串
-        /// </summary>
-        /// <returns></returns>
-        public string ToXElementString()
-        {
-            StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
-            string xsynchronous = !Synchronous ? $"{XSynchronous}={Synchronous}" : "";
-            string xcomment = !string.IsNullOrWhiteSpace(Comment) ? $"{XComment}={Comment}" : "";
-            builder.AppendLine($"<{XInvokeMessage} {XObjectName}=\"{ObjectName}\" {XMethodName}=\"{MethodName}\" {xsynchronous} {xcomment} >");
-
-            if (Parameters?.Length > 0)
-            {
-                Type stringType = typeof(string);
-                foreach (var param in Parameters)
-                {
-                    if (param == null)
-                    {
-                        builder.AppendLine($"<{XParameter} />");
-                        continue;
-                    }
-
-                    Type paramType = param.GetType();
-                    if (paramType == stringType)
-                    {
-                        builder.AppendLine($"<{XParameter} {XType}=\"{paramType}\">{param}</{XParameter}>");
-                        continue;
-                    }
-
-                    string paramString = param.ToString();
-                    try
-                    {
-                        TypeConverter converter = TypeDescriptor.GetConverter(paramType);
-                        if (converter.CanConvertTo(paramType)) paramString = converter.ConvertToString(param);
-                    }
-                    catch (Exception)
-                    {
-                        paramString = param.ToString();
-                    }
-                    builder.AppendLine($"<{XParameter} {XType}=\"{paramType}\">{paramString}</{XParameter}>");
-                }
-            }
-            builder.Append($"</{nameof(InvokeMessage)}>");
-
-            return builder.ToString();
-        }
-
-        /// <summary>
-        /// 检查格式，是否有效
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns>符合协议要求，返回 true</returns>
-        public static bool IsValid(XElement message)
-        {
-            if (message == null) return false;
-
-            if (message.Name.LocalName != XInvokeMessage) return false;
-            if (string.IsNullOrWhiteSpace(message.Attribute(XObjectName)?.Value)) return false;
-            if (string.IsNullOrWhiteSpace(message.Attribute(XMethodName)?.Value)) return false;
-
-            return true;
-        }
-
-#if false
-        internal InvokeMessage(JsonElement message)
-        {
-
-        }
-        /// <summary>
-        /// 返回表示当前对象  <see cref="JsonElement"/>  格式的字符串
-        /// </summary>
-        /// <returns></returns>
-        public string ToJsonElementString()
-        {
-            StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
-            return builder.ToString();
-        }
-#endif
-
-        /// <inheritdoc />
-        public override string ToString()
-        {
-            return $"[{nameof(InvokeMessage)}] {nameof(ObjectName)}=\"{ObjectName}\", {nameof(MethodName)}=\"{MethodName}\"";
-        }
-
+        /// <returns>调用成功且方法有返回值，则返回对象不为 null </returns>
+        public object TryCallMethod(string objectName, string methodName, object[] parameters, bool synchronous)        
+            => TryCallMethod(new InvokeMessage(objectName, methodName, parameters, synchronous, null), out InvokeResult invokeResult) ? invokeResult.ReturnValue : null;
     }
 
-    /// <summary> 方法调用的状态 </summary>
-    public enum StatusCodes
+    /// <inheritdoc/>
+    public class RPCSynchronizationContext : SynchronizationContext
     {
-        /// <summary> 未知状态 </summary>
-        Unknow = -2,
-        /// <summary> 调用失败 </summary>
-        Failed = -1,
-        /// <summary> 调用成功，方法或函数返回参数 </summary>
-        Success = 0,
-        /// <summary> 调用成功，方法或函数有返回参数  </summary>
-        SuccessAndReturn = 1,
+        /// <summary>
+        /// 当前线程的同步上下文
+        /// </summary>
+        private SynchronizationContext CurrentContext = SynchronizationContext.Current;
+
+        /// <summary>
+        /// 创建 <see cref="RPCSynchronizationContext"/> 类的新实例
+        /// </summary>
+        public RPCSynchronizationContext()
+        {
+            CurrentContext = SynchronizationContext.Current;
+        }
+
+        /// <inheritdoc/>
+        public override void Send(SendOrPostCallback d, object state)
+        {
+            if (CurrentContext != null) CurrentContext.Send(d, state);
+            else base.Send(d, state);
+        }
+
+        /// <inheritdoc/>
+        public override void Post(SendOrPostCallback d, object state)
+        {
+            ThreadPool.QueueUserWorkItem(new WaitCallback(d.Invoke), state);
+        }
     }
 
-    /// <summary>
-    /// 方法调用返回的结果对象
-    /// </summary>
-    public class InvokeResult
-    {
-        internal const string XInvokeResult = nameof(InvokeResult);
-        internal const string XStatusCode = nameof(StatusCode);
-        internal const string XObjectMethod = nameof(ObjectMethod);
-        internal const string XReturnType = nameof(ReturnType);
-        internal const string XReturnValue = nameof(ReturnValue);
-        internal const string XExceptionMessage = nameof(ExceptionMessage);
-
-        /// <summary> 方法的调用状态 </summary>
-        public StatusCodes StatusCode { get; internal set; } = StatusCodes.Unknow;
-
-        /// <summary> 对象或实例的方法或函数的完整名称 </summary>
-        public string ObjectMethod { get; internal set; }
-
-        /// <summary> 方法的返回类型 </summary>
-        public Type ReturnType { get; internal set; }
-
-        /// <summary> 方法的返回值 </summary>
-        public object ReturnValue { get; internal set; }
-
-        /// <summary> 方法执行失败 <see cref="StatusCode"/> 小于 0 时的异常信息 </summary>
-        public string ExceptionMessage { get; internal set; }
-
-        /// <summary>
-        /// 方法调用返回的结果对象
-        /// </summary>
-        /// <param name="status"></param>
-        internal InvokeResult(StatusCodes status)
-        {
-            this.StatusCode = status;
-        }
-        /// <summary>
-        /// 方法调用返回的结果对象
-        /// </summary>
-        internal InvokeResult(StatusCodes statusCode, string objectMethod, string exceptionMessage)
-        {
-            this.StatusCode = statusCode;
-            this.ObjectMethod = objectMethod;
-            this.ExceptionMessage = exceptionMessage;
-        }
-
-        internal InvokeResult(XElement result)
-        {
-            if (!IsValid(result))
-                throw new ArgumentException(nameof(result), $"{nameof(XElement)} 数据格式错误");
-
-            ObjectMethod = result.Attribute(XObjectMethod)?.Value;
-            ExceptionMessage = result.Attribute(XExceptionMessage)?.Value;
-            StatusCode = Enum.TryParse(result.Attribute(XStatusCode)?.Value, out StatusCodes status) ? status : StatusCodes.Unknow;
-
-            try
-            {
-                if (result.Attribute(XReturnType) != null)
-                    ReturnType = Type.GetType(result.Attribute(XReturnType).Value, false, true);
-            }
-            catch (Exception)
-            {
-
-            }
-
-            if (ReturnType != null && ReturnType != typeof(void) && result.Attribute(XReturnValue) != null)
-            {
-                string value = result.Attribute(XReturnValue).Value;
-                ReturnValue = !string.IsNullOrWhiteSpace(value) && TypeExtensions.ConvertFrom(value, ReturnType, out object conversionValue) ? conversionValue : value;
-            }
-        }
-        /// <summary>
-        /// 返回表示当前对象 <see cref="XElement"/> 格式的字符串
-        /// </summary>
-        /// <returns></returns>
-        public string ToXElementString()
-        {
-            string returnTypeString = "";
-            string returnValueString = "";
-            string exceptionMessage = StatusCode < StatusCodes.Success ? $"{XExceptionMessage}=\"{ExceptionMessage}\"" : "";
-            string objectMethodString = !string.IsNullOrWhiteSpace(ObjectMethod) ? $"{nameof(XObjectMethod)}=\"{ObjectMethod}\"" : "";
-
-            if (ReturnType == null || ReturnType == typeof(void))
-            {
-                returnTypeString = "";
-                returnValueString = "";
-            }
-            else if (ReturnType == typeof(string))
-            {
-                returnTypeString = $"{XReturnType}=\"{ReturnType.ToString()}\"";
-                returnValueString = $"{XReturnValue}=\"{ReturnValue?.ToString() ?? ""}\"";
-            }
-            else
-            {
-                returnTypeString = $"{XReturnType}=\"{ReturnType.ToString()}\"";
-                returnValueString = $"{XReturnValue}=\"{ReturnValue?.ToString() ?? ""}\"";
-
-                if (ReturnValue != null)
-                {
-                    try
-                    {
-                        TypeConverter converter = TypeDescriptor.GetConverter(ReturnType);
-                        if (converter.CanConvertTo(ReturnType))
-                            returnValueString = $"{XReturnValue}=\"{converter.ConvertToString(ReturnValue)}\"";
-                    }
-                    catch (Exception ex)
-                    {
-                        returnValueString = $"{XReturnValue}=\"{ReturnValue}\" ";
-                        RPCServer.Logger.Warn($"MethodInvokeResult TypeConverter。ConvertToString Exception: {ex}");
-                    }
-                }
-            }
-
-            return $"<{XInvokeResult} {XStatusCode}=\"{(int)StatusCode}\" {objectMethodString} {returnTypeString} {returnValueString} {exceptionMessage} />";
-        }
-
-#if false
-        internal InvokeResult(JsonElement result)
-        {
-
-        }
-        public string ToJsonElementString()
-        {
-            return "";
-        }
-#endif
-
-        /// <inheritdoc />
-        public override string ToString()
-        {
-            if (StatusCode == StatusCodes.SuccessAndReturn)
-                return $"[{nameof(InvokeResult)}] {XStatusCode}=\"{StatusCode}\", {XObjectMethod}=\"{ObjectMethod}\", {XReturnType}=\"{ReturnType}\", {XReturnValue}=\"{ReturnValue}\"";
-
-            return $"[{nameof(InvokeResult)}] {XStatusCode}={StatusCode}, {XObjectMethod}={ObjectMethod}";
-        }
-
-        /// <summary>
-        /// 检查格式，是否有效
-        /// </summary>
-        /// <param name="result"></param>
-        /// <returns>符合协议要求，返回 true</returns>
-        public static bool IsValid(XElement result)
-        {
-            if (result == null) return false;
-            if (result.Name.LocalName != nameof(InvokeResult)) return false;
-            if (string.IsNullOrWhiteSpace(result.Attribute(XStatusCode)?.Value)) return false;
-
-            return true;
-        }
-
-    }
 }

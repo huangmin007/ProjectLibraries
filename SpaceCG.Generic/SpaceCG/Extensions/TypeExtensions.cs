@@ -81,6 +81,7 @@ namespace SpaceCG.Extensions
             if (destinationType == null) return false;
             if (value == null || destinationType == typeof(void)) return true;
 
+            #region 扩展部份字符类型的转换
             Type valueType = value.GetType();
             if (!destinationType.IsArray && valueType == destinationType)
             {
@@ -90,21 +91,35 @@ namespace SpaceCG.Extensions
             else if (!destinationType.IsArray && valueType == typeof(string))
             {
                 string valueString = value.ToString();
+                // 0.空白或字符 "null" 转换为对象 null
                 if (string.IsNullOrWhiteSpace(valueString) || valueString.ToLower().Trim() == "null") return true;
 
+                /* string to object
+                 * 1.枚举类型转换
+                 * 1.1 扩展支持字符 "{枚举类型}.{枚举值}" 的转换
+                 * 1.2 扩展支持数字或字符格式 "数字"或"0x数字" 的转换，识别 "0x" 为十六进制数的转换
+                 * 2.Boolean类型转换
+                 * 2.1 字符或数字 "1" 和 字母 "T" 的转换，为 true，其它为 false
+                 * 3.数值类型的转换
+                 * 3.1 字符或数字格式 "数字"或"0x数字" 的转换，识别 "0x" 为十六进制数的转换
+                 */
                 if (destinationType.IsEnum)
                 {
                     valueString = valueString.ToLower().Trim();
                     string desTypeName = $"{destinationType.Name}.".ToLower();
                     if (valueString.IndexOf(desTypeName) == 0) valueString = valueString.Replace(desTypeName, "");
-                    if (valueString.IndexOf("0x") == 0 && StringExtensions.ToNumber<int>(valueString, out int number)) valueString = number.ToString();
+                    if (valueString.IndexOf("0x") == 0 && StringExtensions.ToNumber(valueString, out int number)) valueString = number.ToString();
 
                     try
                     {
                         conversionValue = Enum.Parse(destinationType, valueString, true);
                         return true;
                     }
-                    catch (Exception ex) { Logger.Warn($"{ex}"); }
+                    catch (Exception ex) 
+                    { 
+                        Logger.Warn($"{ex}");
+                        return false;
+                    }
                 }
                 else if (destinationType == typeof(bool))
                 {
@@ -145,6 +160,7 @@ namespace SpaceCG.Extensions
                 conversionValue = instanceValue;
                 return true;
             }
+            #endregion
 
             try
             {

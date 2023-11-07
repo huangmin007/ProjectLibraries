@@ -64,6 +64,7 @@ namespace SpaceCG.Generic
     /// &lt;Return Result="True/False" Value="value" /&gt;
     /// </code>
     /// </summary>
+    [Obsolete("建议使用 RCPServer/RPCClient 类", false)]
     public class ReflectionController : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ReflectionController));
