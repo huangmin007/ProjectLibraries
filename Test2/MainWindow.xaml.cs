@@ -151,8 +151,17 @@ namespace Test2
             logger1.Info($"Click {button.Name}");
             if (button == Button_Test)
             {
+                InvokeMessage[] invokeMessages = new InvokeMessage[2]
+                {
+                    new InvokeMessage("Window", "Add33", new object[] { "120", 160 }),
+                    new InvokeMessage("Window", "Add33", new object[] { "560", 160 })
+                };
+
                 //var result = rpcClient.TryCallMethod("Window", "Add33", new object[] { "120", 160 }, out InvokeResult invokeResult);
-                var invokeResult = await rpcClient.TryCallMethodAsync("Window", "Add33", new object[] { "120", 160 });
+                //var invokeResult = await rpcClient.TryCallMethodAsync("Window", "Add33", new object[] { "120", 160 }, false);
+
+                var invokeResult = await rpcClient.TryCallMethodsAsync(invokeMessages);
+                //var invokeResult = await rpcClient.TryCallMethodsAsync(XElement.Parse("<InvokeMessages></InvokeMessages>"));
                 logger1.Info($"Result::{invokeResult}");
 
                 //var result = await rpcClient.CallMethodAsync("Window", "Add", new object[] { 12, 16 });

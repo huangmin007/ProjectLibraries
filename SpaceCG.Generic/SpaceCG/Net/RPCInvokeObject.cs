@@ -5,11 +5,12 @@ using System.Linq;
 using System.Text;
 using SpaceCG.Extensions;
 using System.Xml.Linq;
+using System.Threading;
 
 namespace SpaceCG.Net
 {
 
-    /// <summary> 方法调用的状态 </summary>
+    /// <summary> 方法或函数的调用状态 </summary>
     public enum InvokeStatusCode
     {
         /// <summary> 未知状态 </summary>
@@ -23,7 +24,7 @@ namespace SpaceCG.Net
     }
 
     /// <summary>
-    /// RPC 消息格式类型
+    /// RPC 协议支持的消息格式类型
     /// </summary>
     public enum MessageFormatType
     {
@@ -40,19 +41,9 @@ namespace SpaceCG.Net
     /// </summary>
     public class InvokeMessage
     {
+        const string SPACE = " ";
         const string XType = "Type";
         const string XParameter = "Parameter";
-        const string XInvokeMessage = nameof(InvokeMessage);
-        const string XObjectName = nameof(ObjectName);
-        const string XMethodName = nameof(MethodName);
-        const string XParameters = nameof(Parameters);
-        const string XSynchronous = nameof(Synchronous);
-        const string XComment = nameof(Comment);
-
-        /// <summary>
-        /// 消息的格式类型
-        /// </summary>
-        /// internal FormatType FormatType { get; private set; } = FormatType.Code;
 
         /// <summary>
         /// 调用的对象或实例名称
@@ -63,7 +54,7 @@ namespace SpaceCG.Net
         /// </summary>
         public string MethodName { get; set; }
         /// <summary>
-        /// 对象方法或函数名称
+        /// 对象方法或函数全名
         /// </summary>
         internal string ObjectMethod => $"{ObjectName}.{MethodName}";
         /// <summary>
@@ -75,9 +66,10 @@ namespace SpaceCG.Net
         /// </summary>
         public string Comment { get; set; }
         /// <summary>
-        /// 同步或异步调用方法或函数
+        /// 方法或函数的调用是否以异步的方式执行，默认为 false，在 <see cref="SynchronizationContext.Current"/> 以同步方式执行
+        /// <para>需要实例对象的方法支持异步，异步执行不会产生异常</para>
         /// </summary>
-        public bool Synchronous { get; set; } = true;
+        public bool Asynchronous { get; set; } = false;
 
         /// <summary>
         /// 调用远程方法或函数的的消息对象
@@ -99,19 +91,22 @@ namespace SpaceCG.Net
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <param name="synchronous"></param>
-        /// <param name="comment"></param>
-        /// <exception cref="ArgumentNullException"></exception>
-        public InvokeMessage(string objectName, string methodName, object[] parameters, bool synchronous = true, string comment = null)
+        public InvokeMessage(string objectName, string methodName, object[] parameters) : this(objectName, methodName)
         {
-            if (string.IsNullOrWhiteSpace(objectName)) throw new ArgumentNullException(nameof(objectName), "参数不能为空");
-            if (string.IsNullOrWhiteSpace(methodName)) throw new ArgumentNullException(nameof(objectName), "参数不能为空");
-
-            this.Comment = comment;
-            this.ObjectName = objectName;
-            this.MethodName = methodName;
             this.Parameters = parameters;
-            this.Synchronous = synchronous;
+        }
+        /// <summary>
+        /// 调用远程方法或函数的的消息对象
+        /// </summary>
+        /// <param name="objectName"></param>
+        /// <param name="methodName"></param>
+        /// <param name="parameters"></param>
+        /// <param name="asynchronous"></param>
+        /// <param name="comment"></param>
+        public InvokeMessage(string objectName, string methodName, object[] parameters, bool asynchronous, string comment = null) : this(objectName, methodName, parameters)
+        {
+            this.Comment = comment;
+            this.Asynchronous = asynchronous;
         }
         /// <summary>
         /// 调用远程方法或函数的的消息对象
@@ -123,15 +118,15 @@ namespace SpaceCG.Net
             if (!IsValid(message))
                 throw new ArgumentNullException(nameof(message), $"{nameof(XElement)} 数据格式错误，缺少必要属性或值");
 
-            Comment = message.Attribute(XComment)?.Value;
-            ObjectName = message.Attribute(XObjectName)?.Value;
-            MethodName = message.Attribute(XMethodName)?.Value;
+            Comment = message.Attribute(nameof(Comment))?.Value;
+            ObjectName = message.Attribute(nameof(ObjectName))?.Value;
+            MethodName = message.Attribute(nameof(MethodName))?.Value;
 
-            if (message.Attribute(XSynchronous) != null)
+            if (message.Attribute(nameof(Asynchronous)) != null)
             {
-                string syncValue = message.Attribute(XSynchronous).Value;
-                if (!string.IsNullOrWhiteSpace(syncValue) && bool.TryParse(syncValue, out bool sync))
-                    Synchronous = sync;
+                string asyncStringValue = message.Attribute(nameof(Asynchronous)).Value;
+                if (!string.IsNullOrWhiteSpace(asyncStringValue) && bool.TryParse(asyncStringValue, out bool asyncBooleanValue))
+                    Asynchronous = asyncBooleanValue;
             }
 
             //优先 Parameter 节点
@@ -174,43 +169,70 @@ namespace SpaceCG.Net
             else
             {
                 //其次 @Parameters 属性
-                string parameters = message.Attribute(XParameters)?.Value;
+                string parameters = message.Attribute(nameof(Parameters))?.Value;
                 if (!string.IsNullOrWhiteSpace(parameters)) Parameters = StringExtensions.SplitToObjectArray(parameters);
             }
         }
 
         /// <summary>
-        /// 检查对象是否有效，是否符合协议要求
+        /// 检查消息是否有效，是否符合协议要求
         /// </summary>
         /// <returns>符合协议要求，返回 true</returns>
-        public bool IsValid() => !string.IsNullOrWhiteSpace(ObjectName) && !string.IsNullOrWhiteSpace(MethodName);
+        internal bool IsValid() => !string.IsNullOrWhiteSpace(ObjectName) && !string.IsNullOrWhiteSpace(MethodName);
+        /// <summary>
+        /// 检查消息是否有效，是否符合协议要求
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns>符合协议要求，返回 true</returns>
+        internal static bool IsValid(XElement message)
+        {
+            if (message == null) return false;
+            if (message.Name.LocalName == nameof(InvokeMessage))
+            {
+                return !string.IsNullOrWhiteSpace(message.Attribute(nameof(ObjectName))?.Value)
+                    && !string.IsNullOrWhiteSpace(message.Attribute(nameof(MethodName))?.Value);
+            }
+            else if (message.Name.LocalName == $"{nameof(InvokeMessage)}s")
+            {
+                var elements = message.Elements(nameof(InvokeMessage));
+                if (elements.Count() <= 0) return false;
+                foreach (var element in elements)
+                    if (!IsValid(element)) return false;
+                return true;
+            }
+            return false;
+        }
+
+#if false
+        /// <summary>
+        /// 调用远程方法或函数的的消息对象
+        /// </summary>
+        /// <param name="message"></param>
+        /// <exception cref="ArgumentNullException"></exception>
+        internal InvokeMessage(JsonDocument message)
+        {            
+        }
         /// <summary>
         /// 检查对象是否有效，是否符合协议要求
         /// </summary>
         /// <param name="message"></param>
         /// <returns>符合协议要求，返回 true</returns>
-        public static bool IsValid(XElement message)
+        internal static bool IsValid(JsonDocument message)
         {
-            if (message == null) return false;
-
-            if (message.Name.LocalName != XInvokeMessage) return false;
-            if (string.IsNullOrWhiteSpace(message.Attribute(XObjectName)?.Value)) return false;
-            if (string.IsNullOrWhiteSpace(message.Attribute(XMethodName)?.Value)) return false;
-
-            return true;
+            return false;
         }
+#endif
 
         /// <summary>
         /// 返回表示当前对象 <see cref="XElement"/> 格式的字符串
         /// </summary>
         /// <returns></returns>
-        public string ToXMLString()
+        private string ToXMLString()
         {
-            const string SPACE = " ";
             StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
-            string xsynchronous = !Synchronous ? $"{XSynchronous}=\"{Synchronous}\"{SPACE}" : "";
-            string xcomment = !string.IsNullOrWhiteSpace(Comment) ? $"{XComment}=\"{Comment}\"{SPACE}" : "";
-            builder.AppendLine($"<{XInvokeMessage} {XObjectName}=\"{ObjectName}\" {XMethodName}=\"{MethodName}\" {xsynchronous}{xcomment}>");
+            string xasynchronous = Asynchronous ? $"{nameof(Asynchronous)}=\"{Asynchronous}\"{SPACE}" : "";
+            string xcomment = !string.IsNullOrWhiteSpace(Comment) ? $"{nameof(Comment)}=\"{Comment}\"{SPACE}" : "";
+            builder.AppendLine($"<{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\" {nameof(MethodName)}=\"{MethodName}\" {xasynchronous}{xcomment}>");
 
             if (Parameters?.Length > 0)
             {
@@ -250,108 +272,89 @@ namespace SpaceCG.Net
             return builder.ToString();
         }
         /// <summary>
-        /// 返回表示当前对象 <see cref="XElement"/> 格式的字符串
-        /// </summary>
-        /// <param name="invokeMessages"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        public static string ToXMLString(IEnumerable<InvokeMessage> invokeMessages)
-        {
-            if (invokeMessages?.Count() == 0)
-                throw new ArgumentNullException(nameof(invokeMessages), "集合参数不能为空");
-
-            string InvokeMessages = $"{nameof(InvokeMessage)}s";
-            StringBuilder builer = new StringBuilder(RPCServer.BUFFER_SIZE);
-            builer.AppendLine($"<{InvokeMessages}>");
-            for (int i = 0; i < invokeMessages.Count(); i++)
-            {
-                builer.AppendLine(invokeMessages.ElementAt(i).ToXMLString());
-            }
-            builer.AppendLine($"</{InvokeMessages}>");
-
-            return builer.ToString();
-        }
-        /// <summary>
         /// 返回表示当前对象  <see cref="JsonDocument"/>  格式的字符串
         /// </summary>
         /// <returns></returns>
-        public string ToJSONString()
+        private string ToJSONString()
         {
             return null;
         }
-
-#if false
-        /// <summary>
-        /// 调用远程方法或函数的的消息对象
-        /// </summary>
-        /// <param name="message"></param>
-        /// <exception cref="ArgumentNullException"></exception>
-        internal InvokeMessage(JsonDocument message)
-        {
-        }
-        /// <summary>
-        /// 检查对象是否有效，是否符合协议要求
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns>符合协议要求，返回 true</returns>
-        public static bool IsValid(JsonDocument message)
-        {
-            return false;
-        }        
-        /// <summary>
-        /// 返回表示当前对象 <see cref="JsonDocument"/> 格式的字符串
-        /// </summary>
-        /// <param name="invokeMessages"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        public static string ToJSONString(IEnumerable<InvokeMessage> invokeResults)
-        {
-            return null;
-        }
-#endif
         /// <inheritdoc />
-        internal string ToString(MessageFormatType formatType)
+        internal string ToFormatString(MessageFormatType formatType)
         {
             return formatType == MessageFormatType.XML ? ToXMLString() : formatType == MessageFormatType.JSON ? ToJSONString() : ToString();
+        }
+
+        /// <summary>
+        /// 返回表示对象集合的指定的格式字符串
+        /// </summary>
+        /// <param name="invokeMessages"></param>
+        /// <param name="formatType"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        internal static string ToFormatString(IEnumerable<InvokeMessage> invokeMessages, MessageFormatType formatType)
+        {
+            if (invokeMessages == null)
+                throw new ArgumentNullException(nameof(invokeMessages), "集合参数不能为空");
+            StringBuilder builer = new StringBuilder(RPCServer.BUFFER_SIZE);
+
+            if (formatType == MessageFormatType.XML)
+            {
+                string InvokeMessages = $"{nameof(InvokeMessage)}s";
+                builer.AppendLine($"<{InvokeMessages}>");
+                for (int i = 0; i < invokeMessages.Count(); i++)
+                {
+                    builer.AppendLine(invokeMessages.ElementAt(i).ToXMLString());
+                }
+                builer.AppendLine($"</{InvokeMessages}>");
+            }
+            else if (formatType == MessageFormatType.JSON)
+            {
+
+            }
+            else
+            {
+
+            }
+
+            return builer.ToString();
         }
 
         /// <inheritdoc />
         public override string ToString()
         {
-            return $"[{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\", {nameof(MethodName)}=\"{MethodName}\"]";
+            if (Asynchronous)
+                return $"[{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\", {nameof(MethodName)}=\"{MethodName}\", {nameof(Asynchronous)}=\"{Asynchronous}\"]";
+            else
+                return $"[{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\", {nameof(MethodName)}=\"{MethodName}\"]";
         }
     }
 
 
     /// <summary>
-    /// 远程方法或函数调用后返回的结果或信息对象
+    /// 远程方法或函数的调用过程或调用结果的消息对象
     /// </summary>
     public class InvokeResult
     {
-        const string XInvokeResult = nameof(InvokeResult);
-        const string XStatusCode = nameof(StatusCode);
-        const string XObjectMethod = nameof(ObjectMethod);
-        const string XReturnType = nameof(ReturnType);
-        const string XReturnValue = nameof(ReturnValue);
-        const string XExceptionMessage = nameof(ExceptionMessage);
+        const string SPACE = " ";
 
-        /// <summary> 方法的调用状态 </summary>
+        /// <summary> 远程方法或函数的调用状态 </summary>
         public InvokeStatusCode StatusCode { get; internal set; } = InvokeStatusCode.Unknow;
 
-        /// <summary> 对象或实例的方法或函数的完整名称 </summary>
+        /// <summary> 对象实例的方法的完整名称 </summary>
         public string ObjectMethod { get; internal set; }
 
-        /// <summary> 方法的返回类型 </summary>
+        /// <summary> 远程方法或函数的返回值类型 </summary>
         public Type ReturnType { get; internal set; }
 
-        /// <summary> 方法的返回值 </summary>
+        /// <summary> 远程方法或函数的返回值 </summary>
         public object ReturnValue { get; internal set; }
 
-        /// <summary> 方法执行失败 <see cref="StatusCode"/> 小于 0 时的异常信息 </summary>
+        /// <summary> 远程方法或函数调用失败的原因或是异常信息，一般在 <see cref="StatusCode"/> 值小于 0 时该值不为 null  </summary>
         public string ExceptionMessage { get; internal set; }
 
         /// <summary>
-        /// 方法调用返回的结果对象
+        /// 远程方法或函数的调用过程或调用结果的消息对象
         /// </summary>
         /// <param name="status"></param>
         internal InvokeResult(InvokeStatusCode status)
@@ -359,7 +362,7 @@ namespace SpaceCG.Net
             this.StatusCode = status;
         }
         /// <summary>
-        /// 方法调用返回的结果对象
+        /// 远程方法或函数的调用过程或调用结果的消息对象
         /// </summary>
         /// <param name="statusCode"></param>
         /// <param name="objectMethod"></param>
@@ -370,140 +373,63 @@ namespace SpaceCG.Net
             this.ObjectMethod = objectMethod;
             this.ExceptionMessage = exceptionMessage;
         }
+        
         /// <summary>
-        /// 方法调用返回的结果对象
+        /// 远程方法或函数的调用过程或调用结果的消息对象
         /// </summary>
         /// <param name="result"></param>
         /// <exception cref="ArgumentException"></exception>
         internal InvokeResult(XElement result)
         {
-            if (!IsValid(result))
-                throw new ArgumentException(nameof(result), $"{nameof(XElement)} 数据格式错误");
+            if (!IsValid(result)) return;
 
-            ReturnValue = result.Attribute(XReturnValue)?.Value;
-            ObjectMethod = result.Attribute(XObjectMethod)?.Value;
-            ExceptionMessage = result.Attribute(XExceptionMessage)?.Value;
-            StatusCode = Enum.TryParse(result.Attribute(XStatusCode)?.Value, out InvokeStatusCode status) ? status : InvokeStatusCode.Unknow;
+            ReturnValue = result.Attribute(nameof(ReturnValue))?.Value;
+            ObjectMethod = result.Attribute(nameof(ObjectMethod))?.Value;
+            ExceptionMessage = result.Attribute(nameof(ExceptionMessage))?.Value;
+            StatusCode = Enum.TryParse(result.Attribute(nameof(StatusCode))?.Value, out InvokeStatusCode status) ? status : InvokeStatusCode.Unknow;
 
             try
             {
-                if (result.Attribute(XReturnType) != null)
-                    ReturnType = Type.GetType(result.Attribute(XReturnType).Value, false, true);
+                if (result.Attribute(nameof(ReturnType)) != null)
+                    ReturnType = Type.GetType(result.Attribute(nameof(ReturnType)).Value, false, true);
             }
             catch (Exception ex)
             {
                 RPCServer.Logger.Error($"{nameof(InvokeResult)} GetType Exception:: {ex}");
             }
 
-            if (ReturnType != null && ReturnType != typeof(void) && result.Attribute(XReturnValue) != null)
+            if (ReturnType != null && ReturnType != typeof(void) && result.Attribute(nameof(ReturnValue)) != null)
             {
-                string value = result.Attribute(XReturnValue).Value;
+                string value = result.Attribute(nameof(ReturnValue)).Value;
                 ReturnValue = !string.IsNullOrWhiteSpace(value) && TypeExtensions.ConvertFrom(value, ReturnType, out object conversionValue) ? conversionValue : value;
             }
         }
-
         /// <summary>
-        /// 检查对象是否有效，是否符合协议要求
+        /// 检查消息是否有效，是否符合协议要求
         /// </summary>
         /// <param name="result"></param>
         /// <returns>符合协议要求，返回 true</returns>
-        public static bool IsValid(XElement result)
+        internal static bool IsValid(XElement result)
         {
             if (result == null) return false;
-            if (result.Name.LocalName != nameof(InvokeResult)) return false;
-            if (string.IsNullOrWhiteSpace(result.Attribute(XStatusCode)?.Value)) return false;
-
-            return true;
-        }
-
-        /// <summary>
-        /// 返回表示当前对象 <see cref="XElement"/> 格式的字符串
-        /// </summary>
-        /// <returns></returns>
-        public string ToXMLString()
-        {
-            const string SPACE = " ";
-            string returnType = "";
-            string returnValue = "";
-            string objectMethod = !string.IsNullOrWhiteSpace(ObjectMethod) ? $"{XObjectMethod}=\"{ObjectMethod}\"{SPACE}" : "";
-            string exceptionMessage = StatusCode < InvokeStatusCode.Success ? $"{XExceptionMessage}=\"{ExceptionMessage}\"{SPACE}" : "";
-
-            if (ReturnType == null || ReturnType == typeof(void))
+            if (result.Name.LocalName == nameof(InvokeResult))
             {
-                returnType = "";
-                returnValue = "";
+                return !string.IsNullOrWhiteSpace(result.Attribute(nameof(StatusCode))?.Value);
             }
-            else if (ReturnType == typeof(string))
+            else if (result.Name.LocalName == $"{nameof(InvokeResult)}s")
             {
-                returnType = $"{XReturnType}=\"{ReturnType.FullName}\"{SPACE}";
-                returnValue = $"{XReturnValue}=\"{ReturnValue?.ToString() ?? ""}\"{SPACE}";
+                var elements = result.Elements(nameof(InvokeResult));
+                if (elements.Count() <= 0) return false;
+                foreach (var element in elements) 
+                    if (!IsValid(element)) return false;
+                return true;
             }
-            else
-            {
-                returnType = $"{XReturnType}=\"{ReturnType.FullName}\"{SPACE}";
-                returnValue = $"{XReturnValue}=\"{ReturnValue?.ToString() ?? ""}\"{SPACE}";
-
-                if (ReturnValue != null)
-                {
-                    try
-                    {
-                        TypeConverter converter = TypeDescriptor.GetConverter(ReturnType);
-                        if (converter.CanConvertTo(ReturnType))
-                            returnValue = $"{XReturnValue}=\"{converter.ConvertToString(ReturnValue)}\"{SPACE}";
-                    }
-                    catch (Exception ex)
-                    {
-                        returnValue = $"{XReturnValue}=\"{ReturnValue}\"{SPACE}";
-                        RPCServer.Logger.Warn($"{nameof(InvokeResult)} TypeConverter.ConvertToString Exception: {ex}");
-                    }
-                }
-            }
-
-            return $"<{XInvokeResult} {XStatusCode}=\"{(int)StatusCode}\" {objectMethod}{returnType}{returnValue}{exceptionMessage}/>";
-        }
-        /// <summary>
-        /// 返回表示当前对象 <see cref="XElement"/> 格式的字符串
-        /// </summary>
-        /// <param name="invokeResults"></param>
-        /// <param name="formatType"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        public static string ToString(IEnumerable<InvokeResult> invokeResults, MessageFormatType formatType)
-        {
-            if (invokeResults?.Count() == 0)
-                throw new ArgumentNullException(nameof(invokeResults), "集合参数不能为空");
-
-            StringBuilder builer = new StringBuilder(RPCServer.BUFFER_SIZE);
-            if (formatType == MessageFormatType.XML)
-            {
-                string InvokeResults = $"{nameof(InvokeResult)}s";
-                builer.AppendLine($"<{InvokeResults}>");
-                for (int i = 0; i < invokeResults.Count(); i++)
-                {
-                    builer.AppendLine(invokeResults.ElementAt(i).ToXMLString());
-                }
-                builer.AppendLine($"</{InvokeResults}>");
-
-            }
-            else if (formatType == MessageFormatType.JSON)
-            {
-            }
-
-            return builer.ToString();
-        }
-
-        /// <summary>
-        /// 返回表示当前对象  <see cref="JsonDocument"/>  格式的字符串
-        /// </summary>
-        /// <returns></returns>
-        public string ToJSONString()
-        {
-            return null;
+            return false;
         }
 
 #if false
         /// <summary>
-        /// 方法调用返回的结果对象
+        /// 远程方法或函数的调用过程或调用结果的消息对象
         /// </summary>
         /// <param name="result"></param>
         internal InvokeResult(JsonDocument result)
@@ -514,34 +440,119 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="message"></param>
         /// <returns>符合协议要求，返回 true</returns>
-        public static bool IsValid(JsonDocument message)
+        internal static bool IsValid(JsonDocument message)
         {
             return false;
+        }        
+#endif
+
+        /// <summary>
+        /// 返回表示当前对象 <see cref="XElement"/> 格式的字符串
+        /// </summary>
+        /// <returns></returns>
+        private string ToXMLString()
+        {
+            string returnType = "";
+            string returnValue = "";
+            string objectMethod = !string.IsNullOrWhiteSpace(ObjectMethod) ? $"{nameof(ObjectMethod)}=\"{ObjectMethod}\"{SPACE}" : "";
+            string exceptionMessage = StatusCode < InvokeStatusCode.Success ? $"{nameof(ExceptionMessage)}=\"{ExceptionMessage}\"{SPACE}" : "";
+
+            if (ReturnType == null || ReturnType == typeof(void))
+            {
+                returnType = "";
+                returnValue = "";
+            }
+            else if (ReturnType == typeof(string))
+            {
+                returnType = $"{nameof(ReturnType)}=\"{ReturnType.FullName}\"{SPACE}";
+                returnValue = $"{nameof(ReturnValue)}=\"{ReturnValue?.ToString() ?? ""}\"{SPACE}";
+            }
+            else
+            {
+                returnType = $"{nameof(ReturnType)}=\"{ReturnType.FullName}\"{SPACE}";
+                returnValue = $"{nameof(ReturnValue)}=\"{ReturnValue?.ToString() ?? ""}\"{SPACE}";
+
+                if (ReturnValue != null)
+                {
+                    try
+                    {
+                        TypeConverter converter = TypeDescriptor.GetConverter(ReturnType);
+                        if (converter.CanConvertTo(ReturnType))
+                            returnValue = $"{nameof(ReturnValue)}=\"{converter.ConvertToString(ReturnValue)}\"{SPACE}";
+                    }
+                    catch (Exception ex)
+                    {
+                        returnValue = $"{nameof(ReturnValue)}=\"{ReturnValue}\"{SPACE}";
+                        RPCServer.Logger.Warn($"{nameof(InvokeResult)} TypeConverter.ConvertToString Exception: {ex}");
+                    }
+                }
+            }
+
+            return $"<{nameof(InvokeResult)} {nameof(StatusCode)}=\"{(int)StatusCode}\" {objectMethod}{returnType}{returnValue}{exceptionMessage}/>";
         }
         /// <summary>
-        /// 返回表示当前对象 <see cref="JsonDocument"/> 格式的字符串
+        /// 返回表示当前对象  <see cref="JsonDocument"/>  格式的字符串
         /// </summary>
-        /// <param name="invokeResults"></param>
         /// <returns></returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        public static string ToJSONString(IEnumerable<InvokeResult> invokeResults)
+        private string ToJSONString()
         {
             return null;
         }
-#endif
-
-        internal string ToString(MessageFormatType formatType)
+        /// <summary>
+        /// 返回表示当前对象指定的格式字符串
+        /// </summary>
+        /// <param name="formatType"></param>
+        /// <returns></returns>
+        internal string ToFormatString(MessageFormatType formatType)
         {
             return formatType == MessageFormatType.XML ? ToXMLString() : formatType == MessageFormatType.JSON ? ToJSONString() : ToString();
+        }
+
+        /// <summary>
+        /// 返回表示对象集合的指定的格式字符串
+        /// </summary>
+        /// <param name="invokeResults"></param>
+        /// <param name="formatType"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        internal static string ToFormatString(IEnumerable<InvokeResult> invokeResults, MessageFormatType formatType)
+        {
+            if (invokeResults == null)
+                throw new ArgumentNullException(nameof(invokeResults), "参数不能为空");
+
+            StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
+            if (formatType == MessageFormatType.XML)
+            {
+                string InvokeResults = $"{nameof(InvokeResult)}s";
+                builder.AppendLine($"<{InvokeResults}>");
+                for (int i = 0; i < invokeResults.Count(); i++)
+                {
+                    builder.Append("\t");
+                    builder.AppendLine(invokeResults.ElementAt(i).ToXMLString());
+                }
+                builder.AppendLine($"</{InvokeResults}>");
+            }
+            else if (formatType == MessageFormatType.JSON)
+            {
+
+            }
+            else
+            {
+                
+            }
+
+            return builder.ToString();
         }
 
         /// <inheritdoc />
         public override string ToString()
         {
+            if (StatusCode == InvokeStatusCode.Success)
+                return $"[{nameof(InvokeResult)} {nameof(StatusCode)}=\"{StatusCode}\", {nameof(ObjectMethod)}=\"{ObjectMethod}\"]";
             if (StatusCode == InvokeStatusCode.SuccessAndReturn)
-                return $"[{nameof(InvokeResult)} {XStatusCode}=\"{StatusCode}\", {XObjectMethod}=\"{ObjectMethod}\", {XReturnType}=\"{ReturnType}\", {XReturnValue}=\"{ReturnValue}\"]";
-
-            return $"[{nameof(InvokeResult)} {XStatusCode}=\"{StatusCode}\", {XObjectMethod}=\"{ObjectMethod}\"]";
+                return $"[{nameof(InvokeResult)} {nameof(StatusCode)}=\"{StatusCode}\", {nameof(ObjectMethod)}=\"{ObjectMethod}\", {nameof(ReturnType)}=\"{ReturnType}\", {nameof(ReturnValue)}=\"{ReturnValue}\"]";
+            else
+                return $"[{nameof(InvokeResult)} {nameof(StatusCode)}=\"{StatusCode}\", {nameof(ObjectMethod)}=\"{ObjectMethod}\", {nameof(ExceptionMessage)}=\"{ExceptionMessage}\"]";
         }
     }
 

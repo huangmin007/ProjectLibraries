@@ -301,11 +301,11 @@ namespace SpaceCG.Extensions
 #pragma warning restore CS0414
         /// <summary> 正则匹配 ',' 分割, 或结尾部份 </summary>
         internal static readonly string pattern_split = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";
-        internal static readonly string pattern_arguments = $@"{pattern_string}|{pattern_array}|{pattern_split}";
+        internal static readonly string pattern_parameters = $@"{pattern_string}|{pattern_array}|{pattern_split}";
         /// <summary>
         /// 字符串参数正则表达式
         /// </summary>
-        public static readonly Regex RegexStringParameters = new Regex(pattern_arguments, RegexOptions.Compiled | RegexOptions.Singleline);
+        public static readonly Regex RegexStringParameters = new Regex(pattern_parameters, RegexOptions.Compiled | RegexOptions.Singleline);
 
         /// <summary>
         /// 将字符串参数集，分割转换为字符串数组
