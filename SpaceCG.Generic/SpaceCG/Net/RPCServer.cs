@@ -23,13 +23,18 @@ namespace SpaceCG.Net
     /// <code>
     /// //示例：
     /// int value = 12;
-    /// RPCServer rpcServer = new RPCServer();
+    /// RPCServer rpcServer = new RPCServer(21027);
     /// rpcServer.AccessObject.Add(nameof(Thread), typeof(Thread));
     /// rpcServer.AccessObject.Add("Window",  this);
     /// rpcServer.AccessObject.Add(nameof(value), value);
+    /// //本地调用
     /// rpcServer.TryCallMethod("Thread", "Sleep", new object[]{ 3000 }); //调用 Thread 的静态方法
     /// rpcServer.TryCallMethod("Window", "Close"); //调用 Window 实例的 Close 方法
     /// rpcServer.TryCallMethod("value", "ToString"); //调用 value 实例的 ToString 方法
+    /// //远程调用
+    /// RPCClient rpcClient = new RPCClient("127.0.0.1", 21027);
+    /// InvokeResult result = rpcClient.TryCallMethod("Thread", "Sleep", new object[]{ 3000 }); 
+    /// InvokeResult result = await rpcClient.TryCallMethodAsync("Thread", "Sleep", new object[]{ 3000 }); 
     /// </code>
     /// </summary>
     public class RPCServer : IDisposable
@@ -716,6 +721,13 @@ namespace SpaceCG.Net
         /// <returns>用成功时，返回的集合参数长度大于 0 </returns>
         public Task<IEnumerable<InvokeResult>> TryCallMethodsAsync(IEnumerable<InvokeMessage> invokeMessages) => Task.Run(() => TryCallMethods(invokeMessages));
 
+#if false
+        public bool TryCallMethod(System.Text.Json.JsonDocument invokeMessage, out InvokeResult invokeResult) { }
+        public InvokeResult TryCallMethod(System.Text.Json.JsonDocument invokeMessage) { }
+
+        public IEnumerable<InvokeResult> TryCallMethods(System.Text.Json.JsonDocument invokeMessages) { }
+        public Task<IEnumerable<InvokeResult>> TryCallMethodsAsync(System.Text.Json.JsonDocument invokeMessages) { }
+#endif
     }
 
     /// <inheritdoc/>
@@ -747,5 +759,4 @@ namespace SpaceCG.Net
             ThreadPool.QueueUserWorkItem(new WaitCallback(d.Invoke), state);
         }
     }
-
 }

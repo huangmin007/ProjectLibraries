@@ -508,7 +508,12 @@ namespace SpaceCG.Net
 
 #if false
         public bool TryCallMethod(System.Text.Json.JsonDocument invokeMessage, out InvokeResult invokeResult) { }
-        public bool TryCallMethods(System.Text.Json.JsonDocument invokeMessage, out InvokeResult invokeResult) { }
+        public InvokeResult TryCallMethod(System.Text.Json.JsonDocument invokeMessage) { }
+        public Task<InvokeResult> TryCallMethodAsync(System.Text.Json.JsonDocument invokeMessage) { }
+
+        public bool TryCallMethods(System.Text.Json.JsonDocument invokeMessages, out IEnumerable<InvokeResult> invokeResults) { }
+        public IEnumerable<InvokeResult> TryCallMethods(System.Text.Json.JsonDocument invokeMessages) { }
+        public Task<IEnumerable<InvokeResult>> TryCallMethodsAsync(System.Text.Json.JsonDocument invokeMessages) { }
 #endif
     }
 }
