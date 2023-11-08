@@ -294,7 +294,7 @@ namespace SpaceCG.Net
             char last = message[message.Length - 1];
 
             MessageFormatType formatType = MessageFormatType.Code;
-            InvokeResult invokeResult = new InvokeResult(InvokeStatusCode.Failed, $"", $"不支持的消息协议。");
+            InvokeResult invokeResult = new InvokeResult(InvokeStatusCode.Failed, "", $"调用消息不符合协议要求");
 
             //正则表达式测试中，待下次更新 o_o!!
             if (first == '<' && last == '>')
@@ -305,7 +305,7 @@ namespace SpaceCG.Net
                 try
                 {
                     element = XElement.Parse(message);
-                    if (!InvokeMessage.IsValid(element)) throw new FormatException("不支持的消息协议");
+                    if (!InvokeMessage.IsValid(element)) throw new FormatException("调用消息不符合协议要求");
                 }
                 catch (Exception ex)
                 {
@@ -329,7 +329,7 @@ namespace SpaceCG.Net
                 }
                 else
                 {
-                    invokeResult.ExceptionMessage = $"XML 消息格式错误，不支持的节点名称 {element.Name.LocalName}，或是拼写错误。";
+                    invokeResult.ExceptionMessage = $"XML 调用消息不符合协议要求，不支持的节点名称 {element.Name.LocalName}，或是拼写错误。";
                     Logger.Warn($"RPC Client {client.Client?.RemoteEndPoint} Invoke Message Format Not Support: {invokeResult.ExceptionMessage}");
                     SendInvokeResult(ref client, invokeResult, formatType);
                     return;
@@ -483,7 +483,7 @@ namespace SpaceCG.Net
         /// <returns>方法调用成功时，返回 true, 否则返回 false </returns>
         public bool TryCallMethod(InvokeMessage invokeMessage, out InvokeResult invokeResult)
         {
-            invokeResult = new InvokeResult(InvokeStatusCode.Failed, invokeMessage?.ObjectMethod, $"{nameof(InvokeMessage)} 调用消息不符合协议要求，缺少必要属性或值");
+            invokeResult = new InvokeResult(InvokeStatusCode.Failed, invokeMessage?.ObjectMethod, $"{nameof(InvokeMessage)} 调用消息不符合协议要求");
             if (invokeMessage?.IsValid() == false)
             {
                 Logger.Error(invokeResult.ExceptionMessage);

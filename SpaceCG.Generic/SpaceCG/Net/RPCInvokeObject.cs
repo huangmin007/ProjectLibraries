@@ -116,7 +116,7 @@ namespace SpaceCG.Net
         internal InvokeMessage(XElement message)
         {
             if (!IsValid(message))
-                throw new ArgumentNullException(nameof(message), $"{nameof(XElement)} 数据格式错误，缺少必要属性或值");
+                throw new ArgumentNullException(nameof(message), $"{nameof(XElement)} 调用消息不符合协议要求");
 
             Comment = message.Attribute(nameof(Comment))?.Value;
             ObjectName = message.Attribute(nameof(ObjectName))?.Value;

@@ -36,8 +36,7 @@ namespace SpaceCG.Net
             {
                 try
                 {
-                    if (tcpClient == null) return false;
-                    return tcpClient.Connected;
+                    return tcpClient?.Connected ?? false;
                 }
                 catch (Exception)
                 {
@@ -256,7 +255,7 @@ namespace SpaceCG.Net
             try
             {
                 element = XElement.Parse(responseMessage);
-                if (!InvokeResult.IsValid(element)) throw new FormatException("不支持的消息协议");
+                if (!InvokeResult.IsValid(element)) throw new FormatException("响应消息不符合协议要求");
             }
             catch (Exception ex)
             {
@@ -297,7 +296,7 @@ namespace SpaceCG.Net
             try
             {
                 element = XElement.Parse(responseMessage);
-                if (!InvokeResult.IsValid(element)) throw new FormatException("不支持的消息协议");
+                if (!InvokeResult.IsValid(element)) throw new FormatException("响应消息不符合协议要求");
             }
             catch (Exception ex)
             {
@@ -446,7 +445,7 @@ namespace SpaceCG.Net
             try
             {
                 elements = XElement.Parse(responseMessage);
-                if (!InvokeResult.IsValid(elements)) throw new FormatException("不支持的消息协议");
+                if (!InvokeResult.IsValid(elements)) throw new FormatException("响应消息不符合协议要求");
             }
             catch (Exception ex)
             {
