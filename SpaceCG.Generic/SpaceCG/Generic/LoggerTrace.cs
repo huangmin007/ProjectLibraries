@@ -54,10 +54,15 @@ namespace SpaceCG.Generic
         {
             ProcessModule processModule = Process.GetCurrentProcess().MainModule;
             string moduleFileName = processModule?.FileName;
+            StringBuilder fileDateInfo = new StringBuilder(512);
             if (!string.IsNullOrEmpty(moduleFileName))
             {
                 FileInfo info = new FileInfo(moduleFileName);
                 MainModuleName = info.Name.Replace(info.Extension, "");
+
+                fileDateInfo.AppendLine($"{nameof(info.CreationTime)}:\t\t{info.CreationTime}");
+                fileDateInfo.AppendLine($"{nameof(info.LastWriteTime)}:\t\t{info.LastWriteTime}");
+                fileDateInfo.AppendLine($"{nameof(info.LastAccessTime)}:\t\t{info.LastAccessTime}");
             }
 
             string path = "logs";
@@ -95,7 +100,9 @@ namespace SpaceCG.Generic
                 ConsoleListener.Write(processModule.FileVersionInfo.ToString());
                 TextFileListener.Write(processModule.FileVersionInfo.ToString());
             }
-            
+            ConsoleListener.Write(fileDateInfo.ToString());
+            TextFileListener.Write(fileDateInfo.ToString());
+
             ConsoleListener.Flush();
             TextFileListener.Flush();
             FileExtensions.ReserveFileDays(30, path, $"{MainModuleName}.*.log");
@@ -140,11 +147,13 @@ namespace SpaceCG.Generic
         }
         private static async void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
         {
+            if (e.Exception is ObjectDisposedException) return;
+
             await System.Threading.Tasks.Task.Delay(2);
-            
             TraceEventCache eventCache = new TraceEventCache();
-            ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");
-            TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException: {e.Exception}");
+
+            ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException 托管代码中的异常信息: {e.Exception}");
+            TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Warning, 0, $"CurrentDomain_FirstChanceException 托管代码中的异常信息: {e.Exception}");
 
             ConsoleListener.Flush();
             TextFileListener.Flush();
