@@ -15,6 +15,11 @@ namespace SpaceCG.Extensions
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(StringExtensions));
 
         /// <summary>
+        /// 反射调用的历史方法元数据字典，减少不必要的重复查询
+        /// </summary>
+        private static Dictionary<string, MethodInfo> HistoryMethodInfos = new Dictionary<string, MethodInfo>(32);
+
+        /// <summary>
         /// 获取数值型的字符串进位基数
         /// <para>可解析示例：十六进制字符串 "0x45", 二进制字符串 "0B1101_1101", 八进制字符串 "O12", 十进制字符串 "0D12.5"或"12.5"</para>
         /// </summary>
@@ -100,17 +105,27 @@ namespace SpaceCG.Extensions
             string methodName = $"To{numberType.Name}";
             int paramsLength = TypeExtensions.IsFloat(numberType) ? 1 : 2;
 
-            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                              let m_params = method.GetParameters()
-                                              where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
-                                              where (paramsLength == 1 && m_params[0].ParameterType == stringType) ||
-                                                    (paramsLength == 2 && m_params[0].ParameterType == stringType && m_params[1].ParameterType == intType)
-                                              select method;
+            MethodInfo ConvertToNumber = null;
+            string objectMethodKey = $"{nameof(Convert)}.{methodName}.{paramsLength}";
+            if (HistoryMethodInfos.ContainsKey(objectMethodKey))
+            {
+                ConvertToNumber = HistoryMethodInfos[objectMethodKey];
+            }
+            else
+            {
+                IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                                  let m_params = method.GetParameters()
+                                                  where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
+                                                  where (paramsLength == 1 && m_params[0].ParameterType == stringType) ||
+                                                        (paramsLength == 2 && m_params[0].ParameterType == stringType && m_params[1].ParameterType == intType)
+                                                  select method;
+                if (methods?.Count() != 1) return false;
 
-            if (methods?.Count() != 1) return false;
-            MethodInfo ConvertToNumber = methods.First();
+                ConvertToNumber = methods.First();
+                HistoryMethodInfos.Add(objectMethodKey, methods.First());
+            }
+
             object[] parameters = GetNumberStringBase(numberString, numberType);
-
             try
             {
                 number = (NumberType)ConvertToNumber.Invoke(null, parameters);
@@ -142,17 +157,27 @@ namespace SpaceCG.Extensions
             string methodName = $"To{numberType.Name}";
             int paramsLength = TypeExtensions.IsFloat(numberType) ? 1 : 2;
 
-            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                              let m_params = method.GetParameters()
-                                              where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
-                                              where (paramsLength == 1 && m_params[0].ParameterType == stringType) ||
-                                                    (paramsLength == 2 && m_params[0].ParameterType == stringType && m_params[1].ParameterType == intType)
-                                              select method;
+            MethodInfo ConvertToNumber = null;
+            string objectMethodKey = $"{nameof(Convert)}.{methodName}.{paramsLength}";
+            if (HistoryMethodInfos.ContainsKey(objectMethodKey))
+            {
+                ConvertToNumber = HistoryMethodInfos[objectMethodKey];
+            }
+            else
+            {
+                IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                                  let m_params = method.GetParameters()
+                                                  where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
+                                                  where (paramsLength == 1 && m_params[0].ParameterType == stringType) ||
+                                                        (paramsLength == 2 && m_params[0].ParameterType == stringType && m_params[1].ParameterType == intType)
+                                                  select method;
 
-            if (methods?.Count() != 1) return false;
-            MethodInfo ConvertToNumber = methods.First();
+                if (methods?.Count() != 1) return false;
+                ConvertToNumber = methods.First();
+                HistoryMethodInfos.Add(objectMethodKey, methods.First());
+            }
+
             object[] parameters = GetNumberStringBase(numberString, numberType);
-
             try
             {
                 number = (ValueType)ConvertToNumber.Invoke(null, parameters);
@@ -183,20 +208,31 @@ namespace SpaceCG.Extensions
             Type numberType = typeof(NumberType);
             string methodName = $"To{numberType.Name}";
             int paramsLength = TypeExtensions.IsFloat(numberType) ? 1 : 2;
-            IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                              let m_params = method.GetParameters()
-                                              where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
-                                              where (paramsLength == 1 && m_params[0].ParameterType == stringType) ||
-                                                    (paramsLength == 2 && m_params[0].ParameterType == stringType && m_params[1].ParameterType == intType)
-                                              select method;
 
-            if (methods?.Count() != 1) return false;
+            MethodInfo ConvertToNumber = null;
+            string objectMethodKey = $"{nameof(Convert)}.{methodName}.{paramsLength}";
+            if (HistoryMethodInfos.ContainsKey(objectMethodKey))
+            {
+                ConvertToNumber = HistoryMethodInfos[objectMethodKey];
+            }
+            else
+            {
+                IEnumerable<MethodInfo> methods = from method in typeof(Convert).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                                  let m_params = method.GetParameters()
+                                                  where method.Name == methodName && m_params.Length == paramsLength && method.ReturnType == numberType
+                                                  where (paramsLength == 1 && m_params[0].ParameterType == stringType) ||
+                                                        (paramsLength == 2 && m_params[0].ParameterType == stringType && m_params[1].ParameterType == intType)
+                                                  select method;
+
+                if (methods?.Count() != 1) return false;
+                ConvertToNumber = methods.First();
+                HistoryMethodInfos.Add(objectMethodKey, methods.First());
+            }
+
             numberString = numberString.ToUpper().Replace(" ", "").Replace("_", "");
-
             string[] stringArray = numberString.Split(new char[] { separator }, StringSplitOptions.None);
             if (defaultValues == null || defaultValues.Length <= 0) defaultValues = new NumberType[stringArray.Length];
 
-            MethodInfo ConvertToNumber = methods.First();
             ParameterInfo[] ParamsInfo = ConvertToNumber.GetParameters();
             int length = Math.Min(stringArray.Length, defaultValues.Length);
 

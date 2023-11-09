@@ -36,7 +36,7 @@
 ```
 
 | <div style="width:90pt;">**节点/@属性名称**</div> | **说明**                                                                                                                                          | <div style="width:40pt;">**值类型**</div> | <div style="width:50pt;">**必要** |
-| :------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------- | :------------------------------ |
+| :------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------- | :------------------------------------- | :------------------------------ |
 | **InvokeMessages**                          | 调用多个远程方法或函数的消息集合(按顺序调用)                                                                                                                         |                                        | 否，保留                            |
 | @IntervalDelay                              | 调用多个远程方法或函数执行时，每次调用等待的间隔时间；时间单位 ms, 默认为 0 ms；*++要考虑到实现问题，不能堵塞通信进程，那Flash是实现异步的问题？？++*                                                           | Int32                                  | 否，保留                            |
 | **InvokeMessage**                           | 调用远程方法或函数的消息对象，单个调用消息                                                                                                                           |                                        | 是                               |
@@ -100,7 +100,7 @@
 
 | **执行状 @StatusCode** | **状态码**  | **函数执行状态**                                          | **是否有返回值** |
 | :------------------ | :------- | :-------------------------------------------------- | :--------- |
-| Unknow              | -2       | 未知状态，函数可能执行成功，也有可能执行失败，可能是在传输过程中出现不可预测的异常，或是消息读写超时等 |            |
+| Unknow              | -2       | 未知状态，远程方法可能执行成功，也有可能执行失败，可能是在传输过程中出现不可预测的异常，或是消息读写超时等 |            |
 | Failed              | -1       | 确认执行失败                                              | 无          |
 | Success             | 0        | 确认执行成功，函数无返回值为 System.Void 类型                       | 无          |
 | SuccessAndReturn    | 1        | 确认执行成功，函数有返回值(为非 System.Void 类型)                    | 有          |
@@ -217,93 +217,93 @@
 *   示例：Parameters="12,play,1024,\[0x01,0xA0,0xAA],'this is string content'"
     ```java
     // 正则表达式对 @Parameters 分析示例
-            /// <summary> 正则匹配 '~' | "~" </summary>
-            internal static readonly String pattern_string = @"\'([^\']+)\'|" + "\"([^\"]+)\"";
-            /// <summary> 正则匹配 '['~']' </summary>
-            internal static readonly String pattern_array = @"\[([^\[\]]+)\]";
+    /// <summary> 正则匹配 '~' | "~" </summary>
+    internal static readonly String pattern_string = @"\'([^\']+)\'|" + "\"([^\"]+)\"";
+    /// <summary> 正则匹配 '['~']' </summary>
+    internal static readonly String pattern_array = @"\[([^\[\]]+)\]";
     #pragma warning disable CS0414
-            /// <summary> 正则匹配 '('~')' </summary>
-            internal static readonly String pattern_parent = @"\(([^\(\)]+)\)";
+    /// <summary> 正则匹配 '('~')' </summary>
+    internal static readonly String pattern_parent = @"\(([^\(\)]+)\)";
     #pragma warning restore CS0414
-            /// <summary> 正则匹配 ',' 分割, 或结尾部份 </summary>
-            internal static readonly String pattern_split = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";
-            internal static readonly String pattern_arguments = $@"{pattern_string}|{pattern_array}|{pattern_split}";
-            /// <summary>
-            /// 字符串参数正则表达式
-            /// </summary>
-            public static readonly Regex RegexStringParameters = new Regex(pattern_arguments, RegexOptions.Compiled | RegexOptions.Singleline);
+    /// <summary> 正则匹配 ',' 分割, 或结尾部份 </summary>
+    internal static readonly String pattern_split = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";
+    internal static readonly String pattern_arguments = $@"{pattern_string}|{pattern_array}|{pattern_split}";
+    /// <summary>
+    /// 字符串参数正则表达式
+    /// </summary>
+    public static readonly Regex RegexStringParameters = new Regex(pattern_arguments, RegexOptions.Compiled | RegexOptions.Singleline);
 
-            /// <summary>
-            /// 将字符串参数集，分割转换为字符串数组
-            /// <code>示例：
-            /// 输入字符串："0x01,True,32,False"，输出数组：["0x01","True","32","False"]
-            /// 输入字符串："0x01,3,[True,True,False]"，输出数组：["0x01","3",["True","True","False"]]
-            /// 输入字符串："0x01,[0,3,4,7],[True,True,False,True]"，输出数组：["0x01",["0","3","4","7"],["True","True","False","True"]]
-            /// 输入字符串："'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15"
-            /// 输出数组：["hello,world","0x01","3","ni?,hao,[aa,bb]",["True","True","False","True"],["aaa,bb,c","ni,hao"],"15","aa,aaa","15"]
-            /// </code>
-            /// </summary>
-            /// <param name="parameters"></param>
-            /// <returns></returns>
-            public static object[] SplitToObjectArray(this string parameters)
-            {
-                if (string.IsNullOrWhiteSpace(parameters)) return new object[] { }; // null
+    /// <summary>
+    /// 将字符串参数集，分割转换为字符串数组
+    /// <code>示例：
+    /// 输入字符串："0x01,True,32,False"，输出数组：["0x01","True","32","False"]
+    /// 输入字符串："0x01,3,[True,True,False]"，输出数组：["0x01","3",["True","True","False"]]
+    /// 输入字符串："0x01,[0,3,4,7],[True,True,False,True]"，输出数组：["0x01",["0","3","4","7"],["True","True","False","True"]]
+    /// 输入字符串："'hello,world',0x01,3,'ni?,hao,[aa,bb]', [True,True,False],['aaa,bb,c','ni,hao'],15,\"aa,aaa\",15"
+    /// 输出数组：["hello,world","0x01","3","ni?,hao,[aa,bb]",["True","True","False","True"],["aaa,bb,c","ni,hao"],"15","aa,aaa","15"]
+    /// </code>
+    /// </summary>
+    /// <param name="parameters"></param>
+    /// <returns></returns>
+    public static object[] SplitToObjectArray(this string parameters)
+    {
+        if (string.IsNullOrWhiteSpace(parameters)) return new object[] { }; // null
                 
     #if false
-                String pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //匹配'~',"~"
-                String pattern_array    = @"\[([^\[\]]+)\]";                    //匹配[~]
-                String pattern_parent   = @"\(([^\(\)]+)\)";                    //匹配(~)
-                String pattern_split    = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";   //匹配 ',' 分割, 或结尾部份
-                String pattern = $@"{pattern_string}|{pattern_array}|{pattern_split}";
-                MatchCollection matchs = Regex.Matches(parameters, pattern, RegexOptions.Compiled | RegexOptions.Singleline);
+        String pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //匹配'~',"~"
+        String pattern_array    = @"\[([^\[\]]+)\]";                    //匹配[~]
+        String pattern_parent   = @"\(([^\(\)]+)\)";                    //匹配(~)
+        String pattern_split    = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";   //匹配 ',' 分割, 或结尾部份
+        String pattern = $@"{pattern_string}|{pattern_array}|{pattern_split}";
+        MatchCollection matchs = Regex.Matches(parameters, pattern, RegexOptions.Compiled | RegexOptions.Singleline);
     #else
-                MatchCollection matchs = RegexStringParameters.Matches(parameters);
+        MatchCollection matchs = RegexStringParameters.Matches(parameters);
     #endif
 
-                List<object> args = new List<object>();
-                foreach (Match match in matchs)
-                {
-                    if (!match.Success) continue;
+        List<object> args = new List<object>();
+        foreach (Match match in matchs)
+        {
+            if (!match.Success) continue;
     #if true
-                    string trimValue = match.Value.Trim();
-                    char first = trimValue[0];
-                    char last = trimValue[trimValue.Length - 1];
+            string trimValue = match.Value.Trim();
+            char first = trimValue[0];
+            char last = trimValue[trimValue.Length - 1];
 
-                    if (first == '\'' && last == '\'' || first == '\"' && last == '\"')
-                    {
-                        args.Add(trimValue.Substring(1, trimValue.Length - 2));
-                    }
-                    else if (first == '[' && last == ']')
-                    {
-                        args.Add(SplitToObjectArray(trimValue.Substring(1, trimValue.Length - 2)));
-                    }
-                    else if (last == ',')
-                    {
-                        args.Add(trimValue.Substring(0, trimValue.Length - 1));
-                    }
-                    else
-                    {
-                        args.Add(match.Value);
-                    }
-    #else
-                    //.Net Framework 4.7 或以上版本  
-                    //.NET Standard 2.1 或以上版本
-                    //.NET 5,6,7
-                    foreach (Group group in match.Groups)
-                    {
-                        if (group.Success && match.Name != group.Name)
-                        {
-                            if (match.Name != "3") //[~]
-                                args.Add(group.Value);
-                            else
-                                args.Add(SplitParameters(group.Value));
-                        }
-                    }
-    #endif
-                }
-
-                return args.ToArray();
+            if (first == '\'' && last == '\'' || first == '\"' && last == '\"')
+            {
+                args.Add(trimValue.Substring(1, trimValue.Length - 2));
             }
+            else if (first == '[' && last == ']')
+            {
+                args.Add(SplitToObjectArray(trimValue.Substring(1, trimValue.Length - 2)));
+            }
+            else if (last == ',')
+            {
+                args.Add(trimValue.Substring(0, trimValue.Length - 1));
+            }
+            else
+            {
+                args.Add(match.Value);
+            }
+    #else
+            //.Net Framework 4.7 或以上版本  
+            //.NET Standard 2.1 或以上版本
+            //.NET 5,6,7
+            foreach (Group group in match.Groups)
+            {
+                if (group.Success && match.Name != group.Name)
+                {
+                    if (match.Name != "3") //[~]
+                        args.Add(group.Value);
+                    else
+                        args.Add(SplitParameters(group.Value));
+                }
+            }
+    #endif
+        }
+
+        return args.ToArray();
+    }
     ```
 
 ## 消息加密等级参考

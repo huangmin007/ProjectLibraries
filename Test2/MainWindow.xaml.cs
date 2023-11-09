@@ -70,6 +70,9 @@ namespace Test2
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            string test = "Hello, world, test, t e st ";
+            Console.WriteLine($"{test.Replace(' ', '\0')}-");
+
             byte[] buffer = new byte[16];
 
             string message = "1234";

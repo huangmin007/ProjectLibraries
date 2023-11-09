@@ -10,7 +10,9 @@ using System.Threading;
 namespace SpaceCG.Net
 {
 
-    /// <summary> 方法或函数的调用状态 </summary>
+    /// <summary> 
+    /// 方法或函数的调用状态 
+    /// </summary>
     public enum InvokeStatusCode
     {
         /// <summary> 未知状态 </summary>
@@ -249,7 +251,7 @@ namespace SpaceCG.Net
                     Type paramType = param.GetType();
                     if (paramType == stringType)
                     {
-                        builder.AppendLine($"<{XParameter} {XType}=\"{paramType.FullName}\">{param}</{XParameter}>");
+                        builder.AppendLine($"<{XParameter} {XType}=\"{paramType.FullName}\"><![CDATA[{param}]]></{XParameter}>");
                         continue;
                     }
 
@@ -264,7 +266,7 @@ namespace SpaceCG.Net
                         paramString = param.ToString();
                         RPCServer.Logger.Warn($"{nameof(InvokeMessage)} TypeConverter.ConvertToString Exception: {ex}");
                     }
-                    builder.AppendLine($"<{XParameter} {XType}=\"{paramType.FullName}\">{paramString}</{XParameter}>");
+                    builder.AppendLine($"<{XParameter} {XType}=\"{paramType.FullName}\"><![CDATA[{paramString}]]></{XParameter}>");
                 }
             }
             builder.Append($"</{nameof(InvokeMessage)}>");

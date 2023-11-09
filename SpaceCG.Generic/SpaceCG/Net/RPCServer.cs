@@ -20,22 +20,6 @@ namespace SpaceCG.Net
     /// <para>支持实例对象的公共方法，实例类型的扩展方法和类型的静态方法的查询调用</para>
     /// <para>注意：支持参数为值类型(<see cref="ValueType"/>)和数组类型(元素为值类型) 和 返回为值类型(<see cref="ValueType"/>)和<see cref="Void"/>类型的方法，或者是方法的参数和返回类型，支持类型转换器<see cref="TypeConverter"/>的</para>
     /// <param><see cref="RPCServer"/> 不会抛出异常，因为要支持本地/远程要访问，远程访问时不管访问过程或结果如何，调用过程是不能中断的，都是要返回客户端一个调用的过程和状态信息</param>
-    /// <code>
-    /// //示例：
-    /// int value = 12;
-    /// RPCServer rpcServer = new RPCServer(21027);
-    /// rpcServer.AccessObject.Add(nameof(Thread), typeof(Thread));
-    /// rpcServer.AccessObject.Add("Window",  this);
-    /// rpcServer.AccessObject.Add(nameof(value), value);
-    /// //本地调用
-    /// rpcServer.TryCallMethod("Thread", "Sleep", new object[]{ 3000 }); //调用 Thread 的静态方法
-    /// rpcServer.TryCallMethod("Window", "Close"); //调用 Window 实例的 Close 方法
-    /// rpcServer.TryCallMethod("value", "ToString"); //调用 value 实例的 ToString 方法
-    /// //远程调用
-    /// RPCClient rpcClient = new RPCClient("127.0.0.1", 21027);
-    /// InvokeResult result = rpcClient.TryCallMethod("Thread", "Sleep", new object[]{ 3000 }); 
-    /// InvokeResult result = await rpcClient.TryCallMethodAsync("Thread", "Sleep", new object[]{ 3000 }); 
-    /// </code>
     /// </summary>
     public class RPCServer : IDisposable
     {
@@ -163,7 +147,7 @@ namespace SpaceCG.Net
                 TcpClient client = clientObject.Key;
                 try
                 {
-                    if (client != null && client.Connected) client.Dispose();
+                    client?.Dispose();
                 }
                 catch (Exception) { }
             }
