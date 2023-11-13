@@ -2,6 +2,10 @@
 
 ***
 
+|发布版本|发布日期|说明|
+|:---|:---|:----|
+|1.0|2023-11-13|初版|
+
 > RPC协议：远程过程调用(Remote Procedure Call) 或 反射程序控制(Reflection Program Control)
 >
 > 需求场景：DEMO 交互控制
@@ -24,6 +28,7 @@
 >
 > 6.  未来可扩展，增加指令列表的描述定义文件(文件中包含UI描述，层级描述，指令描述)，自动传输至各控制端，控制端跟据描述信息自动解析，生成UI、连接、控制
 
+
 ## XML 消息控制格式
 
 ```html
@@ -45,7 +50,7 @@
 | @Parameters                                 | 节点 **Parameter** 的简单形式，**优先级低于 Parameter 节点**，所有参数将按匹配的函数参数强制类型转换；<br />示例：Parameters="12,play,'hello,world.',\[0x08,0x09,0x10,0x0A,0x0B,0x0C]" | String                                 | 否                               |
 | @Comment                                    | 该条控制消息说明、注释或描述信息；也可以预留未来给控制端做 Label 使用                                                                                                          | String                                 | 否，保留                            |
 | **Parameter**                               | 方法或函数的参数信息，跟据方法或函数是否存在参数而定义；<br />**优先级高于 @Parameters 属性**                                                                                      |                                        | 否                               |
-| @Type                                       | 参数的数据类型，如果不明确指定数据类型，则会跟据方法对应的参数强制类型转换；<br />参考：[TypeCode 枚举](https://learn.microsoft.com/zh-cn/dotnet/api/system.typecode?view=net-7.0)         | String                                 | 否                               |
+| @Type                                       | 参数的数据类型(为服务端的数据类型全名)，如果不明确指定数据类型，则会跟据方法对应的参数强制类型转换；<br />参考类型示例：[TypeCode 枚举](https://learn.microsoft.com/zh-cn/dotnet/api/system.typecode?view=net-7.0)         | String                                 | 否                               |
 | @扩展属性或节点                                    | 可在 InvokeMessage 根节点上扩展属性，或根节点之下扩展子节点(非Parameter节点)                                                                                             |                                        |                                 |
 
 *   [x] **建议：手动输入消息编码使用 @Parameters 属性，代码封装或序列化使用 Parameter 节点；**
@@ -95,12 +100,12 @@
 | @ReturnType                                  | 节点 Return 的简单形式，**优先级低于 Return 节点**                                                                                                 | String                                 | 否                               |
 | @ReturnValue                                 | 节点 Return 的简单形式，**优先级低于 Return 节点**                                                                                                 | String                                 | 否                               |
 | **Return**                                   | 方法或函数的返回值，**优先级高于@ReturnType,@ReturnValue**                                                                                         |                                        | 否                               |
-| @Type                                        | 返回的值类型，如果为System.Void类型，则值为 null；<br /> 参考：[TypeCode 枚举](https://learn.microsoft.com/zh-cn/dotnet/api/system.typecode?view=net-7.0) | String                                 | 否                               |
+| @Type                                        | 返回的值类型(为服务端的数据类型全名)，如果为System.Void类型，则值为 null；<br /> 参考：[TypeCode 枚举](https://learn.microsoft.com/zh-cn/dotnet/api/system.typecode?view=net-7.0) | String                                 | 否                               |
 | @扩展属性或节点                                     | 可在 InvokeResult 根节点上扩展属性，或根节点之下扩展子节点(非Return节点)                                                                                     |                                        |                                 |
 
 | **执行状 @StatusCode** | **状态码**  | **函数执行状态**                                          | **是否有返回值** |
 | :------------------ | :------- | :-------------------------------------------------- | :--------- |
-| Unknow              | -2       | 未知状态，远程方法可能执行成功，也有可能执行失败，可能是在传输过程中出现不可预测的异常，或是消息读写超时等 |            |
+| Unknown              | -2       | 未知状态，远程方法可能执行成功，也有可能执行失败，可能是在传输过程中出现不可预测的异常，或是消息读写超时等 |            |
 | Failed              | -1       | 确认执行失败                                              | 无          |
 | Success             | 0        | 确认执行成功，函数无返回值为 System.Void 类型                       | 无          |
 | SuccessAndReturn    | 1        | 确认执行成功，函数有返回值(为非 System.Void 类型)                    | 有          |

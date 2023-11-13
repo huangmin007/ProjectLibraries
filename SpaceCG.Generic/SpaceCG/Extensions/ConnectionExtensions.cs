@@ -105,7 +105,7 @@ namespace SpaceCG.Extensions
         public static bool CreateConnection<T>(ConnectionType type, string address, ushort port, out T connection) where T : IConnection, new()
         {
             connection = default;
-            if (type == ConnectionType.Unknow || string.IsNullOrWhiteSpace(address) || port == 0)
+            if (type == ConnectionType.Unknown || string.IsNullOrWhiteSpace(address) || port == 0)
             {
                 Logger.Warn($"无效的参数 {type} {address} {port}");
                 return false;

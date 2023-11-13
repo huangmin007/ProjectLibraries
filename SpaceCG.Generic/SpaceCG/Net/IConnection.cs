@@ -10,8 +10,8 @@ namespace SpaceCG.Net
     /// </summary>
     public enum ConnectionType
     {
-        /// <summary> <see cref="Unknow"/> 未知的 或 不确定的类型  </summary>
-        Unknow,
+        /// <summary> <see cref="Unknown"/> 未知的 或 不确定的类型  </summary>
+        Unknown,
 
         /// <summary> <see cref="SerialPort"/> 类型 </summary>
         SerialPort,

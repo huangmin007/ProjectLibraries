@@ -6,6 +6,7 @@ using System.Text;
 using SpaceCG.Extensions;
 using System.Xml.Linq;
 using System.Threading;
+using SpaceCG.Generic;
 
 namespace SpaceCG.Net
 {
@@ -16,7 +17,7 @@ namespace SpaceCG.Net
     public enum InvokeStatusCode
     {
         /// <summary> 未知状态 </summary>
-        Unknow = -2,
+        Unknown = -2,
         /// <summary> 调用失败 </summary>
         Failed = -1,
         /// <summary> 调用成功，方法或函数返回参数 </summary>
@@ -43,8 +44,11 @@ namespace SpaceCG.Net
     /// </summary>
     public class InvokeMessage
     {
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(InvokeMessage));
+
         const string SPACE = " ";
-        const string XType = "Type";
+        const string XValue = "Value";
+        const string XType = nameof(Type);
         const string XParameter = "Parameter";
 
         /// <summary>
@@ -148,7 +152,8 @@ namespace SpaceCG.Net
                     try
                     {
                         string typeString = paramElement.Attribute(XType)?.Value;
-                        Type paramType = string.IsNullOrWhiteSpace(typeString) ? null : Type.GetType(typeString, false, true);
+                        Type paramType = string.IsNullOrWhiteSpace(typeString) ? null : GetObjectType(typeString);
+                        //Type paramType = string.IsNullOrWhiteSpace(typeString) ? null : Type.GetType(typeString, false, true);
                         if (paramType == null)
                         {
                             Parameters[i] = paramElement.Value;
@@ -164,7 +169,7 @@ namespace SpaceCG.Net
                     catch (Exception ex)
                     {
                         Parameters[i] = paramElement.Value;
-                        RPCServer.Logger.Warn($"{nameof(InvokeMessage)} TypeConverter.GetType/ConvertFromString Exception: {ex}");
+                        Logger.Warn($"{nameof(InvokeMessage)} TypeConverter.GetType/ConvertFromString Exception: {ex}");
                     }
                 }
             }
@@ -234,10 +239,12 @@ namespace SpaceCG.Net
             StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
             string xasynchronous = Asynchronous ? $"{nameof(Asynchronous)}=\"{Asynchronous}\"{SPACE}" : "";
             string xcomment = !string.IsNullOrWhiteSpace(Comment) ? $"{nameof(Comment)}=\"{Comment}\"{SPACE}" : "";
-            builder.AppendLine($"<{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\" {nameof(MethodName)}=\"{MethodName}\" {xasynchronous}{xcomment}>");
+            builder.Append($"<{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\" {nameof(MethodName)}=\"{MethodName}\" {xasynchronous}{xcomment}");
 
             if (Parameters?.Length > 0)
             {
+                builder.AppendLine(">");
+
                 Type stringType = typeof(string);
                 foreach (var param in Parameters)
                 {
@@ -264,12 +271,17 @@ namespace SpaceCG.Net
                     catch (Exception ex)
                     {
                         paramString = param.ToString();
-                        RPCServer.Logger.Warn($"{nameof(InvokeMessage)} TypeConverter.ConvertToString Exception: {ex}");
+                        Logger.Warn($"{nameof(InvokeMessage)} TypeConverter.ConvertToString Exception: {ex}");
                     }
                     builder.AppendLine($"<{XParameter} {XType}=\"{paramType.FullName}\"><![CDATA[{paramString}]]></{XParameter}>");
                 }
+
+                builder.Append($"</{nameof(InvokeMessage)}>");
             }
-            builder.Append($"</{nameof(InvokeMessage)}>");
+            else
+            {
+                builder.Append("/>");
+            }
 
             return builder.ToString();
         }
@@ -279,7 +291,71 @@ namespace SpaceCG.Net
         /// <returns></returns>
         private string ToJSONString()
         {
-            return null;
+            StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
+            
+            builder.AppendLine("{");
+            builder.AppendLine($"\t\"{nameof(InvokeMessage)}\":");
+            builder.AppendLine("\t{");
+            builder.AppendLine($"\t\t\"{nameof(ObjectName)}\":\"{ObjectName}\",");
+            builder.AppendLine($"\t\t\"{nameof(MethodName)}\":\"{MethodName}\",");
+            if (Asynchronous) builder.AppendLine($"\t\t\"{nameof(Asynchronous)}\":\"{Asynchronous}\",");
+            if (!string.IsNullOrWhiteSpace(Comment)) builder.AppendLine($"\t\t\"{nameof(Comment)}\":\"{Comment}\",");
+
+            if (Parameters?.Length > 0)
+            {
+                builder.AppendLine($"\t\t\"{nameof(Parameters)}\":");
+                builder.AppendLine("\t\t[");
+
+                Type stringType = typeof(string);
+                foreach (var param in Parameters)
+                {
+                    builder.AppendLine("\t\t\t{");
+                    if (param == null)
+                    {
+                        builder.AppendLine($"\t\t\t\t\"{XValue}\":\"\",");
+                        builder.AppendLine($"\t\t\t\t\"{XType}\":\"\"");
+                        builder.AppendLine("\t\t\t},");
+                        continue;
+                    }
+
+                    Type paramType = param.GetType();
+                    if (paramType == stringType)
+                    {
+                        builder.AppendLine($"\t\t\t\t\"{XValue}\":\"{param}\",");
+                        builder.AppendLine($"\t\t\t\t\"{XType}\":\"{paramType.FullName}\"");
+                        builder.AppendLine("\t\t\t},");
+                        continue;
+                    }
+
+                    string paramString = param.ToString();
+                    try
+                    {
+                        TypeConverter converter = TypeDescriptor.GetConverter(paramType);
+                        if (converter.CanConvertTo(paramType)) paramString = converter.ConvertToString(param);
+                    }
+                    catch (Exception ex)
+                    {
+                        paramString = param.ToString();
+                        RPCServer.Logger.Warn($"{nameof(InvokeMessage)} TypeConverter.ConvertToString Exception: {ex}");
+                    }
+
+                    builder.AppendLine($"\t\t\t\t\"{XValue}\":\"{paramString}\",");
+                    builder.AppendLine($"\t\t\t\t\"{XType}\":\"{paramType.FullName}\"");
+                    builder.AppendLine("\t\t\t},");
+                }
+
+                builder.Replace(',', ' ', builder.Length - 3, 1);
+                builder.AppendLine("\t\t]");
+            }
+            else
+            {
+                builder.Replace(',', ' ', builder.Length - 3, 1);
+            }
+
+            builder.AppendLine("\t}");
+            builder.AppendLine("}");
+
+            return builder.ToString();
         }
         /// <inheritdoc />
         internal string ToFormatString(MessageFormatType formatType)
@@ -300,9 +376,9 @@ namespace SpaceCG.Net
                 throw new ArgumentNullException(nameof(invokeMessages), "集合参数不能为空");
             StringBuilder builer = new StringBuilder(RPCServer.BUFFER_SIZE);
 
+            string InvokeMessages = $"{nameof(InvokeMessage)}s";
             if (formatType == MessageFormatType.XML)
             {
-                string InvokeMessages = $"{nameof(InvokeMessage)}s";
                 builer.AppendLine($"<{InvokeMessages}>");
                 for (int i = 0; i < invokeMessages.Count(); i++)
                 {
@@ -330,6 +406,44 @@ namespace SpaceCG.Net
             else
                 return $"[{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\", {nameof(MethodName)}=\"{MethodName}\"]";
         }
+
+
+        private static Dictionary<string, Type> historyTypes = new Dictionary<string, Type>();
+        internal static Type GetObjectType(string typeFullName)
+        {
+            if (string.IsNullOrWhiteSpace(typeFullName))
+                throw new ArgumentNullException(nameof(typeFullName), "参数不能为空");
+
+            if (historyTypes.ContainsKey(typeFullName)) return historyTypes[typeFullName];
+
+            try
+            {
+                Type type = Type.GetType(typeFullName, false, true);
+                if (type != null)
+                {
+                    historyTypes.Add(typeFullName, type);
+                    return type;
+                }
+            }
+            catch (Exception)
+            {
+            }
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                //if (!assembly.GlobalAssemblyCache) continue;
+                foreach (var type in assembly.GetTypes())
+                {
+                    if (type.FullName == typeFullName)
+                    {
+                        historyTypes.Add(typeFullName, type);
+                        return type;
+                    }
+                }
+            }
+
+            return null;
+        }
     }
 
 
@@ -338,10 +452,12 @@ namespace SpaceCG.Net
     /// </summary>
     public class InvokeResult
     {
+        static readonly LoggerTrace Logger = new LoggerTrace(nameof(InvokeResult));
+
         const string SPACE = " ";
 
         /// <summary> 远程方法或函数的调用状态 </summary>
-        public InvokeStatusCode StatusCode { get; internal set; } = InvokeStatusCode.Unknow;
+        public InvokeStatusCode StatusCode { get; internal set; } = InvokeStatusCode.Unknown;
 
         /// <summary> 对象实例的方法的完整名称 </summary>
         public string ObjectMethod { get; internal set; }
@@ -383,27 +499,47 @@ namespace SpaceCG.Net
         /// <exception cref="ArgumentException"></exception>
         internal InvokeResult(XElement result)
         {
-            if (!IsValid(result)) return;
+            if (!IsValid(result))
+            {
+                Logger.Warn($"无效的消息内容：{result}");
+                return;
+            }
 
-            ReturnValue = result.Attribute(nameof(ReturnValue))?.Value;
             ObjectMethod = result.Attribute(nameof(ObjectMethod))?.Value;
             ExceptionMessage = result.Attribute(nameof(ExceptionMessage))?.Value;
-            StatusCode = Enum.TryParse(result.Attribute(nameof(StatusCode))?.Value, out InvokeStatusCode status) ? status : InvokeStatusCode.Unknow;
+            StatusCode = Enum.TryParse(result.Attribute(nameof(StatusCode))?.Value, out InvokeStatusCode status) ? status : InvokeStatusCode.Unknown;
 
+            if (StatusCode != InvokeStatusCode.SuccessAndReturn) return;
+
+            string returnTypeString, returnValueString;
+            IEnumerable<XElement> returnResults = result.Elements("Return");
+            if (returnResults?.Count() > 0)
+            {
+                returnTypeString = returnResults.First().Attribute(nameof(Type))?.Value;
+                returnValueString = returnResults.First().Value;
+            }
+            else if (result.Attribute(nameof(ReturnType)) != null)
+            {
+                returnTypeString = result.Attribute(nameof(ReturnType)).Value;
+                returnValueString = result.Attribute(nameof(ReturnValue)).Value;
+            }
+            else
+            {
+                returnTypeString = null;
+                returnValueString = null;
+            }
+            
             try
             {
-                if (result.Attribute(nameof(ReturnType)) != null)
-                    ReturnType = Type.GetType(result.Attribute(nameof(ReturnType)).Value, false, true);
+                if (!string.IsNullOrWhiteSpace(returnTypeString)) 
+                    ReturnType = InvokeMessage.GetObjectType(returnTypeString);
+                
+                if (ReturnType != null && ReturnType != typeof(void))
+                    ReturnValue = !string.IsNullOrWhiteSpace(returnValueString) && TypeExtensions.ConvertFrom(returnValueString, ReturnType, out object conversionValue) ? conversionValue : returnValueString;
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
-                RPCServer.Logger.Error($"{nameof(InvokeResult)} GetType Exception:: {ex}");
-            }
-
-            if (ReturnType != null && ReturnType != typeof(void) && result.Attribute(nameof(ReturnValue)) != null)
-            {
-                string value = result.Attribute(nameof(ReturnValue)).Value;
-                ReturnValue = !string.IsNullOrWhiteSpace(value) && TypeExtensions.ConvertFrom(value, ReturnType, out object conversionValue) ? conversionValue : value;
+                Logger.Warn($"数据类型转换失败: {ex}");
             }
         }
         /// <summary>
@@ -454,43 +590,39 @@ namespace SpaceCG.Net
         /// <returns></returns>
         private string ToXMLString()
         {
-            string returnType = "";
-            string returnValue = "";
-            string objectMethod = !string.IsNullOrWhiteSpace(ObjectMethod) ? $"{nameof(ObjectMethod)}=\"{ObjectMethod}\"{SPACE}" : "";
-            string exceptionMessage = StatusCode < InvokeStatusCode.Success ? $"{nameof(ExceptionMessage)}=\"{ExceptionMessage}\"{SPACE}" : "";
+            StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
+            builder.Append($"<{nameof(InvokeResult)} {nameof(StatusCode)}=\"{(int)StatusCode}\" ");
 
-            if (ReturnType == null || ReturnType == typeof(void))
-            {
-                returnType = "";
-                returnValue = "";
-            }
-            else if (ReturnType == typeof(string))
-            {
-                returnType = $"{nameof(ReturnType)}=\"{ReturnType.FullName}\"{SPACE}";
-                returnValue = $"{nameof(ReturnValue)}=\"{ReturnValue?.ToString() ?? ""}\"{SPACE}";
-            }
-            else
-            {
-                returnType = $"{nameof(ReturnType)}=\"{ReturnType.FullName}\"{SPACE}";
-                returnValue = $"{nameof(ReturnValue)}=\"{ReturnValue?.ToString() ?? ""}\"{SPACE}";
+            if (!string.IsNullOrWhiteSpace(ObjectMethod)) builder.Append($"{nameof(ObjectMethod)}=\"{ObjectMethod}\" ");
+            if (StatusCode < InvokeStatusCode.Success) builder.Append($"{nameof(ExceptionMessage)}=\"{ExceptionMessage}\" ");
 
-                if (ReturnValue != null)
+            if (StatusCode != InvokeStatusCode.SuccessAndReturn)
+            {
+                builder.Append("/>");
+                return builder.ToString();
+            }
+
+            string returnTypeString = ReturnType.FullName;
+            string returnValueString = ReturnValue?.ToString();
+            if (!string.IsNullOrWhiteSpace(returnValueString))
+            {
+                try
                 {
-                    try
-                    {
-                        TypeConverter converter = TypeDescriptor.GetConverter(ReturnType);
-                        if (converter.CanConvertTo(ReturnType))
-                            returnValue = $"{nameof(ReturnValue)}=\"{converter.ConvertToString(ReturnValue)}\"{SPACE}";
-                    }
-                    catch (Exception ex)
-                    {
-                        returnValue = $"{nameof(ReturnValue)}=\"{ReturnValue}\"{SPACE}";
-                        RPCServer.Logger.Warn($"{nameof(InvokeResult)} TypeConverter.ConvertToString Exception: {ex}");
-                    }
+                    TypeConverter converter = TypeDescriptor.GetConverter(ReturnType);
+                    if (converter.CanConvertTo(ReturnType)) returnValueString = converter.ConvertToString(ReturnValue);
+                }
+                catch (Exception ex)
+                {
+                    returnValueString = ReturnValue.ToString();
+                    Logger.Warn($"{nameof(InvokeResult)} TypeConverter.ConvertToString Exception: {ex}");
                 }
             }
 
-            return $"<{nameof(InvokeResult)} {nameof(StatusCode)}=\"{(int)StatusCode}\" {objectMethod}{returnType}{returnValue}{exceptionMessage}/>";
+            builder.AppendLine(">");
+            builder.AppendLine($"\t<Return {nameof(Type)}=\"{returnTypeString}\"><![CDATA[{returnValueString}]]></Return>");
+            builder.Append($"</{nameof(InvokeResult)}>");
+
+            return builder.ToString();
         }
         /// <summary>
         /// 返回表示当前对象  <see cref="JsonDocument"/>  格式的字符串
@@ -498,7 +630,47 @@ namespace SpaceCG.Net
         /// <returns></returns>
         private string ToJSONString()
         {
-            return null;
+            StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
+
+            builder.AppendLine("{");
+            builder.AppendLine($"\t\"{nameof(InvokeResult)}\":");
+            builder.AppendLine("\t{");
+            builder.AppendLine($"\t\t\"{nameof(StatusCode)}\":\"{(int)StatusCode}\",");
+            builder.AppendLine($"\t\t\"{nameof(ObjectMethod)}\":\"{ObjectMethod}\",");
+
+            if (StatusCode == InvokeStatusCode.SuccessAndReturn && ReturnType != null)
+            {
+                if (ReturnType == typeof(string))
+                {
+                    builder.AppendLine($"\t\t\"{nameof(ReturnType)}\":\"{ReturnType}\",");
+                    builder.AppendLine($"\t\t\"{nameof(ReturnValue)}\":\"{ReturnValue}\",");
+                }
+                else
+                {
+                    string returnValueString = ReturnValue.ToString();
+                    try
+                    {
+                        TypeConverter converter = TypeDescriptor.GetConverter(ReturnType);
+                        if (converter.CanConvertTo(ReturnType)) returnValueString = converter.ConvertToString(ReturnValue);
+                    }
+                    catch (Exception ex)
+                    {
+                        returnValueString = ReturnValue.ToString();
+                        RPCServer.Logger.Warn($"{nameof(InvokeResult)} TypeConverter.ConvertToString Exception: {ex}");
+                    }
+                    builder.AppendLine($"\t\t\"{nameof(ReturnType)}\":\"{ReturnType}\",");
+                    builder.AppendLine($"\t\t\"{nameof(ReturnValue)}\":\"{returnValueString}\",");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(ExceptionMessage))
+                builder.AppendLine($"\t\t\"{nameof(ExceptionMessage)}\":\"{ExceptionMessage}\",");
+
+            builder.Replace(',', ' ', builder.Length - 3, 1);
+            builder.AppendLine("\t}");
+            builder.AppendLine("}");
+
+            return builder.ToString();
         }
         /// <summary>
         /// 返回表示当前对象指定的格式字符串
@@ -522,14 +694,13 @@ namespace SpaceCG.Net
             if (invokeResults == null)
                 throw new ArgumentNullException(nameof(invokeResults), "参数不能为空");
 
+            string InvokeResults = $"{nameof(InvokeResult)}s";
             StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
             if (formatType == MessageFormatType.XML)
             {
-                string InvokeResults = $"{nameof(InvokeResult)}s";
                 builder.AppendLine($"<{InvokeResults}>");
                 for (int i = 0; i < invokeResults.Count(); i++)
                 {
-                    builder.Append("\t");
                     builder.AppendLine(invokeResults.ElementAt(i).ToXMLString());
                 }
                 builder.AppendLine($"</{InvokeResults}>");
@@ -556,6 +727,6 @@ namespace SpaceCG.Net
             else
                 return $"[{nameof(InvokeResult)} {nameof(StatusCode)}=\"{StatusCode}\", {nameof(ObjectMethod)}=\"{ObjectMethod}\", {nameof(ExceptionMessage)}=\"{ExceptionMessage}\"]";
         }
-    }
 
+    }
 }

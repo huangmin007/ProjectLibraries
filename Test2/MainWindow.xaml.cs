@@ -68,10 +68,23 @@ namespace Test2
         }
         public float Add(float a, float b) => a + b;
 
+        public XElement GetMessage() => XElement.Parse("<Message pro=\"90\" msg=\"hello, world\" />");
+
+        public int Add33(string str, int a, int b)
+        {
+            Console.WriteLine($"str:::{str}");
+            return a + b;
+        }
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            string test = "Hello, world, test, t e st ";
-            Console.WriteLine($"{test.Replace(' ', '\0')}-");
+            //InvokeMessage imessage = new InvokeMessage("Window", "Close", new object[] {12}, false);
+            //string msg = imessage.ToFormatString(MessageFormatType.JSON);
+            //Console.WriteLine(msg);
+
+            //InvokeResult iresult = new InvokeResult(InvokeStatusCode.Success, "W.Close", "error message");
+            //string imsg = iresult.ToFormatString(MessageFormatType.JSON);
+            //Console.WriteLine(imsg);
 
             byte[] buffer = new byte[16];
 
@@ -157,7 +170,7 @@ namespace Test2
                 InvokeMessage[] invokeMessages = new InvokeMessage[2]
                 {
                     new InvokeMessage("Window", "Add33", new object[] { "120", 160 }),
-                    new InvokeMessage("Window", "Add33", new object[] { "560", 160 })
+                    new InvokeMessage("Window", "Add33", new object[] {null, "560", 160 })
                 };
 
                 //var result = rpcClient.TryCallMethod("Window", "Add33", new object[] { "120", 160 }, out InvokeResult invokeResult);
@@ -186,7 +199,9 @@ namespace Test2
             }
             else if(button == Button_Connect)
             {
-                logger1.Info("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
+                var res = await rpcClient.TryCallMethodAsync("Window", "GetMessage");
+                await Console.Out.WriteLineAsync($"InvokeResult::{res}");
+                //logger1.Info("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
             }
             else if(button == Button_Send)
             {

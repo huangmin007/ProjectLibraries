@@ -549,12 +549,12 @@ namespace SpaceCG.Net
                     }
                 },
                 methodInfo.ReturnType == voidType ? null : invokeResult);
-                Logger.Info($"实例对象 {invokeMessage.ObjectName}({instanceType.FullName}) 的方法 {invokeMessage.MethodName} 调用成功");
+                Logger.Info($"实例对象 {invokeMessage.ObjectName}({instanceType.FullName}) 的方法 {invokeMessage.MethodName}({paramsLength}) 调用成功");
             }
             catch (Exception ex)
             {
                 invokeResult.StatusCode = InvokeStatusCode.Failed;
-                invokeResult.ExceptionMessage = $"实例对象 {invokeMessage.ObjectName}({instanceType.FullName}) 的方法 {methodInfo.Name} 调用异常: {ex.Message}";
+                invokeResult.ExceptionMessage = $"实例对象 {invokeMessage.ObjectName}({instanceType.FullName}) 的方法 {methodInfo.Name}({paramsLength}) 调用异常: {ex.Message}";
 
                 Logger.Warn($"{invokeResult.ExceptionMessage}");
                 Logger.Error($"RPC Server MethodBase.Invoke Exception: {ex}");
@@ -593,7 +593,7 @@ namespace SpaceCG.Net
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
-        /// <param name="asynchronous">方法或函数是否异步执行/param>
+        /// <param name="asynchronous">方法或函数是否异步执行</param>
         /// <param name="invokeResult"></param>
         /// <returns>方法调用成功时，返回 true, 否则返回 false </returns>
         public bool TryCallMethod(string objectName, string methodName, object[] parameters, bool asynchronous, out InvokeResult invokeResult) => TryCallMethod(new InvokeMessage(objectName, methodName, parameters, asynchronous, null), out invokeResult);
@@ -661,7 +661,7 @@ namespace SpaceCG.Net
 
             for (int i = 0; i < messages.Count(); i++)
             {
-                invokeResults[i] = new InvokeResult(InvokeStatusCode.Unknow);
+                invokeResults[i] = new InvokeResult(InvokeStatusCode.Unknown);
                 bool success = TryCallMethod(messages.ElementAt(i), out invokeResults[i]);
 
                 if (success && IntervalDelay > 0) Thread.Sleep(IntervalDelay);
@@ -686,7 +686,7 @@ namespace SpaceCG.Net
 
             for (int i = 0; i < invokeMessages.Count(); i++)
             {
-                invokeResults[i] = new InvokeResult(InvokeStatusCode.Unknow);
+                invokeResults[i] = new InvokeResult(InvokeStatusCode.Unknown);
                 TryCallMethod(invokeMessages.ElementAt(i), out invokeResults[i]);
             }
 

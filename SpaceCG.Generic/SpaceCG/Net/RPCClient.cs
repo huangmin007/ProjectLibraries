@@ -259,7 +259,7 @@ namespace SpaceCG.Net
             }
             catch (Exception ex)
             {
-                invokeResult = new InvokeResult(InvokeStatusCode.Unknow, new InvokeMessage(invokeMessage).ObjectMethod, $"RPC Server Invoke Result Message Format Exception: {ex.Message}");
+                invokeResult = new InvokeResult(InvokeStatusCode.Unknown, new InvokeMessage(invokeMessage).ObjectMethod, $"RPC Server Invoke Result Message Format Exception: {ex.Message}");
 
                 Logger.Warn($"RPC Server Invoke Result Message: {responseMessage}");
                 Logger.Error($"RPC Server Invoke Result Message Format Exception: {ex}");
@@ -300,7 +300,7 @@ namespace SpaceCG.Net
             }
             catch (Exception ex)
             {
-                invokeResult = new InvokeResult(InvokeStatusCode.Unknow, invokeMessage.ObjectMethod, $"RPC Server Invoke Result Message Format Exception: {ex.Message}");
+                invokeResult = new InvokeResult(InvokeStatusCode.Unknown, invokeMessage.ObjectMethod, $"RPC Server Invoke Result Message Format Exception: {ex.Message}");
 
                 Logger.Info($"RPC Server Invoke Result Message: {responseMessage}");
                 Logger.Error($"RPC Server Invoke Result Message Format Exception: {ex}");
