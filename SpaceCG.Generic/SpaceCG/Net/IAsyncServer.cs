@@ -68,14 +68,14 @@ namespace SpaceCG.Net
         /// <param name="ipAddress">远程 IP 地址</param>
         /// <param name="port">远程端口号</param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
-        bool SendBytes(byte[] data, String ipAddress, int port);
+        bool SendBytes(byte[] data, string ipAddress, int port);
         /// <summary>
         /// 步发送文本消息到远程客户端
         /// </summary>
         /// <param name="message">要发送的消息</param>
         /// <param name="remote">远程地址</param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
-        bool SendMessage(String message, EndPoint remote);
+        bool SendMessage(string message, EndPoint remote);
         /// <summary>
         /// 步发送文本消息到远程客户端
         /// </summary>
@@ -83,7 +83,7 @@ namespace SpaceCG.Net
         /// <param name="ipAddress">远程 IP 地址</param>
         /// <param name="port">远程端口号</param>
         /// <returns>函数调用成功则返回 True, 否则返回 False</returns>
-        bool SendMessage(String message,  String ipAddress, int port);
+        bool SendMessage(string message,  string ipAddress, int port);
     }
 
     /// <summary>

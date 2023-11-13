@@ -17,7 +17,7 @@ namespace SpaceCG.Extensions
         /// <param name="queuq"></param>
         public static void Clear<T>(this ConcurrentQueue<T> queuq)
         {
-            while (queuq.TryDequeue(out T result))
+            while (queuq.TryDequeue(out _))
             {
                 ;
             }

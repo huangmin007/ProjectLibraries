@@ -91,7 +91,7 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="message"></param>
         /// <returns>发送成功则返回 True, 否则返回 False</returns>
-        bool SendMessage(String message);
+        bool SendMessage(string message);
     }
 
 }

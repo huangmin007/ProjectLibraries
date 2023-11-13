@@ -66,7 +66,7 @@ namespace SpaceCG.Extensions
                 refTemplate.AddAfterSelf(XElement.Parse(templateString).Elements());
 
                 if (removeRefTemplates) refTemplate.Remove();
-                else refTemplate.Name = $"{refTemplate.Name.LocalName}.Handle";
+                else refTemplate.Name = $"{refTemplate.Name.LocalName}.Clone";
 
                 i--;
             }

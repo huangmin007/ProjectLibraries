@@ -107,10 +107,12 @@ namespace Test2
             Console.WriteLine(XML);
             Console.WriteLine(XML.Element("string").Value);
 
-            Type[] src = new Type[] { typeof(int), typeof(string) };
-            List<Type> dst = new List<Type>() { typeof(int), typeof(string)};
-            bool booo = TypeExtensions.Equals(src, dst);
-            Console.WriteLine($"Equals::{booo}");
+            Type[] src = new Type[] { typeof(int),  xmlString.GetType(), typeof(bool) };
+            List<Type> dst = new List<Type>() { typeof(int), typeof(string), typeof(bool)};
+            //bool booo = TypeExtensions.Equals(src, dst);
+            bool booo0 = src.SequenceEqual<Type>(dst);
+            //Console.WriteLine($"Equals::{booo}");
+            Console.WriteLine($"Equals::{booo0}");
 
             Type type = Type.GetType("System.Threading.Thread", false, true);            
             Console.WriteLine($"Type::{type}");

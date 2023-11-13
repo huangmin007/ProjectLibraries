@@ -455,6 +455,7 @@ namespace SpaceCG.Net
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(InvokeResult));
 
         const string SPACE = " ";
+        const string XReturn = "Return";
 
         /// <summary> 远程方法或函数的调用状态 </summary>
         public InvokeStatusCode StatusCode { get; internal set; } = InvokeStatusCode.Unknown;
@@ -512,7 +513,7 @@ namespace SpaceCG.Net
             if (StatusCode != InvokeStatusCode.SuccessAndReturn) return;
 
             string returnTypeString, returnValueString;
-            IEnumerable<XElement> returnResults = result.Elements("Return");
+            IEnumerable<XElement> returnResults = result.Elements(XReturn);
             if (returnResults?.Count() > 0)
             {
                 returnTypeString = returnResults.First().Attribute(nameof(Type))?.Value;
@@ -619,7 +620,7 @@ namespace SpaceCG.Net
             }
 
             builder.AppendLine(">");
-            builder.AppendLine($"\t<Return {nameof(Type)}=\"{returnTypeString}\"><![CDATA[{returnValueString}]]></Return>");
+            builder.AppendLine($"\t<{XReturn} {nameof(Type)}=\"{returnTypeString}\"><![CDATA[{returnValueString}]]></{XReturn}>");
             builder.Append($"</{nameof(InvokeResult)}>");
 
             return builder.ToString();

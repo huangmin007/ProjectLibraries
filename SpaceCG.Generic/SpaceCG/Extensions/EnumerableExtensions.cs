@@ -9,5 +9,6 @@ namespace SpaceCG.Extensions
     /// </summary>
     public static class EnumerableExtensions
     {
+
     }
 }
