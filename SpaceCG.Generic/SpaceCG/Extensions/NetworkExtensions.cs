@@ -2,12 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Text;
 using SpaceCG.Generic;
-using SpaceCG.Net;
 
 namespace SpaceCG.Extensions
 {
@@ -106,7 +103,7 @@ namespace SpaceCG.Extensions
         /// </summary>
         /// <param name="ipAddress"></param>
         /// <returns></returns>
-        public static IPAddress GetBroadcastAddress(String ipAddress)
+        public static IPAddress GetBroadcastAddress(string ipAddress)
         {
             if (IPAddress.TryParse(ipAddress, out IPAddress address))
                 return GetBroadcastAddress(address);

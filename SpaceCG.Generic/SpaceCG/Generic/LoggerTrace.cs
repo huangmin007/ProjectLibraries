@@ -207,7 +207,7 @@ namespace SpaceCG.Generic
         /// </summary>
         /// <param name="name"></param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public LoggerTrace(String name)
+        public LoggerTrace(string name)
         {
             Initialize(name, SourceLevels.All);
         }
@@ -226,7 +226,7 @@ namespace SpaceCG.Generic
         /// <param name="name"></param>
         /// <param name="defaultLevel"></param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public LoggerTrace(String name, SourceLevels defaultLevel)
+        public LoggerTrace(string name, SourceLevels defaultLevel)
         {
             Initialize(name, defaultLevel);
         }

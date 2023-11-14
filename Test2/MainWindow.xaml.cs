@@ -7,6 +7,8 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Runtime.Serialization;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +17,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Xml;
 using System.Xml.Linq;
 using SpaceCG.Extensions;
 using SpaceCG.Generic;
@@ -28,6 +31,25 @@ namespace Test2
         B = 0x10,
         C = 0x20,
         D = 0x40,
+    }
+    [DataContract(Name = "TestMessage")]
+    public class TestMessage
+    {
+        [DataMember()]
+        public string FirstName;
+
+        [DataMember]
+        public string LastName;
+
+        [DataMember()]
+        public int ID;
+
+        public TestMessage(string firstName, string lastName, int iD)
+        {
+            FirstName = firstName;
+            LastName = lastName;
+            ID = iD;
+        }
     }
 
     /// <summary>
@@ -85,6 +107,11 @@ namespace Test2
             //InvokeResult iresult = new InvokeResult(InvokeStatusCode.Success, "W.Close", "error message");
             //string imsg = iresult.ToFormatString(MessageFormatType.JSON);
             //Console.WriteLine(imsg);
+
+            //XmlDictionaryWriter xdw = XmlDictionaryWriter.CreateTextWriter(someStream, Encoding.UTF8);
+            //TestMessage tm = new TestMessage("hello", "world", 12);
+            //DataContractSerializer ser =  new DataContractSerializer(typeof(TestMessage));
+            //ser.WriteObject(writer, tm);
 
             byte[] buffer = new byte[16];
 

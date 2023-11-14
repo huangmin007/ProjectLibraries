@@ -362,7 +362,7 @@ namespace SpaceCG.Extensions
 #if false
             string pattern_string   = @"\'([^\']+)\'|" + "\"([^\"]+)\"";    //匹配'~',"~"
             string pattern_array    = @"\[([^\[\]]+)\]";                    //匹配[~]
-            string pattern_parent   = @"\(([^\(\)]+)\)";                    //匹配(~)
+            //string pattern_parent   = @"\(([^\(\)]+)\)";                    //匹配(~)
             string pattern_split    = @"([^\,\'\[\]]+),|([^\,\'\[\]]+)$";   //匹配 ',' 分割, 或结尾部份
             string pattern = $@"{pattern_string}|{pattern_array}|{pattern_split}";
             MatchCollection matchs = Regex.Matches(parameters, pattern, RegexOptions.Compiled | RegexOptions.Singleline);
@@ -374,7 +374,8 @@ namespace SpaceCG.Extensions
             foreach (Match match in matchs)
             {
                 if (!match.Success) continue;
-#if true
+
+#if NETSTANDARD2_0_OR_GREATER || NET47_OR_GREATER || NET5_0_OR_GREATER
                 string trimValue = match.Value.Trim();
                 char first = trimValue[0];
                 char last = trimValue[trimValue.Length - 1];
@@ -406,7 +407,7 @@ namespace SpaceCG.Extensions
                         if (match.Name != "3") //[~]
                             args.Add(group.Value);
                         else
-                            args.Add(SplitParameters(group.Value));
+                            args.Add(SplitToObjectArray(group.Value));
                     }
                 }
 #endif

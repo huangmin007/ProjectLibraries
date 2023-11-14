@@ -301,7 +301,7 @@
                     if (match.Name != "3") //[~]
                         args.Add(group.Value);
                     else
-                        args.Add(SplitParameters(group.Value));
+                        args.Add(SplitToObjectArray(group.Value));
                 }
             }
     #endif

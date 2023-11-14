@@ -152,7 +152,7 @@ namespace SpaceCG.Net
                     try
                     {
                         string typeString = paramElement.Attribute(XType)?.Value;
-                        Type paramType = string.IsNullOrWhiteSpace(typeString) ? null : GetObjectType(typeString);
+                        Type paramType = string.IsNullOrWhiteSpace(typeString) ? null : TypeExtensions.GetType(typeString);
                         //Type paramType = string.IsNullOrWhiteSpace(typeString) ? null : Type.GetType(typeString, false, true);
                         if (paramType == null)
                         {
@@ -406,44 +406,6 @@ namespace SpaceCG.Net
             else
                 return $"[{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\", {nameof(MethodName)}=\"{MethodName}\"]";
         }
-
-
-        private static Dictionary<string, Type> historyTypes = new Dictionary<string, Type>();
-        internal static Type GetObjectType(string typeFullName)
-        {
-            if (string.IsNullOrWhiteSpace(typeFullName))
-                throw new ArgumentNullException(nameof(typeFullName), "参数不能为空");
-
-            if (historyTypes.ContainsKey(typeFullName)) return historyTypes[typeFullName];
-
-            try
-            {
-                Type type = Type.GetType(typeFullName, false, true);
-                if (type != null)
-                {
-                    historyTypes.Add(typeFullName, type);
-                    return type;
-                }
-            }
-            catch (Exception)
-            {
-            }
-
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                //if (!assembly.GlobalAssemblyCache) continue;
-                foreach (var type in assembly.GetTypes())
-                {
-                    if (type.FullName == typeFullName)
-                    {
-                        historyTypes.Add(typeFullName, type);
-                        return type;
-                    }
-                }
-            }
-
-            return null;
-        }
     }
 
 
@@ -533,7 +495,7 @@ namespace SpaceCG.Net
             try
             {
                 if (!string.IsNullOrWhiteSpace(returnTypeString)) 
-                    ReturnType = InvokeMessage.GetObjectType(returnTypeString);
+                    ReturnType = TypeExtensions.GetType(returnTypeString);
                 
                 if (ReturnType != null && ReturnType != typeof(void))
                     ReturnValue = !string.IsNullOrWhiteSpace(returnValueString) && TypeExtensions.ConvertFrom(returnValueString, ReturnType, out object conversionValue) ? conversionValue : returnValueString;

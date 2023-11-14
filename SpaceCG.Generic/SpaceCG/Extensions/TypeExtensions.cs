@@ -201,6 +201,51 @@ namespace SpaceCG.Extensions
             return result;
         }
 
+        /// <summary>
+        /// 获取具有指定名称的类型
+        /// </summary>
+        /// <param name="typeName"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public static Type GetType(string typeName)
+        {
+            if (string.IsNullOrWhiteSpace(typeName))
+                throw new ArgumentNullException(nameof(typeName), "参数不能为空");
+
+            if (GetTypeHistory.ContainsKey(typeName)) return GetTypeHistory[typeName];
+
+            try
+            {
+                Type type = Type.GetType(typeName, false, true);
+                if (type != null)
+                {
+                    GetTypeHistory.Add(typeName, type);
+                    return type;
+                }
+            }
+            catch (TypeLoadException ex)
+            {
+                Logger.Warn($"GetType TypeLoadException: {ex.Message}");
+            }
+
+            Logger.Info($"GetType from AppDomain.CurrentDomain ... ");
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                //if (!assembly.GlobalAssemblyCache) continue;
+                foreach (Type type in assembly.GetTypes())
+                {
+                    if (type.FullName == typeName)
+                    {
+                        GetTypeHistory.Add(typeName, type);
+                        return type;
+                    }
+                }
+            }
+
+            return null;
+        }
+        internal static Dictionary<string, Type> GetTypeHistory { get; private set; } = new Dictionary<string, Type>();
+
 #if false
         /// <summary>
         /// 比较两个类型的集合是否相同
