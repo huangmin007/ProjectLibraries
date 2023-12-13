@@ -113,6 +113,7 @@ namespace Test2
             //DataContractSerializer ser =  new DataContractSerializer(typeof(TestMessage));
             //ser.WriteObject(writer, tm);
 
+
             byte[] buffer = new byte[16];
 
             string message = "1234";
@@ -183,6 +184,16 @@ namespace Test2
 
             inputHook = new InputHook();
             inputHook.KeydbEvent += InputHook_KeydbEvent;
+
+
+
+            string test = "Hello world";
+            test = test.Replace("ll", "oo");
+            Console.WriteLine(test);
+
+            StringBuilder sb = new StringBuilder("Hello world");
+            sb.Replace("ll", "oooa");
+            Console.WriteLine(sb.ToString());
         }
 
         private void InputHook_KeydbEvent(KEYBDDATA e)
@@ -230,11 +241,16 @@ namespace Test2
             {
                 var res = await rpcClient.TryCallMethodAsync("Window", "GetMessage");
                 await Console.Out.WriteLineAsync($"InvokeResult::{res}");
-                //logger1.Info("<Action Target=\"Window\" Method=\"SetWidth\" Params=\"400\" Sync=\"False\" />");
             }
             else if(button == Button_Send)
             {
-                
+                XElement config = XElement.Load("XElementExamples.Config");
+                Stopwatch sw = new Stopwatch();
+                sw.Restart();
+                XElementExtensions.ReplaceTemplateElements(config);
+                sw.Stop();
+                Console.WriteLine(config);
+                Console.WriteLine($"use::{sw.ElapsedMilliseconds}");
             }
         }
 

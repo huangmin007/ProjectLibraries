@@ -138,12 +138,14 @@ namespace SpaceCG.Generic
             ConsoleListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, eventType, 0, $"未处理的异常对象: {e.ExceptionObject}");
             ConsoleListener.Flush();
 
+#if false
             if (e.IsTerminating)
             {
                 AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_UnhandledException;
                 AppDomain.CurrentDomain.FirstChanceException -= CurrentDomain_FirstChanceException;
                 Environment.Exit(System.Runtime.InteropServices.Marshal.GetHRForException((Exception)e.ExceptionObject));
             }
+#endif
         }
         private static async void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
         {

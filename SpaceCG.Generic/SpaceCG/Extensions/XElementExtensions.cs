@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Xml.Linq;
 using SpaceCG.Generic;
 
@@ -26,38 +27,39 @@ namespace SpaceCG.Extensions
             if (rootElement == null || string.IsNullOrWhiteSpace(templateXName) || string.IsNullOrWhiteSpace(refTemplateXName) || templateXName == refTemplateXName)
                 throw new ArgumentException($"参数错误, 参数不能为空, 或参数 {nameof(templateXName)} 与 {nameof(refTemplateXName)} 不能为相同元素名称");
 
-            string XName = "Name";
+            const string XName = "Name";
             //获取有效的模板元素集合
-            var templates = from template in rootElement.Descendants(templateXName)
-                            let tempName = template.Attribute(XName)?.Value
-                            where !string.IsNullOrWhiteSpace(tempName)
-                            where !(from refTemplate in template.Descendants(refTemplateXName)
-                                    where refTemplate.Attribute(XName)?.Value == tempName
-                                    select true).Any()
-                            select template;
+            IEnumerable<XElement> templates = from template in rootElement.Descendants(templateXName)
+                                              let tempName = template.Attribute(XName)?.Value
+                                              where !string.IsNullOrWhiteSpace(tempName)
+                                              //在当前模板查找，不能有对自身的引用
+                                              where !(from refTemplate in template.Descendants(refTemplateXName)
+                                                      where refTemplate.Attribute(XName)?.Value == tempName
+                                                      select true).Any()
+                                              select template;
             if (templates?.Count() <= 0) return;
 
             //获取有效的引用模板元素集合
-            var refTemplates = rootElement.Descendants(refTemplateXName);
+            IEnumerable<XElement> refTemplates = from refTemplate in rootElement.Descendants(refTemplateXName)
+                                                 where !string.IsNullOrWhiteSpace(refTemplate.Attribute(XName)?.Value)
+                                                 select refTemplate;
             if (refTemplates?.Count() <= 0) return;
 
             //Analyse And Replace
-            for (int i = 0; i < refTemplates?.Count(); i++)
+            for (int i = 0; i < refTemplates.Count(); i++)
             {
-                var refTemplate = refTemplates.ElementAt(i);
-                var refTempName = refTemplate.Attribute(XName)?.Value;
-                if (string.IsNullOrWhiteSpace(refTempName)) continue;
+                XElement refTemplate = refTemplates.ElementAt(i);
+                string refTempName = refTemplate.Attribute(XName).Value;
 
                 //在模板集合中查找指定名称的模板
                 var temps = from template in templates
-                            where refTempName == template.Attribute(XName)?.Value
+                            where refTempName == template.Attribute(XName).Value
                             select template;
                 if (temps?.Count() <= 0) continue;
 
                 //拷贝模板并更新属性值
                 string templateString = temps.First().ToString();
-                IEnumerable<XAttribute> attributes = refTemplate.Attributes();
-                foreach (XAttribute attribute in attributes)
+                foreach (XAttribute attribute in refTemplate.Attributes())
                 {
                     if (attribute.Name != XName)
                         templateString = templateString.Replace($"{{{attribute.Name}}}", attribute.Value);
@@ -91,23 +93,23 @@ namespace SpaceCG.Extensions
         /// <param name="rootElement"> XML 元素或根元素</param>
         public static void ReplaceTemplateElements(this XElement rootElement)
         {
-            if(rootElement == null) return;
+            if (rootElement == null) return;
 
+            //Default Parameters
+            bool removeRefTemplates = true;
+            string templateXName = "Template";
+            string refTemplateXName = "RefTemplate";
+
+            //Root Element Attributes Name
             const string XTemplateXName = "TemplateXName";
             const string XRefTemplateXName = "RefTemplateXName";
             const string XRemoveRefTemplates = "RemoveRefTemplates";
 
-            string templateXName = string.IsNullOrWhiteSpace(rootElement.Attribute(XTemplateXName)?.Value) ? "Template" : rootElement.Attribute(XTemplateXName).Value;
-            string refTemplateXName = string.IsNullOrWhiteSpace(rootElement.Attribute(XRefTemplateXName)?.Value) ? "RefTemplate" : rootElement.Attribute(XRefTemplateXName).Value;
-            
-            bool removeRefTemplates = true;
-            if (rootElement.Attribute(XRemoveRefTemplates) != null && bool.TryParse(rootElement.Attribute(XRemoveRefTemplates).Value, out bool result))
-            {
-                removeRefTemplates = result;
-            }
+            if (bool.TryParse(rootElement.Attribute(XRemoveRefTemplates)?.Value, out bool result)) removeRefTemplates = result;
+            if (string.IsNullOrWhiteSpace(rootElement.Attribute(XTemplateXName)?.Value)) templateXName = rootElement.Attribute(XTemplateXName).Value;
+            if (string.IsNullOrWhiteSpace(rootElement.Attribute(XRefTemplateXName)?.Value)) refTemplateXName = rootElement.Attribute(XRefTemplateXName).Value;
 
             ReplaceTemplateElements(rootElement, templateXName, refTemplateXName, removeRefTemplates);
         }
-
     }
 }
