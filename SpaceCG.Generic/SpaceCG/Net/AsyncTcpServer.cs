@@ -290,9 +290,9 @@ namespace SpaceCG.Net
             }
         }
         /// <inheritdoc/>
-        public bool SendMessage(String message, EndPoint remote) => SendBytes(Encoding.UTF8.GetBytes(message), remote);
+        public bool SendMessage(string message, EndPoint remote) => SendBytes(Encoding.UTF8.GetBytes(message), remote);
         /// <inheritdoc/>
-        public bool SendMessage(String message, String ipAddress, int port) => SendBytes(Encoding.UTF8.GetBytes(message), ipAddress, port);
+        public bool SendMessage(string message, String ipAddress, int port) => SendBytes(Encoding.UTF8.GetBytes(message), ipAddress, port);
 
         /// <summary>
         /// 发送数据完成处理回调函数
@@ -324,13 +324,13 @@ namespace SpaceCG.Net
         /// <inheritdoc/>
         public bool SendBytes(byte[] data, int offset, int count)
         {
-            if (data?.Length <= 0 || offset >= data.Length || offset <= 0 || count <= 0 ||
-                offset >= data.Length || count - offset > data.Length) return false;
+            if (data == null || data.Length == 0) return false;
 
             foreach (var kv in clients)
             {
                 TcpClient tcpClient = kv.Value;
                 EndPoint remote = tcpClient.Client.RemoteEndPoint;
+
                 if (!AsyncTcpClient.IsOnline(ref tcpClient))
                 {
                     RemoveClient(ref tcpClient, remote);
@@ -351,7 +351,7 @@ namespace SpaceCG.Net
         }
 
         /// <inheritdoc/>
-        public bool SendMessage(String message) => SendBytes(Encoding.UTF8.GetBytes(message));
+        public bool SendMessage(string message) => SendBytes(Encoding.UTF8.GetBytes(message));
 
         /// <inheritdoc/>
         public void Dispose()

@@ -202,8 +202,7 @@ namespace SpaceCG.Net
         /// <returns></returns>
         public bool SendBytes(byte[] data, int offset, int count)
         {
-            if (!this.IsConnected || data?.Length <= 0 || offset <= 0 || count <= 0 ||
-                offset >= data.Length || count - offset > data.Length) return false;
+            if (data == null || data.Length == 0 || !this.IsConnected) return false;
 
             try
             {
