@@ -74,7 +74,7 @@ namespace SpaceCG.Generic
             TextFileListener.Filter = new EventTypeFilter(SourceLevels.Information);
             TextFileListener.TraceSourceEvent += (s, e) => FileTraceEvent?.Invoke(s, e);
             TextFileListener.WriteLine(Environment.NewLine);
-
+            
             ConsoleListener = new TextFileStreamTraceListener(Console.Out, "ConsoleTrace");
             ConsoleListener.UseConsoleColored = true;
             ConsoleListener.Filter = new EventTypeFilter(SourceLevels.All);
@@ -164,7 +164,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 当前 <see cref="LoggerTrace"/> 跟踪代码的执行并将跟踪消息的源对象
         /// </summary>
-        private TraceSource TraceSource;
+        public TraceSource TraceSource { get; private set; }
         /// <summary>
         /// 当前 <see cref="LoggerTrace"/> 源开关和事件类型筛选器筛选的跟踪消息的级别
         /// </summary>
