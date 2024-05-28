@@ -24,6 +24,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceCG.Extensions.NETFrame
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test.ConsoleApp.NET", "Test.ConsoleApp.NET\Test.ConsoleApp.NET.csproj", "{CFC84CAF-CEFC-4832-8C41-17E2FB2809A5}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "HPSocketExtensions", "HPSocketExtensions\HPSocketExtensions.shproj", "{D7E55D2F-E617-4C5E-9FA0-2E75E43B4440}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -132,5 +134,8 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0B680372-5154-4660-9116-13F1BB239E64}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		HPSocketExtensions\HPSocketExtensions.projitems*{d7e55d2f-e617-4c5e-9fa0-2e75e43b4440}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

@@ -64,7 +64,6 @@ namespace SpaceCG.Generic
     /// &lt;Return Result="True/False" Value="value" /&gt;
     /// </code>
     /// </summary>
-    [Obsolete("建议使用 RCPServer/RPCClient 类", false)]
     public class ReflectionController : IDisposable
     {
         static readonly LoggerTrace Logger = new LoggerTrace(nameof(ReflectionController));
@@ -124,13 +123,6 @@ namespace SpaceCG.Generic
         /// <para>例如："*.Dispose" 禁止反射访问所有对象的 Dispose 方法，默认已添加</para>
         /// </summary>        
         public List<string> MethodFilters { get; } = new List<string>(16) { "*.Dispose" };
-
-        /// <summary>
-        /// 可控制、访问的对象的属性过滤集合，指定对象的属性不在访问范围内；字符格式为：objectName.propertyName, objectName 支持通配符 '*'
-        /// <para>例如："*.Name" 禁止反射访问所有对象的 Name 属性，默认已添加</para>
-        /// </summary>
-        [Obsolete("弃用", true)]
-        public List<string> PropertyFilters { get; } = new List<string>(16) { "*.Name" };
         
         /// <summary>
         /// 默认情况下, 使用同步上下文执行控制或是访问对象, 默认为 true
@@ -364,12 +356,6 @@ namespace SpaceCG.Generic
                 {
                     TryParseCallMethod(actionElement, internalEventArgs);
                 }
-#if false
-                else if (actionElement.Attribute(XTarget) != null && actionElement.Attribute(XProperty) != null)
-                {
-                    TryParseChangeValue(actionElement, internalEventArgs);
-                }
-#endif
                 else
                 {
                     Logger.Error($"XML 格式数据错误 {actionElement} 不支持的格式");
@@ -432,8 +418,6 @@ namespace SpaceCG.Generic
             }
 
             TryParseControlMessage(element, null);
-
-            //TryParseControlMessage(message);
         }
 
         /// <summary>
@@ -537,126 +521,7 @@ namespace SpaceCG.Generic
                 Logger.Error(ex.ToString());
             }
         }
-        /// <summary>
-        /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典找实例对象，并设置/获取实例对象属性的值
-        /// <para>XML 格式：&lt;Action Target="object key name" Property="property name" Value="newValue" /&gt; </para>
-        /// </summary>
-        /// <param name="actionElement"></param>
-        /// <param name="internalEventArgs"></param>
-        [Obsolete("弃用", true)]
-        protected void TryParseChangeValue(XElement actionElement, MessageEventArgs internalEventArgs = null)
-        {
-            if (actionElement == null || actionElement.Name.LocalName != XAction) return;
-            if (PropertyFilters.IndexOf("*.*") != -1) return;
-
-            string objectName = actionElement.Attribute(XTarget)?.Value;
-            string propertyName = actionElement.Attribute(XProperty)?.Value;
-            if (string.IsNullOrWhiteSpace(objectName) || string.IsNullOrWhiteSpace(propertyName))
-            {
-                Logger.Warn($"控制消息 XML 格式数数据错误，节点名称应为 {XAction}, 且属性 {XTarget}, {XProperty} 值不能为空");
-                return;
-            }
-            if (!AccessObjects.TryGetValue(objectName, out object targetObject) || targetObject == null)
-            {
-                Logger.Warn($"未找到目标实例对象 {objectName}, 或目标对象为 null 没创建实例");
-                return;
-            }
-
-            //不可操作的对象及属性
-            if (targetObject.GetType() == typeof(ReflectionController) ||
-                PropertyFilters.IndexOf($"*.{propertyName}") != -1 || PropertyFilters.IndexOf($"{objectName}.{propertyName}") != -1)
-            {
-                Logger.Warn($"禁止访问的对象属性 {objectName}.{propertyName} ");
-                return;
-            }
-
-            bool isSyncContext = bool.TryParse(actionElement.Attribute(XSync)?.Value, out bool booSync) ? booSync : DefaultSyncContext;
-            bool isReturnResult = bool.TryParse(actionElement.Attribute(XReturn)?.Value, out bool booReturn) ? booReturn : DefaultReturnResult;
-
-            Action<SendOrPostCallback, object> dispatcher = null;
-            if (isSyncContext) dispatcher = syncContext.Send;
-            else dispatcher = syncContext.Post;
-
-            try
-            {
-                dispatcher.Invoke((state) =>
-                {
-                    if (actionElement.Attribute(XValue) != null)
-                        InstanceExtensions.SetInstancePropertyValue(targetObject, propertyName, actionElement.Attribute(XValue).Value);
-
-                    if (state == null) return;
-                    bool result = InstanceExtensions.GetInstancePropertyValue(targetObject, propertyName, out object value);
-                    XElement returnElement = XElement.Parse($"<Return Result=\"{result}\" Value=\"{value}\" />");
-
-                    if (state.GetType() == typeof(MessageEventArgs))
-                    {
-                        MessageEventArgs eventArgs = state as MessageEventArgs;
-                        eventArgs.Action.AddFirst(returnElement);
-
-                        (eventArgs.Sender as IAsyncClient)?.SendMessage(eventArgs.Action.ToString());
-                        (eventArgs.Sender as IAsyncServer)?.SendMessage(eventArgs.Action.ToString(), eventArgs.EndPoint);
-                    }
-                }, isReturnResult && internalEventArgs != null ? internalEventArgs : null);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"执行 XML 数据指令错误：{actionElement}");
-                Logger.Error(ex.ToString());
-            }
-        }
-        /// <summary>
-        /// 试图解析 xml 格式消息，在 <see cref="AccessObjects"/> 字典找实例对象，并设置/获取实例对象的多个属性的值
-        /// <para>XML 格式：&lt;ObjectName PropertyName1="Value" PropertyName2="Value" PropertyName3="Value" Sync="True"/&gt; </para>
-        /// </summary>
-        /// <param name="objectElement"></param>
-        [Obsolete("弃用", true)]
-        protected void TryParseChangeValues(XElement objectElement)
-        {
-            if (objectElement == null) return;
-            if (PropertyFilters.IndexOf("*.*") != -1) return;
-
-            string objectName = objectElement.Name.LocalName;
-            if (!AccessObjects.TryGetValue(objectName, out object targetObject))
-            {
-                Logger.Warn($"XML 数据格式错误, 未找到以节点名称为目标实例的对象 {objectName} {objectElement}");
-                return;
-            }
-
-            //移除不可操作的对象属性
-            XElement objectElementClone = XElement.Parse(objectElement.ToString());
-            foreach (XAttribute attribute in objectElementClone.Attributes())
-            {
-                if (PropertyFilters.IndexOf($"*.{attribute.Name}") != -1 || PropertyFilters.IndexOf($"{objectName}.{attribute.Name}") != -1)
-                {
-                    attribute.Remove();
-                }
-            }
-
-            bool isSyncContext = DefaultSyncContext;
-            if (objectElement.Attribute(XSync) != null)
-            {
-                objectElementClone.Attribute(XSync).Remove();
-                isSyncContext = bool.TryParse(objectElement.Attribute(XSync).Value, out bool result) && result;
-            }
-
-            Action<SendOrPostCallback, object> dispatcher;
-            if (isSyncContext) dispatcher = syncContext.Send;
-            else dispatcher = syncContext.Post;
-
-            try
-            {
-                dispatcher.Invoke((state) =>
-                {
-                    InstanceExtensions.SetInstancePropertyValues(targetObject, objectElementClone.Attributes());
-                }, null);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"执行 XML 数据指令错误：{objectElement}");
-                Logger.Error(ex.ToString());
-            }
-        }
-
+        
         /// <inheritdoc/>
         public void Dispose()
         {
