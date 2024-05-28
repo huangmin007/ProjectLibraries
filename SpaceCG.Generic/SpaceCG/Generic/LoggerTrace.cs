@@ -265,7 +265,7 @@ namespace SpaceCG.Generic
 
             if (ConsoleListener != null) TraceSource.Listeners.Add(ConsoleListener);
             if (TextFileListener != null) TraceSource.Listeners.Add(TextFileListener);
-            if (ConsoleListener != null && TextFileListener != null) TraceSource.Listeners.Remove("Default");
+            //if (ConsoleListener != null && TextFileListener != null) TraceSource.Listeners.Remove("Default");
         }
 
         /// <inheritdoc/>
