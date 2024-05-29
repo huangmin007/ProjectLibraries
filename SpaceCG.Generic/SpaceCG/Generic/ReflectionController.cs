@@ -133,7 +133,7 @@ namespace SpaceCG.Generic
         /// 网络控制情况下，是否返回执行结果，默认为 false
         /// <para>可以跟据消息协议属性 Return 动态调整当前消息是否需要返回信息，只返回成功后的结果</para>
         /// </summary>
-        public bool DefaultReturnResult { get; private set; } = false;
+        public bool DefaultReturnResult { get; set; } = true;
 
         private SynchronizationContext syncContext = SynchronizationContext.Current;
         /// <summary>
