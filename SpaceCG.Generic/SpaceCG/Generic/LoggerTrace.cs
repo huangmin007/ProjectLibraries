@@ -105,7 +105,7 @@ namespace SpaceCG.Generic
 
             ConsoleListener.Flush();
             TextFileListener.Flush();
-            FileExtensions.ReserveFileDays(30, path, $"{MainModuleName}.*.log");
+            FileExtensions.ReserveFileDays(path, 30, $"{MainModuleName}.*.log");
 
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
@@ -697,7 +697,7 @@ namespace SpaceCG.Generic
                 Writer = null;
 
                 File.Move(sourceFileName, destFileName);
-                FileExtensions.ReserveFileDays(30, curLogFile.DirectoryName, $"*{moduleName}*{curLogFile.Extension}");
+                FileExtensions.ReserveFileDays(curLogFile.DirectoryName, 30, $"*{moduleName}*{curLogFile.Extension}");
 #if true
                 //解决过 24点 后文件名上的日期问题，但无法彻底解决，因为父类的属性 fileName 是私有的, 得继承 TraceListener 重写才可行
                 string path = $"{curLogFile.Directory.FullName}\\{DateTime.Today.ToString("yyyy-MM-dd")}.{moduleName}{curLogFile.Extension}";

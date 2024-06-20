@@ -22,6 +22,7 @@ using System.Xml.Linq;
 using SpaceCG.Extensions;
 using SpaceCG.Generic;
 using SpaceCG.Net;
+using TypeExtensions = SpaceCG.Extensions.TypeExtensions;
 
 namespace Test2
 {
@@ -112,6 +113,13 @@ namespace Test2
             //TestMessage tm = new TestMessage("hello", "world", 12);
             //DataContractSerializer ser =  new DataContractSerializer(typeof(TestMessage));
             //ser.WriteObject(writer, tm);
+
+            DirectoryInfo dirInfo0 = new DirectoryInfo("logs//");
+            Console.WriteLine($"File 00::{dirInfo0.Exists} {dirInfo0.FullName}");
+
+            DirectoryInfo dirInfo1 = new DirectoryInfo("logs");
+            Console.WriteLine($"File 11::{dirInfo1.Exists} {dirInfo1.FullName}");
+            Console.WriteLine($"{Path.DirectorySeparatorChar}");
 
 
             byte[] buffer = new byte[16];
