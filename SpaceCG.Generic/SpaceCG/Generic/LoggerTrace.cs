@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using SpaceCG.Extensions;
@@ -53,16 +54,33 @@ namespace SpaceCG.Generic
         static LoggerTrace()
         {
             ProcessModule processModule = Process.GetCurrentProcess().MainModule;
+            string moduleName = processModule?.ModuleName;
             string moduleFileName = processModule?.FileName;
+            if (moduleName != null && moduleName.StartsWith("dotnet", StringComparison.OrdinalIgnoreCase))
+            {
+                var args = Environment.GetCommandLineArgs();
+                if (args.Length > 0) moduleFileName = args[0];
+            }
+
             StringBuilder fileDateInfo = new StringBuilder(512);
             if (!string.IsNullOrEmpty(moduleFileName))
             {
                 FileInfo info = new FileInfo(moduleFileName);
-                MainModuleName = info.Name.Replace(info.Extension, "");
+                FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(moduleFileName);
+                fileDateInfo.Append(versionInfo.ToString());
 
-                fileDateInfo.AppendLine($"{nameof(info.CreationTime)}:\t\t{info.CreationTime}");
-                fileDateInfo.AppendLine($"{nameof(info.LastWriteTime)}:\t\t{info.LastWriteTime}");
-                fileDateInfo.AppendLine($"{nameof(info.LastAccessTime)}:\t\t{info.LastAccessTime}");
+                if (!string.IsNullOrWhiteSpace(info.Extension))
+                {
+                    MainModuleName = info.Name.Replace(info.Extension, "");
+
+                    fileDateInfo.AppendLine($"{nameof(info.CreationTime)}:\t{info.CreationTime,19}");
+                    fileDateInfo.AppendLine($"{nameof(info.LastWriteTime)}:\t{info.LastWriteTime,19}");
+                    fileDateInfo.AppendLine($"{nameof(info.LastAccessTime)}:\t{info.LastAccessTime,19}");
+                }
+                else
+                {
+                    MainModuleName = info.Name;
+                }
             }
 
             string path = "logs";
@@ -74,7 +92,7 @@ namespace SpaceCG.Generic
             TextFileListener.Filter = new EventTypeFilter(SourceLevels.Information);
             TextFileListener.TraceSourceEvent += (s, e) => FileTraceEvent?.Invoke(s, e);
             TextFileListener.WriteLine(Environment.NewLine);
-            
+
             ConsoleListener = new TextFileStreamTraceListener(Console.Out, "ConsoleTrace");
             ConsoleListener.UseConsoleColored = true;
             ConsoleListener.Filter = new EventTypeFilter(SourceLevels.All);
@@ -95,11 +113,6 @@ namespace SpaceCG.Generic
             TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, systemInfo);
             TextFileListener.TraceEvent(eventCache, AppDomain.CurrentDomain.FriendlyName, TraceEventType.Information, 0, moduleInfo);
 
-            if (processModule != null)
-            {
-                ConsoleListener.Write(processModule.FileVersionInfo.ToString());
-                TextFileListener.Write(processModule.FileVersionInfo.ToString());
-            }
             ConsoleListener.Write(fileDateInfo.ToString());
             TextFileListener.Write(fileDateInfo.ToString());
 
