@@ -424,7 +424,7 @@ namespace SpaceCG.Generic
         /// <summary>
         /// 跟踪事件格式化消息容器 <see cref="EventFormatMessage"/> <see cref="TraceEventArgs.FormatMessage"/>
         /// </summary>
-        protected StringBuilder EventFormatMessage { get; private set; } = new StringBuilder(1024);
+        protected StringBuilder EventFormatMessage { get; private set; } = new StringBuilder();
 
         /// <summary>
         /// 跟踪源事件
@@ -665,11 +665,21 @@ namespace SpaceCG.Generic
         /// <param name="eventArgs"></param>
         protected void TraceSourceEventInvoke(TraceEventArgs eventArgs)
         {
-            eventArgs.FormatMessage = EventFormatMessage.ToString();
-            TraceSourceEvent?.Invoke(this, eventArgs);
+            try
+            {
+                if (TraceSourceEvent != null)
+                {
+                    eventArgs.FormatMessage = EventFormatMessage.ToString();
+                    TraceSourceEvent.Invoke(this, eventArgs);
+                }
 
-            CurrentTreceCount++;
-            EventFormatMessage.Clear();
+                CurrentTreceCount++;
+                EventFormatMessage.Clear();
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError($"TraceSourceEventInvoke(TraceEventArgs eventArgs) Error:{ex.ToString()}");
+            }
 
             if (CurrentTreceCount == TRACE_TARGET_COUNT)
             {
