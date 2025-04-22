@@ -104,8 +104,17 @@ namespace SpaceCG.Net
         {
             this.localPort = localPort;
         }
+        /// <summary>
+        /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
+        /// </summary>
+        /// <param name="localPort"></param>
+        /// <param name="name">服务名称、标识或Demo名称、标识</param>
+        /// <exception cref="ArgumentException"></exception>
         public RPCServer(ushort localPort, string name) : this(localPort)
         {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("参数不能为空或空白", nameof(name));
+
             this.Name = name;
 
             udpClient = new UdpClient(localPort);
