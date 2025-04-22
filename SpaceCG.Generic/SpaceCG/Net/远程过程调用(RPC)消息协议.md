@@ -1,4 +1,4 @@
-﻿# 时空DEMO远程过程调用(RPC)消息协议 v1.0
+﻿# 时空 DEMO 程序远程过程调用(XML-RPC)消息协议 v1.0
 
 ***
 
@@ -8,30 +8,24 @@
 
 > RPC协议：远程过程调用(Remote Procedure Call) 或 反射程序控制(Reflection Program Control)
 >
-> 需求场景：DEMO 交互控制
+> 需求场景：DEMO 交互控制，PC 端应用程序控制
 >
-> 交互特点：局域网络，数据量小，传输频率低，属于指令、控制类型数据，对消息加密没有特别要求
->
-> 思考：DEMO 端应用(2C端，Flash+C#应用) 对 XML 与 JSON 消息格式的选择问题？
+> 交互特点：局域网络交互，数据量小，传输频率低，属于指令、控制类型数据，对消息加密没有特别要求
 >
 > 分析：
 >
-> 1.  Flash 对 XML 的支持友好，处理性能相比 JSON 要高些
+> 1.  XML 格式可读性高，比较友好，对编辑软件没能特别要求
 >
-> 2.  Flash 本地配置文件一般都是使用 XML 格式，基本不会使用 JSON 格式做配置项
+> 2.  本地应用程序配置文件一般都是使用 XML 格式
 >
-> 3.  C# 应用(包括Unit3D, .NET应用)，支持 LINQ(语言集成查询) to XML，JSON 格式通常会使用第三方库
+> 3.  C# 应用(包括Unit3D, .NET应用)，支持 LINQ(语言集成查询) to XML，操作、解析方便
 >
-> 4.  C# 应用在项目上都使用过 XML 和 JSON 格式，但统计使用 XML 格式较多
->
-> 5.  考虑 DEMO 端的综合效率问题，建议优先支持 XML 格式，后继在考虑是否实现对 JSON 格式的支持
->
-> 6.  未来可扩展，增加指令列表的描述定义文件(文件中包含UI描述，层级描述，指令描述)，自动传输至各控制端，控制端跟据描述信息自动解析，生成UI、连接、控制
+> 4.  未来可扩展，增加指令列表的描述定义文件(文件中包含UI描述，层级描述，指令描述)，自动传输至各控制端，控制端跟据描述信息自动解析，生成UI、连接、控制按扭等
 
 
 ## XML 消息控制格式
 
-```html
+```XML
 <InvokeMessage ObjectName="" MethodName="" Parameters="" Comment="">
 	<Parameter Type="System.Int32">12</Parameter>
 	<Parameter Type="System.String">play</Parameter>
@@ -57,7 +51,7 @@
 
 > #### 控制消息示例：
 >
-> ```html
+> ```XML
 > <InvokeMessage ObjectName="Window" MethodName="Show" /> 
 > <InvokeMessage ObjectName="Window" MethodName="Close" />
 > <InvokeMessage ObjectName="Demo" MethodName="GetCurrentPage" />
@@ -79,12 +73,12 @@
 > 	<InvokeMessage ObjectName="Video" MethodName="Open" />
 > 	<InvokeMessage ObjectName="Video" MethodName="Play" />
 > 	<InvokeMessage ObjectName="Video" MethodName="SetVolume" Parameters="0.5" />
-> </IvokeMessages>
+> </InvokeMessages>
 > ```
 
 ## XML 消息响应格式
 
-```html
+```XML
 <InvokeResult StatusCode="" ExceptionMessage="" ObjectMethod="" ReturnType="" ReturnValue="">
 	<Return Type="System.Int32">6</Return>
 </InvokeResult>
@@ -113,7 +107,7 @@
 
 > #### 响应消息示例
 >
-> ```html
+> ```XML
 > <InvokeResult StatusCode="0" ObjectMethod="Window.Show" /> 
 > <InvokeResult StatusCode="-1" ObjectMethod="Window.Close" ExceptionMessage="excption message content" />
 > <InvokeResult StatusCode="1" ObjectMethod="Demo.OpenPage" ReturnType="System.Boolean" ReturnValue="True" />
@@ -129,90 +123,6 @@
 > </InvokeResults>
 > ```
 
-## JSON 消息控制格式
-
-```json
-{
-	"InvokeMessage":
-	{
-		"ObjectName":"",
-		"MethodName":"",
-		"Comment":"",
-		//"Parameters":"", //考虑支持两种值类型？
-		"Parameters":[
-			{
-				"Type":"",
-				"Value":""
-			},
-			{
-				"Type":"",
-				"Value":""
-			}
-		]		
-	}
-}
-// 同时执行多个控制消息
-{
-	"InvokeMessages":[
-		{
-			"ObjectName":"",
-			"MethodName":"",
-			"Parameters":"",
-			"Comment":""
-		},
-		{
-			"ObjectName":"",
-			"MethodName":"",
-			"Comment":"",
-			"Parameters":[
-				{
-					"Type":"",
-					"Value":""
-				},
-				{
-					"Type":"",
-					"Value":""
-				}
-			]
-		}
-	]
-}
-```
-
-## JSON 消息响应格式
-
-```json
-{
-	"InvokeResult":
-	{
-		"StatusCode":"",
-		"ExceptionMessage":"",
-		"ObjectMethod":"",
-		"ReturnType":"",
-		"ReturnValue":""
-	}
-}
-// 多个响应消息
-{
-	"InvokeResults":[
-		{
-			"StatusCode":"",
-			"ExceptionMessage":"",
-			"ObjectMethod":"",
-			"ReturnType":"",
-			"ReturnValue":""
-		},
-		{
-			"StatusCode":"",
-			"ExceptionMessage":"",
-			"ObjectMethod":"",
-			"ReturnType":"",
-			"ReturnValue":""
-		}
-	]
-}
-```
-
 ## 属性 @Parameters 的约定
 
 *   多个参数值以英文 ',' 符号间隔区分，不用明确值类型
@@ -220,7 +130,7 @@
 *   支持识别十六进制字符内容，以 '0x' 开头的字符
 *   支持字符串识别，以单引号或双引号包裹内的字符
 *   示例：Parameters="12,play,1024,\[0x01,0xA0,0xAA],'this is string content'"
-    ```java
+    ```C#
     // 正则表达式对 @Parameters 分析示例
     /// <summary> 正则匹配 '~' | "~" </summary>
     internal static readonly String pattern_string = @"\'([^\']+)\'|" + "\"([^\"]+)\"";

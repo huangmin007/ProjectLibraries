@@ -28,7 +28,12 @@ namespace SpaceCG.Net
         /// <summary>
         /// Buffer Size
         /// </summary>
-        internal const int BUFFER_SIZE = 1024;
+        internal const int BUFFER_SIZE = 10240;
+
+        /// <summary>
+        /// 服务名称、标识或Demo名称、标识
+        /// </summary>
+        public string Name { get; private set; }
 
         /// <summary>
         /// 连接的客户端集合
@@ -69,6 +74,7 @@ namespace SpaceCG.Net
         }
 
         private ushort localPort;
+        private UdpClient udpClient;
         private TcpListener listener;
         /// <summary>
         /// 历史调用过的唯一方法，无歧义的方法
@@ -97,6 +103,57 @@ namespace SpaceCG.Net
         public RPCServer(ushort localPort) : this()
         {
             this.localPort = localPort;
+        }
+        public RPCServer(ushort localPort, string name) : this(localPort)
+        {
+            this.Name = name;
+
+            udpClient = new UdpClient(localPort);
+            udpClient.EnableBroadcast = true;
+
+            try { udpClient.AllowNatTraversal(true); }
+            catch (Exception) { }
+
+            udpClient.BeginReceive(new AsyncCallback(UdpReceiveCallback), udpClient);
+        }
+        private void UdpReceiveCallback(IAsyncResult ar)
+        {
+            byte[] data;
+            IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            try
+            {
+                data = udpClient?.EndReceive(ar, ref remoteEndPoint);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"UDP Receive Callback Exception: {ex.Message}");
+                return;
+            }
+
+            try
+            {
+                if (data != null && data.Length > 0)
+                {
+                    string message = Encoding.UTF8.GetString(data);
+                    Logger.Debug($"Receive UDP {remoteEndPoint} Message {data.Length} Bytes \r\n{message}");
+
+                    XElement element = XElement.Parse(message);
+                    if (Name.Equals(element.Attribute("Name")?.Value, StringComparison.OrdinalIgnoreCase))
+                    {
+                        element.Add(new XAttribute("Port", localPort));
+                        var respose = Encoding.UTF8.GetBytes(element.ToString());
+                        udpClient?.Send(respose, respose.Length, remoteEndPoint);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"UDP Receive Callback Exception: {ex.Message}");
+            }
+            finally
+            {
+                udpClient?.BeginReceive(new AsyncCallback(UdpReceiveCallback), udpClient);
+            }
         }
 
         /// <summary>

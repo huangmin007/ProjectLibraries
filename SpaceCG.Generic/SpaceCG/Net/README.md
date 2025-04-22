@@ -1,4 +1,4 @@
-﻿## RPC 消息协议应用示例
+﻿## XML-RPC 消息协议应用示例
 ***
 > RPC协议：远程过程调用(Remote Procedure Call) 或 反射程序控制(Reflection Program Control)
 

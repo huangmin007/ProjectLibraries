@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using SpaceCG.Generic;
@@ -65,6 +67,50 @@ namespace SpaceCG.Net
         {
             this.remotePort = remotePort;
             this.remoteHost = remoteHost;
+        }
+
+        private bool _searching = false;
+        /// <summary>
+        /// 启动自动搜索 RPC 服务端，当搜索到服务端后会自动连接并中断搜索服务。
+        /// </summary>
+        /// <param name="remotePort"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public void StartSearchRPCServer(ushort remotePort, string name)
+        {
+            if (_searching) return;
+
+            _searching = true;
+
+            Task.Run(() =>
+            {
+                using (UdpClient udpClient = new UdpClient())
+                {
+                    udpClient.EnableBroadcast = true;
+                    byte[] message = Encoding.UTF8.GetBytes($"<Broadcast Name=\"{name}\" />");
+
+                    while (_searching)
+                    {
+                        if (!_searching) return;
+
+                        udpClient.Send(message, message.Length, new IPEndPoint(IPAddress.Broadcast, remotePort));
+                        Thread.Sleep(1000);
+
+                        if (udpClient.Available > 0)
+                        {
+                            IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+
+                            var bufffer = udpClient.Receive(ref remoteEP);
+                            string response = Encoding.UTF8.GetString(bufffer);
+                            Logger.Debug($"Search RPC Server {name} Response: {response} {remoteEP}");
+
+                            if (!IsConnected) ConnectAsync(remoteEP.Address.ToString(), (ushort)remoteEP.Port);
+
+                            _searching = false;
+                        }
+                    }
+                }
+            });
         }
 
         /// <summary>
@@ -151,6 +197,8 @@ namespace SpaceCG.Net
         /// <inheritdoc />
         public void Dispose()
         {
+            _searching = false;
+
             Close();
 
             buffer = null;
