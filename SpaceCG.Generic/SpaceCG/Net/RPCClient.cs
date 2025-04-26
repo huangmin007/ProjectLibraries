@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -7,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using SpaceCG.Extensions;
 using SpaceCG.Generic;
 
 namespace SpaceCG.Net
@@ -25,9 +27,9 @@ namespace SpaceCG.Net
         private TcpClient tcpClient;
 
         /// <summary> 读取超时 </summary>
-        public int ReadTimeout { get; set; } = 3000;
+        public int ReadTimeout { get; set; } = 1000;
         /// <summary> 写入超时 </summary>
-        public int WriteTimeout { get; set; } = 3000;
+        public int WriteTimeout { get; set; } = 1000;
 
         /// <summary>
         /// 是否连接到远程主机
@@ -116,7 +118,7 @@ namespace SpaceCG.Net
         /// <summary>
         /// 同步连接远程服务端
         /// </summary>
-        protected void Connect()
+        public void Connect()
         {
             if (remotePort <= 0) return;
             Close();
@@ -140,10 +142,11 @@ namespace SpaceCG.Net
         /// <summary>
         /// 连接远程服务端
         /// </summary>
-        public async void ConnectAsync()
+        public async Task ConnectAsync()
         {
             if (remotePort <= 0) return;
             Close();
+            //Trace.WriteLine($"RPC Client Connect(Async) {remoteHost}:{remotePort}");
 
             try
             {
@@ -164,8 +167,8 @@ namespace SpaceCG.Net
             else
             {
                 Logger.Debug($"RPC Client Ready Reconnecting {remoteHost}:{remotePort}");
-                await Task.Delay(1000);
-                ConnectAsync();
+                //await Task.Delay(1000);
+                //await ConnectAsync();
             }
         }
         /// <summary>
@@ -173,12 +176,12 @@ namespace SpaceCG.Net
         /// </summary>
         /// <param name="remoteHost"></param>
         /// <param name="remotePort"></param>
-        public void ConnectAsync(string remoteHost, ushort remotePort)
+        public async Task ConnectAsync(string remoteHost, ushort remotePort)
         {
             this.remotePort = remotePort;
             this.remoteHost = remoteHost;
 
-            ConnectAsync();
+            await ConnectAsync();
         }
 
         /// <summary> 关闭连接 </summary>
@@ -186,6 +189,11 @@ namespace SpaceCG.Net
         {
             try
             {
+                if (tcpClient != null && tcpClient.Connected)
+                {
+                    tcpClient.Close();
+                }
+
                 tcpClient?.Dispose();
             }
             catch { }
@@ -205,6 +213,8 @@ namespace SpaceCG.Net
             remotePort = 0;
             remoteHost = null;
         }
+
+        private Stopwatch _readStopwatch = new Stopwatch();
 
         /// <summary>
         /// 写一次消息，并同步等待响应消息。
@@ -251,20 +261,33 @@ namespace SpaceCG.Net
 
             try
             {
-                while (networkStream != null)
+                _readStopwatch.Restart();
+                while(networkStream != null && !networkStream.DataAvailable && _readStopwatch.ElapsedMilliseconds < 100)
                 {
-                    int count = networkStream.Read(buffer, 0, buffer.Length);
+                    Thread.Sleep(1);
+                }
 
-                    if (count <= 0)
+                if (networkStream != null && !networkStream.DataAvailable)
+                {
+                    // 响应超时
+                    return false;
+                }
+                else
+                {
+                    while (networkStream != null && networkStream.DataAvailable)
                     {
-                        ConnectAsync();
-                        Logger.Warn("RPC Server is Closed.");
-                        return false;
-                    }
+                        int count = networkStream.Read(buffer, 0, buffer.Length);
 
-                    responseMessage = Encoding.UTF8.GetString(buffer, 0, count)?.Trim();
-                    Logger.Debug($"Receive RPC Server Invoke Result {count} Bytes \r\n{responseMessage}");
-                    break;
+                        if (count <= 0)
+                        {
+                            Logger.Warn("RPC Server is Closed.");
+                            return false;
+                        }
+
+                        responseMessage = Encoding.UTF8.GetString(buffer, 0, count)?.Trim();
+                        Logger.Debug($"Receive RPC Server Invoke Result {count} Bytes \r\n{responseMessage}");
+                        break;
+                    }
                 }
             }
             catch (Exception ex)

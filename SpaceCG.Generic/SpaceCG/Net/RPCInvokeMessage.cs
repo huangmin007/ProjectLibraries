@@ -17,12 +17,14 @@ namespace SpaceCG.Net
     public enum InvokeStatusCode
     {
         /// <summary> 未知状态 </summary>
-        Unknown = -2,
-        /// <summary> 调用失败 </summary>
+        Unknown = int.MinValue,
+        /// <summary> 客户端发送消息，等待服务端响应超时 </summary>
+        Timeout = -2,
+        /// <summary> 服务端接收到消息数据，但可能调用失败 </summary>
         Failed = -1,
-        /// <summary> 调用成功，方法或函数返回参数 </summary>
+        /// <summary> 服务端接收到消息数据，确定调用成功，方法或函数没有返回参数 </summary>
         Success = 0,
-        /// <summary> 调用成功，方法或函数有返回参数  </summary>
+        /// <summary> 服务端接收到消息数据，确定调用成功，方法或函数有返回参数  </summary>
         SuccessAndReturn = 1,
     }
 
