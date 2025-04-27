@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <RootNamespace></RootNamespace>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Title>Shenzhen SpaceCG Private Packets</Title>
@@ -11,10 +11,11 @@
     <PackageProjectUrl />
     <RepositoryUrl>https://github.com/huangmin007/ProjectLibraries/tree/master/SpaceCG.Generic</RepositoryUrl>
     <Copyright>2023</Copyright>
-    <Version>1.2.11</Version>
+    <Version>1.2.0</Version>
     <IncludeSymbols>False</IncludeSymbols>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

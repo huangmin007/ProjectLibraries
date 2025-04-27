@@ -1,102 +1,125 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using SpaceCG.Extensions;
-using SpaceCG.Generic;
 
 namespace SpaceCG.Net
 {
     /// <summary>
-    /// RPC (Remote Procedure Call) or (Reflection Program Control) Client
+    /// TCP 客户端扩展方法
+    /// </summary>
+    public static class TcpClientExtensions
+    {
+        /// <summary>
+        /// <see cref="TcpClient"/> 连接状态
+        /// </summary>
+        /// <param name="tcpClient"></param>
+        /// <returns></returns>
+        public static bool IsOnline(this TcpClient tcpClient)
+        {
+            if (tcpClient == null || tcpClient.Client == null) return false;
+            return !((tcpClient.Client.Poll(1000, SelectMode.SelectRead) && (tcpClient.Client.Available == 0)) || !tcpClient.Client.Connected);
+        }
+    }
+
+
+    /// <summary>
+    /// 优化后的RPC客户端，支持自动重连
     /// </summary>
     public class RPCClient : IDisposable
     {
-        static readonly LoggerTrace Logger = new LoggerTrace(nameof(RPCClient));
+        private int _remotePort;
+        private string _remoteHost;
 
-        private string remoteHost;
-        private ushort remotePort;
-
-        private byte[] buffer;
-        private TcpClient tcpClient;
+        private bool _searching = false;
+        private bool _isDisposed = false;
+        private TcpClient _tcpClient;
+        private CancellationTokenSource _cts;
 
         /// <summary> 读取超时 </summary>
-        public int ReadTimeout { get; set; } = 1000;
+        public int ReadTimeout { get; set; } = 3000;
         /// <summary> 写入超时 </summary>
-        public int WriteTimeout { get; set; } = 1000;
+        public int WriteTimeout { get; set; } = 3000;
+
+        /// <summary> 是否已连接 </summary>
+        public bool IsConnected => _tcpClient?.IsOnline() ?? false;
+        //public bool IsConnected => _tcpClient?.Connected ?? false;
+
+        /// <summary> 连接状态变更事件 </summary>
+        public event EventHandler<bool> ConnectionStateChanged;
+
+        private readonly byte[] ReadBuffer = new byte[RPCServer.BUFFER_SIZE];
 
         /// <summary>
-        /// 是否连接到远程主机
-        /// </summary>
-        public bool IsConnected
-        {
-            get
-            {
-                try
-                {
-                    return tcpClient?.Connected ?? false;
-                }
-                catch (Exception)
-                {
-                    return false;
-                }
-            }
-        }
-        /// <summary>
-        /// <see cref="TcpClient"/> 客户端对象
-        /// </summary>
-        public TcpClient TcpClient => tcpClient;
-
-        /// <summary>
-        /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
-        /// </summary>
-        public RPCClient()
-        {
-            this.buffer = new byte[RPCServer.BUFFER_SIZE];
-        }
-        /// <summary>
-        /// RPC (Remote Procedure Call) or (Reflection Program Control) Server
+        /// 构造函数
         /// </summary>
         /// <param name="remoteHost"></param>
         /// <param name="remotePort"></param>
-        public RPCClient(string remoteHost, ushort remotePort) : this()
+        /// <exception cref="ArgumentNullException"></exception>
+        public RPCClient(string remoteHost, int remotePort)
         {
-            this.remotePort = remotePort;
-            this.remoteHost = remoteHost;
-        }
+            if (string.IsNullOrEmpty(remoteHost))
+                throw new ArgumentNullException(nameof(remoteHost), "远程主机不能为空");
+            if (remotePort < 1 || remotePort > 65535)
+                throw new ArgumentOutOfRangeException(nameof(remotePort), "端口必须在 1~65535 之间");
 
-        private bool _searching = false;
+            _remoteHost = remoteHost;
+            _remotePort = remotePort;            
+        }
         /// <summary>
-        /// 启动自动搜索 RPC 服务端，当搜索到服务端后会自动连接并中断搜索服务。
+        /// 构造函数
         /// </summary>
         /// <param name="remotePort"></param>
-        /// <param name="name"></param>
-        /// <returns></returns>
-        public void StartSearchRPCServer(ushort remotePort, string name)
+        /// <param name="serverName"></param>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        public RPCClient(int remotePort, string serverName)
         {
-            if (_searching) return;
+            if (remotePort < 1 || remotePort > 65535)
+                throw new ArgumentOutOfRangeException(nameof(remotePort), "端口必须在 1~65535 之间");
+            if (string.IsNullOrWhiteSpace(serverName))
+                throw new ArgumentException("远程服务端名称不能为空", nameof(serverName));
 
+            this._remotePort = remotePort;
+            SearchDiscoveryService(remotePort, serverName);
+        }
+
+        /// <summary>
+        /// 搜索并连接服务端
+        /// </summary>
+        /// <param name="remotePort"></param>
+        /// <param name="serverName"></param>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        public void SearchDiscoveryService(int remotePort, string serverName)
+        {
+            if (remotePort < 1 || remotePort > 65535)
+                throw new ArgumentOutOfRangeException(nameof(remotePort), "端口必须在 1~65535 之间");
+            if (string.IsNullOrWhiteSpace(serverName))
+                throw new ArgumentException("远程服务端名称不能为空", nameof(serverName));
+
+            if (_searching) return;
             _searching = true;
 
-            Task.Run(() =>
+            Task.Run(async () =>
             {
                 using (UdpClient udpClient = new UdpClient())
                 {
                     udpClient.EnableBroadcast = true;
-                    byte[] message = Encoding.UTF8.GetBytes($"<Broadcast Name=\"{name}\" />");
+                    byte[] message = Encoding.UTF8.GetBytes($"DISCOVER:{serverName}");
+                    IPEndPoint broadcastEndPoint = new IPEndPoint(IPAddress.Broadcast, remotePort);                    
 
                     while (_searching)
                     {
                         if (!_searching) return;
 
-                        udpClient.Send(message, message.Length, new IPEndPoint(IPAddress.Broadcast, remotePort));
-                        Thread.Sleep(1000);
+                        udpClient.Send(message, message.Length, broadcastEndPoint);
+                        await Task.Delay(500, _cts.Token);
 
                         if (udpClient.Available > 0)
                         {
@@ -104,10 +127,20 @@ namespace SpaceCG.Net
 
                             var bufffer = udpClient.Receive(ref remoteEP);
                             string response = Encoding.UTF8.GetString(bufffer);
-                            Logger.Debug($"Search RPC Server {name} Response: {response} {remoteEP}");
+                            Trace.TraceInformation($"Search Discovery XML-RPC Server {serverName} Response: {response} {remoteEP}");
 
-                            if (!IsConnected) ConnectAsync(remoteEP.Address.ToString(), (ushort)remoteEP.Port);
+                            if (!response.StartsWith("SERVER_INFO:")) continue;
 
+                            string[] parts = response.Split(',');
+                            if (parts.Length != 2 || int.TryParse(parts[1], out int serverPort) == false) continue;
+
+                            if (!IsConnected)
+                            {
+                                this._remotePort = serverPort;
+                                this._remoteHost = remoteEP.Address.ToString();
+
+                                await StartAsync();
+                            }
                             _searching = false;
                         }
                     }
@@ -116,474 +149,336 @@ namespace SpaceCG.Net
         }
 
         /// <summary>
-        /// 同步连接远程服务端
+        /// 启动客户端并尝试连接
         /// </summary>
-        public void Connect()
+        public async Task StartAsync()
         {
-            if (remotePort <= 0) return;
-            Close();
+            if (_isDisposed) 
+                throw new ObjectDisposedException(nameof(RPCClient));
 
-            try
-            {
-                tcpClient = new TcpClient();
-                tcpClient.SendTimeout = WriteTimeout;
-                tcpClient.ReceiveTimeout = ReadTimeout;
-                tcpClient.Connect(remoteHost, remotePort);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"RPC Client Connect(Sync) Exception: {ex}");
-                return;
-            }
+            if (string.IsNullOrWhiteSpace(_remoteHost) || _remotePort < 1 || _remotePort > 65535)
+                throw new InvalidOperationException("连接远程主机和端口没能正确设置");
 
-            if (IsConnected)
-                Logger.Info($"RPC Client {tcpClient.Client.LocalEndPoint} Connect(Sync) Server {tcpClient.Client.RemoteEndPoint} Success");
+            if (IsConnected || _cts != null) return;
+
+            _cts = new CancellationTokenSource();
+            await ConnectWithRetryAsync();
         }
         /// <summary>
-        /// 连接远程服务端
+        /// 停止客户端并断开连接
         /// </summary>
-        public async Task ConnectAsync()
+        /// <returns></returns>
+        public async Task StopAsync()
         {
-            if (remotePort <= 0) return;
-            Close();
-            //Trace.WriteLine($"RPC Client Connect(Async) {remoteHost}:{remotePort}");
+            if (_isDisposed)
+                throw new ObjectDisposedException(nameof(RPCClient));
 
-            try
-            {
-                tcpClient = new TcpClient();
-                tcpClient.SendTimeout = WriteTimeout;
-                tcpClient.ReceiveTimeout = ReadTimeout;
-                await tcpClient.ConnectAsync(remoteHost, remotePort);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"RPC Client Connect(Async) Exception: {ex}");
-            }
+            if (_cts == null) return;
 
-            if (IsConnected)
-            {
-                Logger.Info($"RPC Client {tcpClient.Client.LocalEndPoint} Connect(Async) Server {tcpClient.Client.RemoteEndPoint} Success");
-            }
-            else
-            {
-                Logger.Debug($"RPC Client Ready Reconnecting {remoteHost}:{remotePort}");
-                //await Task.Delay(1000);
-                //await ConnectAsync();
-            }
+            _cts.Cancel();
+            await Task.Delay(10);
+
+            CloseConnection();
+
+            _cts.Dispose();
+            _cts = null;
         }
+
         /// <summary>
-        /// 连接远程服务端
+        /// 关闭连接
         /// </summary>
-        /// <param name="remoteHost"></param>
-        /// <param name="remotePort"></param>
-        public async Task ConnectAsync(string remoteHost, ushort remotePort)
-        {
-            this.remotePort = remotePort;
-            this.remoteHost = remoteHost;
-
-            await ConnectAsync();
-        }
-
-        /// <summary> 关闭连接 </summary>
-        public void Close()
+        private void CloseConnection()
         {
             try
             {
-                if (tcpClient != null && tcpClient.Connected)
-                {
-                    tcpClient.Close();
-                }
-
-                tcpClient?.Dispose();
+                _tcpClient?.Dispose();
             }
-            catch { }
+            catch
+            {
+                // 忽略
+            }
             finally
             {
-                tcpClient = null;
+                _tcpClient = null;
             }
         }
-        /// <inheritdoc />
-        public void Dispose()
+        /// <summary>
+        /// 处理连接断开
+        /// </summary>
+        private async void HandleDisconnection()
         {
-            _searching = false;
+            ConnectionStateChanged?.Invoke(this, false);
+            CloseConnection();
 
-            Close();
-
-            buffer = null;
-            remotePort = 0;
-            remoteHost = null;
+            if (!_cts.IsCancellationRequested)
+            {
+                await ConnectWithRetryAsync();
+            }
         }
-
-        private Stopwatch _readStopwatch = new Stopwatch();
 
         /// <summary>
-        /// 写一次消息，并同步等待响应消息。
+        /// 带重试机制的连接方法
         /// </summary>
-        /// <param name="invokeMessage"></param>
-        /// <param name="responseMessage"></param>
-        /// <returns>写-读成功返回 true, 否则返回 false </returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        protected bool ReadWriteMessage(string invokeMessage, out string responseMessage)
+        private async Task ConnectWithRetryAsync()
         {
-            if (string.IsNullOrWhiteSpace(invokeMessage))
-                throw new ArgumentNullException(nameof(invokeMessage), "参数不能为空");
+            int reconnectCount = 0;            // 当前重连次数
+            int reconnectInterval = 5;         // 重连间隔(秒)
+            const int MaxReconnectCount = 120;   // 最大重连次数
 
-            responseMessage = null;
-            if (!IsConnected) Connect();
-            if (!IsConnected)
+            while (!_cts.IsCancellationRequested)
             {
-                Logger.Error("RPC Client Connect(Sync) Failed");
-                return false;
+                try
+                {                    
+                    await InternalConnectAsync();
+
+                    // 重置重连计数器、间隔时间
+                    reconnectCount = 0;
+                    reconnectInterval = 5000;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    reconnectCount++;
+
+                    Trace.TraceWarning($"连接失败: ({ex.GetType().Name}){ex.Message}");
+                    Trace.TraceInformation($"等待 {reconnectInterval} 秒后，尝试第 {reconnectCount} 次重新连接 ...");
+
+                    if (reconnectCount >= MaxReconnectCount)
+                    {
+                        reconnectInterval = 10; // 重连间隔增加
+                    }
+
+                    await Task.Delay(reconnectInterval * 1000, _cts.Token);
+                }
             }
 
-            NetworkStream networkStream = null;
+            Debug.WriteLine($"已连接到服务端 {_remoteHost}:{_remotePort}，重连机制已退出。");
+        }
+        /// <summary>
+        /// 内部连接方法
+        /// </summary>
+        private async Task InternalConnectAsync()
+        {
+            if (IsConnected) return;
+
+            CloseConnection(); // 确保先关闭现有连接
+
+            _tcpClient = new TcpClient();
+            _tcpClient.SendTimeout = WriteTimeout;
+            _tcpClient.ReceiveTimeout = ReadTimeout;
+
+            Debug.WriteLine($"正在连接远程服务端 {_remoteHost}:{_remotePort} ...");
+
+            await _tcpClient.ConnectAsync(_remoteHost, _remotePort);
+
+            if (IsConnected)
+            {
+                Trace.TraceInformation($"已成功连接到远程服务端: {_tcpClient.Client.LocalEndPoint} -> {_tcpClient.Client.RemoteEndPoint}");
+                ConnectionStateChanged?.Invoke(this, true);
+
+                // 启动接收任务
+                //_ = Task.Run(() => ReceiveLoopAsync(_cts.Token), _cts.Token);
+            }
+        }
+        /// <summary>
+        /// 接收消息循环
+        /// </summary>
+        private async Task ReceiveLoopAsync(CancellationToken cancelToken)
+        {
             try
             {
-                networkStream = tcpClient.GetStream();
+                byte[] buffer = new byte[RPCServer.BUFFER_SIZE];
+
+                while (!cancelToken.IsCancellationRequested && IsConnected)
+                {
+                    var networkStream = _tcpClient.GetStream();
+                    var readBytesCount = await networkStream.ReadAsync(buffer, 0, buffer.Length, cancelToken);
+
+                    if (readBytesCount == 0)
+                    {
+                        Trace.TraceWarning("远程服务端关闭了连接");
+                        HandleDisconnection();
+                        break;
+                    }
+
+                    var receivedMessage = Encoding.UTF8.GetString(buffer, 0, readBytesCount);
+                    Debug.WriteLine($"收到服务端的消息: {receivedMessage}");
+
+                    // 这里可以添加消息处理逻辑
+
+                    // 这里响应消息
+                    var resposeMessage = "hello";
+                    var resposeBytes = Encoding.UTF8.GetBytes(resposeMessage);
+                    await networkStream.WriteAsync(resposeBytes, 0, resposeBytes.Length, cancelToken);
+                }
+            }
+            catch (Exception ex) when (ex is OperationCanceledException || ex is ObjectDisposedException)
+            {
+                // 正常退出
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError($"接收消息时出错: ({ex.GetType().Name}){ex.Message}");
+                HandleDisconnection();
+            }
+        }
+
+        /// <summary>
+        /// 异步调用远程实例对象的方法
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="cancelToken"></param>
+        /// <returns>如果本地消息没有发送成功，则返回 null </returns>
+        /// <exception cref="ObjectDisposedException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        protected async Task<InvokeResult> CallRemoteMethodAsync(string message, CancellationToken cancelToken)
+        {
+            if (_isDisposed) 
+                throw new ObjectDisposedException(nameof(RPCClient));
+            if (string.IsNullOrWhiteSpace(message))
+                throw new ArgumentException("参数不能为空", nameof(message));
+
+            if (!IsConnected) return null;
+
+#if false
+            // 在这里验证一次消息格式是否是 XML 格式
+            XElement invokeMessage;
+            //NetworkStream networkStream;
+            try
+            {
+                invokeMessage = XElement.Parse(message);
+                //networkStream = _tcpClient.GetStream();
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError($"解析消息失败: ({ex.GetType().Name}){ex.Message}");
+                return null;
+            }
+#endif
+            try
+            {
+                var networkStream = _tcpClient.GetStream();
+
+                #region 清空读取缓冲区
+                networkStream.ReadTimeout = 1;
+                while (networkStream.DataAvailable)
+                {
+                    int bytesRead = networkStream.Read(ReadBuffer, 0, ReadBuffer.Length);
+                    if (bytesRead <= 0) break;  // 没有数据了
+                }
+                #endregion
+
                 networkStream.ReadTimeout = ReadTimeout;
                 networkStream.WriteTimeout = WriteTimeout;
 
-                //clear read buffer
-                while (networkStream.DataAvailable)
-                {
-                    int count = networkStream.Read(buffer, 0, buffer.Length);
-                    Logger.Warn($"RPC Client Clear Buffer Size: {count}");
-                }
+                var requestBytes = Encoding.UTF8.GetBytes(message);
+                await networkStream.WriteAsync(requestBytes, 0, requestBytes.Length, cancelToken);
+                //await networkStream.FlushAsync(cancelToken);
 
-                byte[] bytes = Encoding.UTF8.GetBytes(invokeMessage);
-                networkStream.Write(bytes, 0, bytes.Length);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"RPC Client Write Message Exception: {ex}");
-                return false;
-            }
-
-            try
-            {
-                _readStopwatch.Restart();
-                while(networkStream != null && !networkStream.DataAvailable && _readStopwatch.ElapsedMilliseconds < 100)
+                Stopwatch stopwatch = Stopwatch.StartNew();
+                while (!cancelToken.IsCancellationRequested && IsConnected && stopwatch.ElapsedMilliseconds < ReadTimeout)
                 {
-                    Thread.Sleep(1);
-                }
-
-                if (networkStream != null && !networkStream.DataAvailable)
-                {
-                    // 响应超时
-                    return false;
-                }
-                else
-                {
-                    while (networkStream != null && networkStream.DataAvailable)
+                    if (networkStream.DataAvailable)
                     {
-                        int count = networkStream.Read(buffer, 0, buffer.Length);
-
-                        if (count <= 0)
+                        var readBytesCount = await networkStream.ReadAsync(ReadBuffer, 0, ReadBuffer.Length, cancelToken);
+                        if (readBytesCount == 0)
                         {
-                            Logger.Warn("RPC Server is Closed.");
-                            return false;
+                            Trace.TraceWarning("远程服务端关闭了连接");
+                            HandleDisconnection();
+                            break;
                         }
 
-                        responseMessage = Encoding.UTF8.GetString(buffer, 0, count)?.Trim();
-                        Logger.Debug($"Receive RPC Server Invoke Result {count} Bytes \r\n{responseMessage}");
-                        break;
+                        // 这里可以解析响应消息
+                        // 简化示例，实际实现需要更复杂的响应处理
+                        string exceptionMessage = string.Empty;
+                        try
+                        {
+                            var responseMessage = Encoding.UTF8.GetString(ReadBuffer, 0, readBytesCount);
+                            Debug.WriteLine($"收到服务端的响应: {responseMessage}");
+
+                            var result = XElement.Parse(responseMessage);
+                            return new InvokeResult(result);
+                        }
+                        catch (Exception ex)
+                        {
+                            exceptionMessage = $"解析响应消息时格式异常: ({ex.GetType().Name}){ex.Message}";
+                        }
+
+                        try
+                        {
+                            XElement invokeMessage = XElement.Parse(message);
+                            var objectMethod = $"{invokeMessage.Attributes(nameof(InvokeMessage.ObjectName))} .{invokeMessage.Attributes(nameof(InvokeMessage.MethodName))}";
+                            
+                            Trace.TraceError($"调用远程对象方法 {objectMethod} 异常，{exceptionMessage}");
+                            return new InvokeResult(InvokeStatusCode.Failed, objectMethod, exceptionMessage);
+                        }
+                        catch (Exception ex)
+                        {
+                            Trace.TraceError($"解析消息失败: ({ex.GetType().Name}){ex.Message}");
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        await Task.Delay(100, cancelToken);
                     }
                 }
+
+                stopwatch.Stop();
+                return new InvokeResult(InvokeStatusCode.Timeout, null, "服务端响应超时");
             }
             catch (Exception ex)
             {
-                Logger.Error($"RPC Client Read Message Exception: {ex}");
-                return false;
+                Trace.TraceError($"发送消息失败: ({ex.GetType().Name}){ex.Message}");
+                HandleDisconnection();
+                return null;
             }
-
-            return true;
         }
-
-
         /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para>返回结果为 true 时, 此时输出参数 <see cref="InvokeResult"/> 不为 null</para>
+        /// 异步调用远程实例对象的方法
         /// </summary>
         /// <param name="invokeMessage"></param>
-        /// <param name="invokeResult"></param>
-        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="ArgumentException"></exception>
-        public bool TryCallMethod(XElement invokeMessage, out InvokeResult invokeResult)
+        /// <returns></returns>
+        public async Task<InvokeResult> CallRemoteMethodAsync(XElement invokeMessage) => await CallRemoteMethodAsync(invokeMessage.ToString(), _cts.Token);
+        /// <summary>
+        /// 异步调用远程实例对象的方法
+        /// </summary>
+        /// <param name="invokeMessage"></param>
+        /// <returns></returns>
+        public async Task<InvokeResult> CallRemoteMethodAsync(InvokeMessage invokeMessage) => await CallRemoteMethodAsync(invokeMessage.ToXMLString(), _cts.Token);
+        
+        /// <summary>
+        /// 异步调用远程实例对象的方法
+        /// </summary>
+        /// <param name="objectName"></param>
+        /// <param name="methodName"></param>
+        /// <returns></returns>
+        public async Task<InvokeResult> CallRemoteMethodAsync(string objectName, string methodName) => await CallRemoteMethodAsync(new InvokeMessage(objectName, methodName));
+        /// <summary>
+        /// 异步调用远程实例对象的方法
+        /// </summary>
+        /// <param name="objectName"></param>
+        /// <param name="methodName"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        public async Task<InvokeResult> CallRemoteMethodAsync(string objectName, string methodName, object[] parameters) => await CallRemoteMethodAsync(new InvokeMessage(objectName, methodName, parameters));
+        /// <summary>
+        /// 异步调用远程实例对象的方法
+        /// </summary>
+        /// <param name="objectName"></param>
+        /// <param name="methodName"></param>
+        /// <param name="asynchronous"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        public async Task<InvokeResult> CallRemoteMethodAsync(string objectName, string methodName, bool asynchronous, object[] parameters) => await CallRemoteMethodAsync(new InvokeMessage(objectName, methodName, asynchronous, parameters));
+
+        /// <inheritdoc />
+        public void Dispose()
         {
-            if (invokeMessage == null)
-                throw new ArgumentNullException(nameof(invokeMessage), "参数不能为空");
-            if (!InvokeMessage.IsValid(invokeMessage))
-                throw new ArgumentException(nameof(invokeMessage), $"{nameof(InvokeMessage)} 调用消息不符合协议要求");
+            if (_isDisposed) return;
 
-            invokeResult = null;
-            if (!ReadWriteMessage(invokeMessage.ToString(), out string responseMessage))
-            {
-                return false;
-            }
-
-            XElement element = null;
-            try
-            {
-                element = XElement.Parse(responseMessage);
-                if (!InvokeResult.IsValid(element)) throw new FormatException("响应消息不符合协议要求");
-            }
-            catch (Exception ex)
-            {
-                invokeResult = new InvokeResult(InvokeStatusCode.Unknown, new InvokeMessage(invokeMessage).ObjectMethod, $"RPC Server Invoke Result Message Format Exception: {ex.Message}");
-
-                Logger.Warn($"RPC Server Invoke Result Message: {responseMessage}");
-                Logger.Error($"RPC Server Invoke Result Message Format Exception: {ex}");
-                return true;
-            }
-
-            invokeResult = new InvokeResult(element);
-
-            return true;
+            _isDisposed = true;
+            StopAsync().Wait();
         }
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para>返回结果为 true 时, 此时输出参数 <see cref="InvokeResult"/> 不为 null</para>
-        /// </summary>
-        /// <param name="invokeMessage"></param>
-        /// <param name="invokeResult"></param>
-        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="ArgumentException"></exception>
-        public bool TryCallMethod(InvokeMessage invokeMessage, out InvokeResult invokeResult)
-        {
-            if (invokeMessage == null)
-                throw new ArgumentNullException(nameof(invokeMessage), "参数不能为空");
-            if (!invokeMessage.IsValid())
-                throw new ArgumentException(nameof(invokeMessage), $"{nameof(InvokeMessage)} 调用消息不符合协议要求");
-
-            invokeResult = null;
-            if (!ReadWriteMessage(invokeMessage.ToFormatString(MessageFormatType.XML), out string responseMessage))
-            {
-                return false;
-            }
-
-            XElement element = null;
-            try
-            {
-                element = XElement.Parse(responseMessage);
-                if (!InvokeResult.IsValid(element)) throw new FormatException("响应消息不符合协议要求");
-            }
-            catch (Exception ex)
-            {
-                invokeResult = new InvokeResult(InvokeStatusCode.Unknown, invokeMessage.ObjectMethod, $"RPC Server Invoke Result Message Format Exception: {ex.Message}");
-
-                Logger.Info($"RPC Server Invoke Result Message: {responseMessage}");
-                Logger.Error($"RPC Server Invoke Result Message Format Exception: {ex}");
-                return true;
-            }
-
-            invokeResult = new InvokeResult(element);
-
-            return true;
-        }
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para>返回结果为 true 时, 此时输出参数 <see cref="InvokeResult"/> 不为 null</para>
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="invokeResult"></param>
-        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
-        public bool TryCallMethod(string objectName, string methodName, out InvokeResult invokeResult) => TryCallMethod(new InvokeMessage(objectName, methodName), out invokeResult);
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para>返回结果为 true 时, 此时输出参数 <see cref="InvokeResult"/> 不为 null</para>
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <param name="invokeResult"></param>
-        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
-        public bool TryCallMethod(string objectName, string methodName, object[] parameters, out InvokeResult invokeResult) => TryCallMethod(new InvokeMessage(objectName, methodName, parameters), out invokeResult);
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para>返回结果为 true 时, 此时输出参数 <see cref="InvokeResult"/> 不为 null</para>
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <param name="asynchronous">远程方法或函数是否异步执行，需要远端应用的支持</param>
-        /// <param name="invokeResult"></param>
-        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
-        public bool TryCallMethod(string objectName, string methodName, object[] parameters, bool asynchronous, out InvokeResult invokeResult) => TryCallMethod(new InvokeMessage(objectName, methodName, parameters, asynchronous, null), out invokeResult);
-
-
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="invokeMessage"></param>
-        /// <returns>远程实例对象的方法调用成功，返回 <see cref="InvokeResult"/> 对象，否则返回 null 值 </returns>
-        public InvokeResult TryCallMethod(XElement invokeMessage) => TryCallMethod(invokeMessage, out InvokeResult invokeResult) ? invokeResult : null;
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="invokeMessage"></param>
-        /// <returns>远程实例对象的方法调用成功，返回 <see cref="InvokeResult"/> 对象，否则返回 null 值 </returns>
-        public InvokeResult TryCallMethod(InvokeMessage invokeMessage) => TryCallMethod(invokeMessage, out InvokeResult invokeResult) ? invokeResult : null;
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <returns>远程实例对象的方法调用成功，返回 <see cref="InvokeResult"/> 对象，否则返回 null 值 </returns>
-        public InvokeResult TryCallMethod(string objectName, string methodName) => TryCallMethod(new InvokeMessage(objectName, methodName), out InvokeResult invokeResult)  ? invokeResult : null;
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <returns>远程实例对象的方法调用成功，返回 <see cref="InvokeResult"/> 对象，否则返回 null 值 </returns>
-        public InvokeResult TryCallMethod(string objectName, string methodName, object[] parameters) => TryCallMethod(new InvokeMessage(objectName, methodName, parameters), out InvokeResult invokeResult) ? invokeResult : null;
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <param name="asynchronous">远程方法或函数是否异步执行，需要远端应用的支持</param>
-        /// <returns>远程实例对象的方法调用成功，返回 <see cref="InvokeResult"/> 对象，否则返回 null 值</returns>
-        public InvokeResult TryCallMethod(string objectName, string methodName, object[] parameters, bool asynchronous) => TryCallMethod(new InvokeMessage(objectName, methodName, parameters, asynchronous, null), out InvokeResult invokeResult) ? invokeResult : null;
-
-
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// <para></para>
-        /// </summary>
-        /// <param name="invokeMessage"></param>
-        /// <returns>远程服务端有任何响应信息时, 异步操作返回对象 <see cref="InvokeResult"/> 不为 null </returns>
-        public Task<InvokeResult> TryCallMethodAsync(XElement invokeMessage) => Task.Run(() => TryCallMethod(invokeMessage, out InvokeResult invokeResult) ? invokeResult : null);
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="invokeMessage"></param>
-        /// <returns>远程服务端有任何响应信息时, 异步操作返回对象 <see cref="InvokeResult"/> 不为 null </returns>
-        public Task<InvokeResult> TryCallMethodAsync(InvokeMessage invokeMessage) => Task.Run(() => TryCallMethod(invokeMessage, out InvokeResult invokeResult) ? invokeResult : null);
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <returns>远程服务端有任何响应信息时, 异步操作返回对象 <see cref="InvokeResult"/> 不为 null </returns>
-        public Task<InvokeResult> TryCallMethodAsync(string objectName, string methodName) => Task.Run(() => TryCallMethod(objectName, methodName, out InvokeResult invokeResult) ? invokeResult : null);
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <returns>远程服务端有任何响应信息时, 异步操作返回对象 <see cref="InvokeResult"/> 不为 null </returns>
-        public Task<InvokeResult> TryCallMethodAsync(string objectName, string methodName, object[] parameters) => Task.Run(() => TryCallMethod(objectName, methodName, parameters, out InvokeResult invokeResult) ? invokeResult : null);
-        /// <summary>
-        /// 调用远程实例对象的方法
-        /// </summary>
-        /// <param name="objectName"></param>
-        /// <param name="methodName"></param>
-        /// <param name="parameters"></param>
-        /// <param name="asynchronous">远程方法或函数是否异步执行，需要远端应用的支持</param>
-        /// <returns>远程服务端有任何响应信息时, 异步操作返回对象 <see cref="InvokeResult"/> 不为 null</returns>
-        public Task<InvokeResult> TryCallMethodAsync(string objectName, string methodName, object[] parameters, bool asynchronous) => Task.Run(() => TryCallMethod(objectName, methodName, parameters, asynchronous, out InvokeResult invokeResult) ? invokeResult : null);
-
-
-        /// <summary>
-        /// 调用远程多个实例对象的方法
-        /// </summary>
-        /// <param name="invokeMessages"></param>
-        /// <param name="invokeResults"></param>
-        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="ArgumentException"></exception>
-        public bool TryCallMethods(XElement invokeMessages, out IEnumerable<InvokeResult> invokeResults)
-        {
-            if (invokeMessages == null)
-                throw new ArgumentNullException(nameof(invokeMessages), "参数不能为空");
-            if (!InvokeMessage.IsValid(invokeMessages))
-                throw new ArgumentException(nameof(invokeMessages), $"{nameof(invokeMessages)} 调用消息不符合协议要求");
-
-            invokeResults = null;
-            if (!ReadWriteMessage(invokeMessages.ToString(), out string responseMessage))
-            {
-                return false;
-            }
-
-            XElement elements = null;
-            try
-            {
-                elements = XElement.Parse(responseMessage);
-                if (!InvokeResult.IsValid(elements)) throw new FormatException("响应消息不符合协议要求");
-            }
-            catch (Exception ex)
-            {
-                invokeResults = Enumerable.Empty<InvokeResult>();
-                Logger.Info($"RPC Server Invoke Result: {responseMessage}");
-                Logger.Error($"RPC Server Invoke Result Format Exception: {ex}");
-                return true;
-            }
-
-            var xResults = elements.Elements(nameof(InvokeResult));
-            InvokeResult[] iResults = new InvokeResult[xResults.Count()];
-            for (int i = 0; i < xResults.Count(); i++)
-            {
-                iResults[i] = new InvokeResult(xResults.ElementAt(i));
-            }
-
-            invokeResults = iResults;
-            return true;
-        }
-        /// <summary>
-        /// 调用远程多个实例对象的方法
-        /// </summary>
-        /// <param name="invokeMessages"></param>
-        /// <param name="invokeResults"></param>
-        /// <returns>远程服务端有任何响应信息时, 都会返回 true, 否则返回 false</returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        public bool TryCallMethods(IEnumerable<InvokeMessage> invokeMessages, out IEnumerable<InvokeResult> invokeResults)
-        {
-            if (invokeMessages?.Count() == 0)
-                throw new ArgumentNullException(nameof(invokeMessages), "参数不能为空");
-
-            return TryCallMethods(XElement.Parse(InvokeMessage.ToFormatString(invokeMessages, MessageFormatType.XML)), out invokeResults);
-        }
-        /// <summary>
-        /// 调用远程多个实例对象的方法
-        /// </summary>
-        /// <param name="invokeMessages"></param>
-        /// <returns>远程实例对象的方法调用成功，返回 <see cref="InvokeResult"/> 对象的集合，否则返回空集合 </returns>
-        public IEnumerable<InvokeResult> TryCallMethods(XElement invokeMessages) => TryCallMethods(invokeMessages, out IEnumerable<InvokeResult> invokeResults) ? invokeResults : Enumerable.Empty<InvokeResult>();
-        /// <summary>
-        /// 调用远程多个实例对象的方法
-        /// </summary>
-        /// <param name="invokeMessages"></param>
-        /// <returns>远程实例对象的方法调用成功，返回 <see cref="InvokeResult"/> 对象的集合，否则返回空集合 </returns>
-        public IEnumerable<InvokeResult> TryCallMethods(IEnumerable<InvokeMessage> invokeMessages) => TryCallMethods(invokeMessages, out IEnumerable<InvokeResult> invokeResults) ? invokeResults : Enumerable.Empty<InvokeResult>();
-        /// <summary>
-        /// 调用远程多个实例对象的方法
-        /// </summary>
-        /// <param name="invokeMessages"></param>
-        /// <returns>远程实例对象的方法调用成功，返回 <see cref="InvokeResult"/> 对象的集合，否则返回空集合</returns>
-        public Task<IEnumerable<InvokeResult>> TryCallMethodsAsync(XElement invokeMessages) => Task.Run(() => TryCallMethods(invokeMessages));
-        /// <summary>
-        /// 调用远程多个实例对象的方法
-        /// </summary>
-        /// <param name="invokeMessages"></param>
-        /// <returns>远程实例对象的方法调用成功，返回 <see cref="InvokeResult"/> 对象的集合，否则返回空集合</returns>
-        public Task<IEnumerable<InvokeResult>> TryCallMethodsAsync(IEnumerable<InvokeMessage> invokeMessages) => Task.Run(() => TryCallMethods(invokeMessages));
-
-
-#if false
-        public bool TryCallMethod(System.Text.Json.JsonDocument invokeMessage, out InvokeResult invokeResult) { }
-        public InvokeResult TryCallMethod(System.Text.Json.JsonDocument invokeMessage) { }
-        public Task<InvokeResult> TryCallMethodAsync(System.Text.Json.JsonDocument invokeMessage) { }
-
-        public bool TryCallMethods(System.Text.Json.JsonDocument invokeMessages, out IEnumerable<InvokeResult> invokeResults) { }
-        public IEnumerable<InvokeResult> TryCallMethods(System.Text.Json.JsonDocument invokeMessages) { }
-        public Task<IEnumerable<InvokeResult>> TryCallMethodsAsync(System.Text.Json.JsonDocument invokeMessages) { }
-#endif
     }
 }

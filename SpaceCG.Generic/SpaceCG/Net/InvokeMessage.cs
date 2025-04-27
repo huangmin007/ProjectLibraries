@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.Linq;
@@ -14,7 +16,7 @@ namespace SpaceCG.Net
     /// <summary>
     /// 调用消息
     /// </summary>
-    public sealed class InvokeMessage2
+    public sealed class InvokeMessage
     {
         internal static readonly string XType = nameof(Type);
         internal static readonly string XParameter = "Parameter";
@@ -45,7 +47,7 @@ namespace SpaceCG.Net
         /// </summary>
         public bool Asynchronous { get; private set; } = false;
 
-        internal InvokeMessage2()
+        internal InvokeMessage()
         {
         }
 
@@ -55,7 +57,7 @@ namespace SpaceCG.Net
         /// <param name="objectName"></param>
         /// <param name="methodName"></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public InvokeMessage2(string objectName, string methodName)
+        public InvokeMessage(string objectName, string methodName)
         {
             if (string.IsNullOrWhiteSpace(objectName) || string.IsNullOrWhiteSpace(methodName))
                 throw new ArgumentNullException("参数不能为空");
@@ -72,7 +74,7 @@ namespace SpaceCG.Net
         /// <param name="methodName"></param>
         /// <param name="parameters"></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public InvokeMessage2(string objectName, string methodName, params object[] parameters):this(objectName, methodName)
+        public InvokeMessage(string objectName, string methodName, params object[] parameters):this(objectName, methodName)
         {
             this.Parameters = parameters;
         }
@@ -84,19 +86,19 @@ namespace SpaceCG.Net
         /// <param name="asynchronous"></param>
         /// <param name="parameters"></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public InvokeMessage2(string objectName, string methodName, bool asynchronous, params object[] parameters):this(objectName, methodName, parameters)
+        public InvokeMessage(string objectName, string methodName, bool asynchronous, params object[] parameters):this(objectName, methodName, parameters)
         {
             this.Asynchronous = asynchronous;
         }
 
         /// <summary>
-        /// 试图解析 <see cref="XElement"/> 元素为 <see cref="InvokeMessage2"/> 对象
+        /// 试图解析 <see cref="XElement"/> 元素为 <see cref="InvokeMessage"/> 对象
         /// </summary>
         /// <param name="element"></param>
         /// <param name="invokeMessage"></param>
         /// <param name="exceptionMessage"></param>
         /// <returns></returns>
-        public static bool TryParse(XElement element, out InvokeMessage2 invokeMessage, out string exceptionMessage)
+        public static bool TryParse(XElement element, out InvokeMessage invokeMessage, out string exceptionMessage)
         {
             invokeMessage = null;
             exceptionMessage = string.Empty;
@@ -107,7 +109,7 @@ namespace SpaceCG.Net
                 return false;
             }
 
-            if (element.Name.LocalName == "InvokeMessage")
+            if (element.Name.LocalName == nameof(InvokeMessage))
             {
                 var objectName = element.Attribute(nameof(ObjectName))?.Value;
                 var methodName = element.Attribute(nameof(MethodName))?.Value;
@@ -119,7 +121,7 @@ namespace SpaceCG.Net
                     return false;
                 }
                 
-                invokeMessage = new InvokeMessage2()
+                invokeMessage = new InvokeMessage()
                 {
                     ObjectName = objectName,
                     MethodName = methodName,
@@ -173,7 +175,7 @@ namespace SpaceCG.Net
 
                 return true;
             }
-            else if (element.Name.LocalName == "InvokeMessages")
+            else if (element.Name.LocalName == $"{nameof(InvokeMessage)}s")
             {
 
             }
@@ -184,6 +186,71 @@ namespace SpaceCG.Net
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// 将当前对象转换为 XML 格式字符串
+        /// </summary>
+        /// <returns></returns>
+        public string ToXMLString()
+        {
+            StringBuilder builder = new StringBuilder(RPCServer.BUFFER_SIZE);
+            builder.Append($"<{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\" {nameof(MethodName)}=\"{MethodName}\" ");
+            if (Asynchronous) builder.Append($"{nameof(Asynchronous)}=\"{Asynchronous}\" ");
+            if (!string.IsNullOrWhiteSpace(Comment)) builder.Append($"{nameof(Comment)}=\"{Comment}\" ");
+
+            if (Parameters?.Length > 0)
+            {
+                builder.AppendLine(">");
+
+                Type stringType = typeof(string);
+                foreach (var param in Parameters)
+                {
+                    builder.Append("\t");
+                    if (param == null)
+                    {
+                        builder.AppendLine($"<{XParameter} />");
+                        continue;
+                    }
+
+                    Type paramType = param.GetType();
+                    if (paramType == stringType)
+                    {
+                        builder.AppendLine($"<{XParameter} {XType}=\"{paramType.FullName}\"><![CDATA[{param}]]></{XParameter}>");
+                        continue;
+                    }
+
+                    string paramString = param.ToString();
+                    try
+                    {
+                        TypeConverter converter = TypeDescriptor.GetConverter(paramType);
+                        if (converter.CanConvertTo(paramType)) paramString = converter.ConvertToString(param);
+                    }
+                    catch (Exception ex)
+                    {
+                        paramString = param.ToString();
+                        Trace.TraceWarning($"{nameof(InvokeMessage)} TypeConverter.ConvertToString Exception: {ex}");                        
+                    }
+                    builder.AppendLine($"<{XParameter} {XType}=\"{paramType.FullName}\"><![CDATA[{paramString}]]></{XParameter}>");
+                }
+
+                builder.Append($"</{nameof(InvokeMessage)}>");
+            }
+            else
+            {
+                builder.Append("/>");
+            }
+
+            return builder.ToString();
+        }
+
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            if (Asynchronous)
+                return $"[{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\", {nameof(MethodName)}=\"{MethodName}\", {nameof(Asynchronous)}=\"{Asynchronous}\"]";
+            else
+                return $"[{nameof(InvokeMessage)} {nameof(ObjectName)}=\"{ObjectName}\", {nameof(MethodName)}=\"{MethodName}\"]";
         }
     }
 }
